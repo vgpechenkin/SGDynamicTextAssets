@@ -19,7 +19,13 @@
 
 USGDynamicTextAssetRegistry* USGDynamicTextAssetRegistry::Get()
 {
-    return GEngine ? GEngine->GetEngineSubsystem<USGDynamicTextAssetRegistry>() : nullptr;
+    if (!GEngine)
+    {
+        // This should never happen unless your loading/starting your modules incorrectly
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetRegistry::Get: Engine is not valid! Double check your not doing something you shouldn't!"));
+        return nullptr;
+    }
+    return GEngine->GetEngineSubsystem<USGDynamicTextAssetRegistry>();
 }
 
 USGDynamicTextAssetRegistry& USGDynamicTextAssetRegistry::GetChecked()
