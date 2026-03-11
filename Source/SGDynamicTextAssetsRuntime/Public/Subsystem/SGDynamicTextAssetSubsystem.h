@@ -17,6 +17,55 @@ class FJsonObject;
 class USGDynamicTextAsset;
 
 /**
+ * Wrapper for a set of tracked UClass references used by instanced sub-objects.
+ * Needed because UPROPERTY does not support nested containers
+ * (e.g., TMap<Id, TSet<UClass*>>).
+ */
+USTRUCT()
+struct FSGTrackedInstancedClasses
+{
+    GENERATED_BODY()
+public:
+
+    /** Set of UClass references used by instanced sub-objects of a single DTA. */
+    UPROPERTY(Transient)
+    TSet<TObjectPtr<UClass>> Classes;
+};
+
+/**
+ * Context passed when instanced object classes drop to zero references
+ * after a DTA is removed from cache. External systems can use this to
+ * trigger GC, log diagnostics, or pre-load replacements.
+ */
+USTRUCT(BlueprintType)
+struct FSGInstancedClassReleaseContext
+{
+    GENERATED_BODY()
+public:
+
+    /** The DTA Id whose removal caused these classes to become unreferenced. */
+    UPROPERTY(BlueprintReadOnly, Category = "Dynamic Text Asset")
+    FSGDynamicTextAssetId RemovedAssetId;
+
+    /** Classes that dropped to zero references after this removal. */
+    UPROPERTY(BlueprintReadOnly, Category = "Dynamic Text Asset")
+    TArray<TObjectPtr<UClass>> ReleasedClasses;
+
+    /** Number of unique classes still tracked after this removal. */
+    UPROPERTY(BlueprintReadOnly, Category = "Dynamic Text Asset")
+    int32 RemainingTrackedClassCount = 0;
+};
+
+/**
+ * Broadcast when one or more instanced object classes drop to zero
+ * references after a DTA is removed from cache via RemoveFromCache.
+ * Not broadcast during ClearCache (bulk/shutdown operation).
+ */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+    FOnInstancedClassesReleased,
+    const FSGInstancedClassReleaseContext&, Context);
+
+/**
  * Game Instance Subsystem for loading and caching dynamic text assets at runtime.
  *
  * This subsystem manages the lifecycle of dynamic text assets, providing:
@@ -221,9 +270,48 @@ public:
      */
     void FetchAndApplyServerTypeOverrides(FOnServerTypeOverridesComplete OnComplete = FOnServerTypeOverridesComplete());
 
-    /** Broadcast when a dynamic text asset provider is added to cache */
+    /**
+     * Returns the total number of unique instanced object UClass references
+     * currently tracked across all cached DTAs.
+     */
+    UFUNCTION(BlueprintPure, Category = "Dynamic Text Asset|Diagnostics")
+    int32 GetTrackedInstancedClassCount() const;
+
+    /**
+     * Returns the deduplicated set of all instanced object UClass references
+     * currently tracked across all cached DTAs.
+     * Useful for diagnostics and verifying that GC is correctly retaining
+     * classes used by instanced sub-objects.
+     *
+     * @return Set of unique UClass pointers from all tracked DTAs
+     */
+    UFUNCTION(BlueprintPure, Category = "Dynamic Text Asset|Diagnostics")
+    TSet<UClass*> GetAllTrackedInstancedClasses() const;
+
+    /**
+     * Returns the tracked UClass references for a specific DTA by Id.
+     * Returns an empty array if the Id is not tracked.
+     *
+     * @param Id The unique identifier of the DTA
+     * @return Array of UClass pointers tracked for this DTA
+     */
+    UFUNCTION(BlueprintPure, Category = "Dynamic Text Asset|Diagnostics")
+    TArray<UClass*> GetTrackedInstancedClassesForId(const FSGDynamicTextAssetId& Id) const;
+
+    /** Broadcast when a dynamic text asset provider is added to cache. */
     UPROPERTY(BlueprintAssignable, Category = "Dynamic Text Asset|Events")
     FOnDynamicTextAssetProvider_Dynamic_Multi OnDynamicTextAssetCached;
+
+    /**
+     * Broadcast when instanced object classes drop to zero references
+     * after a DTA is removed via RemoveFromCache. The subsystem removes
+     * its UPROPERTY tracking (making classes GC-eligible) but never
+     * force-unloads packages. External systems can listen to this
+     * delegate to trigger GC, log, or take other cleanup actions.
+     * Not broadcast during ClearCache (bulk/shutdown operation).
+     */
+    UPROPERTY(BlueprintAssignable, Category = "Dynamic Text Asset|Events")
+    FOnInstancedClassesReleased OnInstancedClassesReleased;
 
 protected:
 
@@ -251,6 +339,33 @@ protected:
     TObjectPtr<USGDynamicTextAssetServerInterface> ServerInterface = nullptr;
 
 private:
+
+    /**
+     * Scans a provider's UObject for instanced sub-object classes and adds
+     * them to the tracking map under the given Id.
+     *
+     * @param Id The DTA identifier to track under
+     * @param ProviderObject The UObject to scan for instanced sub-objects
+     */
+    void TrackInstancedClassesForProvider(const FSGDynamicTextAssetId& Id, const UObject* ProviderObject);
+
+    /**
+     * Per-DTA tracking of UClass references used by instanced sub-objects.
+     * Acts as a GC safety net: holding a UPROPERTY reference to each UClass
+     * ensures GC will not collect a class while any cached DTA uses it.
+     * Populated after deserialization, cleaned up on cache removal.
+     */
+    UPROPERTY(Transient)
+    TMap<FSGDynamicTextAssetId, FSGTrackedInstancedClasses> TrackedInstancedClasses;
+
+    /**
+     * Reference count per instanced object UClass across all cached DTAs.
+     * When a class's count drops to zero during RemoveFromCache, it is
+     * included in the OnInstancedClassesReleased broadcast and removed
+     * from this map, allowing GC to collect the class.
+     */
+    UPROPERTY(Transient)
+    TMap<TObjectPtr<UClass>, int32> InstancedClassRefCounts;
 
     /**
      * Constructs a TScriptInterface from a UObject that implements ISGDynamicTextAssetProvider.

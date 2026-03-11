@@ -6,8 +6,6 @@
 
 #include "Modules/ModuleManager.h"
 
-DECLARE_LOG_CATEGORY_EXTERN(LogSGDynamicTextAssetsRuntime, Log, All);
-
 /**
  * Module interface for SGDynamicTextAssetsRuntime.
  * Provides runtime loading, caching, and access to dynamic text assets.

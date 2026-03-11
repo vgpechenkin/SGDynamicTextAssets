@@ -2,7 +2,7 @@
 
 #include "Core/SGDynamicTextAsset.h"
 
-#include "SGDynamicTextAssetsRuntimeModule.h"
+#include "SGDynamicTextAssetLogs.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 
@@ -58,7 +58,23 @@ void USGDynamicTextAsset::ValidateSoftPathsInProperty(const FProperty* Property,
                     assetData = assetRegistryModule.Get().GetAssetByObjectPath(strippedPath);
                 }
             }
-            
+
+            // If still not found, check if this is a sub-object path (e.g., a level actor instance).
+            // Sub-object paths use ':' to separate the top-level asset from the sub-object within it.
+            // The Asset Registry only tracks top-level assets, so validate the parent asset instead.
+            // Examples:
+            //   /Game/Lvl_Basic.Lvl_Basic:PersistentLevel.BP_TestActor_C_2 -> validates /Game/Lvl_Basic.Lvl_Basic
+            //   /Game/SomeBP.SomeBP:MyComponent -> validates /Game/SomeBP.SomeBP
+            if (!assetData.IsValid())
+            {
+                FString subPathString = AssetPath.GetSubPathString();
+                if (!subPathString.IsEmpty())
+                {
+                    FSoftObjectPath parentPath(AssetPath.GetAssetPath(), FString());
+                    assetData = assetRegistryModule.Get().GetAssetByObjectPath(parentPath);
+                }
+            }
+
             if (!assetData.IsValid())
             {
                 OutResult.AddError(
@@ -69,6 +85,26 @@ void USGDynamicTextAsset::ValidateSoftPathsInProperty(const FProperty* Property,
             }
         }
     };
+
+    // Instanced object properties own sub-objects whose properties may contain soft paths.
+    // Walk into the sub-object and recurse on its properties.
+    if (const FObjectProperty* objectProp = CastField<FObjectProperty>(Property))
+    {
+        if (Property->HasAllPropertyFlags(CPF_InstancedReference))
+        {
+            const void* valuePtr = objectProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+            if (const UObject* subObject = objectProp->GetObjectPropertyValue(valuePtr))
+            {
+                for (TFieldIterator<FProperty> innerIt(subObject->GetClass()); innerIt; ++innerIt)
+                {
+                    const FProperty* innerProp = *innerIt;
+                    FString nestedPath = FString::Printf(TEXT("%s.%s"), *PropertyPath, *innerProp->GetName());
+                    ValidateSoftPathsInProperty(innerProp, subObject, nestedPath, OutResult);
+                }
+            }
+            return;
+        }
+    }
 
     if (const FSoftObjectProperty* softObjProp = CastField<FSoftObjectProperty>(Property))
     {

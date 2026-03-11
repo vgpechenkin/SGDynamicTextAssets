@@ -11,6 +11,7 @@
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "UObject/Package.h"
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
+#include "Serialization/SGDynamicTextAssetSerializerBase.h"
 #include "Server/SGDynamicTextAssetServerNullInterface.h"
 #include "Templates/SubclassOf.h"
 
@@ -71,6 +72,8 @@ void USGDynamicTextAssetSubsystem::ClearCache()
 {
     const int32 count = LoadedObjects.Num();
     LoadedObjects.Empty();
+    TrackedInstancedClasses.Empty();
+    InstancedClassRefCounts.Empty();
     UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("Cleared %d dynamic text assets from cache"), count);
 }
 
@@ -85,6 +88,46 @@ bool USGDynamicTextAssetSubsystem::RemoveFromCache(const FSGDynamicTextAssetId& 
     const int32 removed = LoadedObjects.Remove(Id);
     if (removed > 0)
     {
+        // Decrement ref counts and collect classes that drop to zero
+        TArray<UClass*> releasedClasses;
+        if (const FSGTrackedInstancedClasses* trackedEntry = TrackedInstancedClasses.Find(Id))
+        {
+            for (const TObjectPtr<UClass>& trackedClass : trackedEntry->Classes)
+            {
+                if (!trackedClass)
+                {
+                    continue;
+                }
+
+                if (int32* refCount = InstancedClassRefCounts.Find(trackedClass))
+                {
+                    (*refCount)--;
+                    if (*refCount <= 0)
+                    {
+                        InstancedClassRefCounts.Remove(trackedClass);
+                        releasedClasses.Add(trackedClass);
+                    }
+                }
+            }
+        }
+
+        TrackedInstancedClasses.Remove(Id);
+
+        // Broadcast if any classes were fully released
+        if (!releasedClasses.IsEmpty())
+        {
+            FSGInstancedClassReleaseContext context;
+            context.RemovedAssetId = Id;
+            context.ReleasedClasses = MoveTemp(releasedClasses);
+            context.RemainingTrackedClassCount = InstancedClassRefCounts.Num();
+
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Log,
+                TEXT("Released %d instanced object class(es) for DTA Id(%s), %d class(es) still tracked"),
+                context.ReleasedClasses.Num(), *Id.ToString(), context.RemainingTrackedClassCount);
+
+            OnInstancedClassesReleased.Broadcast(context);
+        }
+
         UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("Removed dynamic text asset from cache: Id(%s)"), *Id.ToString());
         return true;
     }
@@ -127,6 +170,10 @@ bool USGDynamicTextAssetSubsystem::AddToCache(const TScriptInterface<ISGDynamicT
     }
 
     LoadedObjects.Add(id, Provider);
+
+    // Track instanced sub-object classes as a GC safety net
+    TrackInstancedClassesForProvider(id, providerObject);
+
     UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("Added provider to cache: id(%s) Class(%s)"),
         *id.ToString(), *GetNameSafe(providerObject->GetClass()));
 
@@ -656,8 +703,7 @@ void USGDynamicTextAssetSubsystem::LoadDynamicTextAssetAsync(const FSGDynamicTex
             // Failed to find file
             AsyncTask(ENamedThreads::GameThread, [weakThis, Id, OnComplete]()
             {
-                USGDynamicTextAssetSubsystem* subsystem = weakThis.Get();
-                if (subsystem)
+                if (USGDynamicTextAssetSubsystem* subsystem = weakThis.Get())
                 {
                     subsystem->PendingAsyncLoads.Decrement(); // Manually decrement since we aren't calling Internal_...
                     UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("Async load failed: Could not find file for Id(%s)"), *Id.ToString());
@@ -812,4 +858,78 @@ void USGDynamicTextAssetSubsystem::FetchAndApplyServerTypeOverrides(FOnServerTyp
                 OnComplete.ExecuteIfBound(bSuccess, OverrideData);
             }));
 #endif
+}
+
+void USGDynamicTextAssetSubsystem::TrackInstancedClassesForProvider(
+    const FSGDynamicTextAssetId& Id,
+    const UObject* ProviderObject)
+{
+    if (!ProviderObject || !Id.IsValid())
+    {
+        return;
+    }
+
+    FSGTrackedInstancedClasses& entry = TrackedInstancedClasses.FindOrAdd(Id);
+    FSGDynamicTextAssetSerializerBase::CollectInstancedObjectClasses(ProviderObject, entry.Classes);
+
+    // Increment ref counts for each tracked class
+    for (const TObjectPtr<UClass>& trackedClass : entry.Classes)
+    {
+        if (trackedClass)
+        {
+            int32& refCount = InstancedClassRefCounts.FindOrAdd(trackedClass, 0);
+            refCount++;
+        }
+    }
+
+    if (!entry.Classes.IsEmpty())
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
+            TEXT("Tracked %d instanced object class(es) for DTA Id(%s)"),
+            entry.Classes.Num(), *Id.ToString());
+    }
+}
+
+int32 USGDynamicTextAssetSubsystem::GetTrackedInstancedClassCount() const
+{
+    int32 total = 0;
+    for (const TPair<FSGDynamicTextAssetId, FSGTrackedInstancedClasses>& pair : TrackedInstancedClasses)
+    {
+        total += pair.Value.Classes.Num();
+    }
+    return total;
+}
+
+TSet<UClass*> USGDynamicTextAssetSubsystem::GetAllTrackedInstancedClasses() const
+{
+    TSet<UClass*> result;
+    for (const TPair<FSGDynamicTextAssetId, FSGTrackedInstancedClasses>& pair : TrackedInstancedClasses)
+    {
+        result.Reserve(result.Num() + pair.Value.Classes.Num());
+        for (UClass* classPtr : pair.Value.Classes)
+        {
+            if (classPtr)
+            {
+                result.Add(classPtr);
+            }
+        }
+    }
+    return result;
+}
+
+TArray<UClass*> USGDynamicTextAssetSubsystem::GetTrackedInstancedClassesForId(const FSGDynamicTextAssetId& Id) const
+{
+    TArray<UClass*> result;
+    if (const FSGTrackedInstancedClasses* entry = TrackedInstancedClasses.Find(Id))
+    {
+        result.Reserve(result.Num() + entry->Classes.Num());
+        for (UClass* classPtr : entry->Classes)
+        {
+            if (classPtr)
+            {
+                result.AddUnique(classPtr);
+            }
+        }
+    }
+    return result;
 }

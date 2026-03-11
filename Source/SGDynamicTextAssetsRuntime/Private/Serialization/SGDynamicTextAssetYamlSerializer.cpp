@@ -8,9 +8,10 @@
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "Dom/JsonValue.h"
 #include "Dom/JsonObject.h"
-#include "SGDynamicTextAssetsRuntimeModule.h"
+#include "SGDynamicTextAssetLogs.h"
 #include "Statics/SGDynamicTextAssetSlateStyles.h"
 #include "UObject/TextProperty.h"
+#include "UObject/UnrealType.h"
 
 THIRD_PARTY_INCLUDES_START
 #include <fkYAML/node.hpp>
@@ -318,6 +319,101 @@ namespace FSGDynamicTextAssetYamlSerializerInternals
     }
 
     /**
+     * Converts a YAML mapping node representing an instanced sub-object to
+     * an FJsonObject suitable for DeserializeValueToInstancedObject.
+     *
+     * Reads the SG_INST_OBJ_CLASS key to resolve the UClass, then uses the
+     * resolved class's property descriptors to convert each child YAML node to
+     * the correct FJsonValue variant via YamlNodeToJsonValue. Handles nested
+     * instanced objects by recursion.
+     *
+     * @param YamlNode The YAML mapping node containing the instanced object data
+     * @return FJsonValueObject with class key and property values, or FJsonValueNull for null objects
+     */
+    TSharedPtr<FJsonValue> YamlNodeToInstancedObjectJsonValue(const fkyaml::node& YamlNode)
+    {
+        // Null node means null sub-object
+        if (YamlNode.is_null())
+        {
+            return MakeShared<FJsonValueNull>();
+        }
+
+        // Non-mapping node (e.g., empty scalar) also means null sub-object
+        if (!YamlNode.is_mapping())
+        {
+            return MakeShared<FJsonValueNull>();
+        }
+
+        // Empty mapping means null sub-object
+        if (YamlNode.empty())
+        {
+            return MakeShared<FJsonValueNull>();
+        }
+
+        // Read class name from the reserved key
+        const std::string classKey = ToStdString(FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY);
+        if (!YamlNode.contains(classKey))
+        {
+            return nullptr;
+        }
+
+        const fkyaml::node& classNode = YamlNode[classKey];
+        if (!classNode.is_string())
+        {
+            return nullptr;
+        }
+
+        const FString className = ToFString(classNode.get_value<std::string>());
+        if (className.IsEmpty())
+        {
+            return nullptr;
+        }
+
+        // Resolve class to get property type information for correct JSON variant conversion
+        UClass* resolvedClass = FindFirstObject<UClass>(*className, EFindFirstObjectOptions::ExactClass);
+        if (!resolvedClass)
+        {
+            return nullptr;
+        }
+
+        // Build JSON object with class key and typed property values
+        TSharedRef<FJsonObject> jsonObject = MakeShared<FJsonObject>();
+        jsonObject->SetStringField(FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY, className);
+
+        for (TFieldIterator<FProperty> propIt(resolvedClass); propIt; ++propIt)
+        {
+            FProperty* subProp = *propIt;
+            const std::string subPropName = ToStdString(subProp->GetName());
+            if (!YamlNode.contains(subPropName))
+            {
+                continue;
+            }
+
+            // Handle nested single instanced objects recursively
+            if (FSGDynamicTextAssetSerializerBase::IsInstancedObjectProperty(subProp))
+            {
+                if (CastField<FObjectProperty>(subProp))
+                {
+                    TSharedPtr<FJsonValue> nestedValue = YamlNodeToInstancedObjectJsonValue(YamlNode[subPropName]);
+                    if (nestedValue.IsValid())
+                    {
+                        jsonObject->SetField(subProp->GetName(), nestedValue);
+                    }
+                    continue;
+                }
+            }
+
+            TSharedPtr<FJsonValue> fieldValue = YamlNodeToJsonValue(YamlNode[subPropName], subProp);
+            if (fieldValue.IsValid())
+            {
+                jsonObject->SetField(subProp->GetName(), fieldValue);
+            }
+        }
+
+        return MakeShared<FJsonValueObject>(jsonObject);
+    }
+
+    /**
      * Parses a YAML string into a fkYAML root node.
      *
      * @param InString The YAML string to parse
@@ -463,6 +559,110 @@ bool FSGDynamicTextAssetYamlSerializer::SerializeProvider(const ISGDynamicTextAs
             }
 
             const void* valuePtr = property->ContainerPtrToValuePtr<void>(providerObject);
+
+            // Handle instanced object properties.
+            // CPF_InstancedReference is on the FObjectProperty itself (single) or on
+            // the container's inner/element/value property (TArray, TSet, TMap).
+
+            // Single instanced object
+            if (IsInstancedObjectProperty(property))
+            {
+                if (const FObjectProperty* objectProp = CastField<FObjectProperty>(property))
+                {
+                    const UObject* subObject = objectProp->GetObjectPropertyValue(valuePtr);
+                    TSharedPtr<FJsonValue> jsonValue = SerializeInstancedObjectToValue(objectProp, subObject);
+                    if (jsonValue.IsValid())
+                    {
+                        dataNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(property->GetName())] =
+                            FSGDynamicTextAssetYamlSerializerInternals::JsonValueToYamlNode(jsonValue);
+                    }
+                    continue;
+                }
+            }
+
+            // Array of instanced objects
+            if (const FArrayProperty* arrayProp = CastField<FArrayProperty>(property))
+            {
+                if (arrayProp->Inner && IsInstancedObjectProperty(arrayProp->Inner))
+                {
+                    if (const FObjectProperty* innerObjProp = CastField<FObjectProperty>(arrayProp->Inner))
+                    {
+                        FScriptArrayHelper arrayHelper(arrayProp, valuePtr);
+                        TArray<TSharedPtr<FJsonValue>> jsonArray;
+                        jsonArray.Reserve(arrayHelper.Num());
+
+                        for (int32 i = 0; i < arrayHelper.Num(); ++i)
+                        {
+                            const UObject* element = innerObjProp->GetObjectPropertyValue(arrayHelper.GetRawPtr(i));
+                            jsonArray.Add(SerializeInstancedObjectToValue(innerObjProp, element));
+                        }
+
+                        TSharedPtr<FJsonValue> arrayValue = MakeShared<FJsonValueArray>(jsonArray);
+                        dataNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(property->GetName())] =
+                            FSGDynamicTextAssetYamlSerializerInternals::JsonValueToYamlNode(arrayValue);
+                        continue;
+                    }
+                }
+            }
+
+            // TSet of instanced objects
+            if (const FSetProperty* setProp = CastField<FSetProperty>(property))
+            {
+                if (setProp->ElementProp && IsInstancedObjectProperty(setProp->ElementProp))
+                {
+                    if (const FObjectProperty* elemObjProp = CastField<FObjectProperty>(setProp->ElementProp))
+                    {
+                        FScriptSetHelper setHelper(setProp, valuePtr);
+                        TArray<TSharedPtr<FJsonValue>> jsonArray;
+                        jsonArray.Reserve(setHelper.Num());
+
+                        for (int32 i = 0; i < setHelper.GetMaxIndex(); ++i)
+                        {
+                            if (setHelper.IsValidIndex(i))
+                            {
+                                const UObject* element = elemObjProp->GetObjectPropertyValue(setHelper.GetElementPtr(i));
+                                jsonArray.Add(SerializeInstancedObjectToValue(elemObjProp, element));
+                            }
+                        }
+
+                        TSharedPtr<FJsonValue> arrayValue = MakeShared<FJsonValueArray>(jsonArray);
+                        dataNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(property->GetName())] =
+                            FSGDynamicTextAssetYamlSerializerInternals::JsonValueToYamlNode(arrayValue);
+                        continue;
+                    }
+                }
+            }
+
+            // TMap with instanced object values
+            if (const FMapProperty* mapProp = CastField<FMapProperty>(property))
+            {
+                if (mapProp->ValueProp && IsInstancedObjectProperty(mapProp->ValueProp))
+                {
+                    if (const FObjectProperty* valueObjProp = CastField<FObjectProperty>(mapProp->ValueProp))
+                    {
+                        FScriptMapHelper mapHelper(mapProp, valuePtr);
+                        TSharedRef<FJsonObject> mapObject = MakeShared<FJsonObject>();
+
+                        for (int32 i = 0; i < mapHelper.Num(); ++i)
+                        {
+                            if (mapHelper.IsValidIndex(i))
+                            {
+                                FString keyString;
+                                mapProp->KeyProp->ExportTextItem_Direct(keyString, mapHelper.GetKeyPtr(i), nullptr, nullptr, PPF_None);
+
+                                const UObject* valueObj = valueObjProp->GetObjectPropertyValue(mapHelper.GetValuePtr(i));
+                                mapObject->SetField(keyString, SerializeInstancedObjectToValue(valueObjProp, valueObj));
+                            }
+                        }
+
+                        TSharedPtr<FJsonValue> mapValue = MakeShared<FJsonValueObject>(mapObject);
+                        dataNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(property->GetName())] =
+                            FSGDynamicTextAssetYamlSerializerInternals::JsonValueToYamlNode(mapValue);
+                        continue;
+                    }
+                }
+            }
+
             TSharedPtr<FJsonValue> jsonValue = SerializePropertyToValue(property, valuePtr);
 
             if (jsonValue.IsValid())
@@ -680,10 +880,133 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
             continue;
         }
 
+        void* valuePtr = property->ContainerPtrToValuePtr<void>(providerObject);
+
+        // Handle instanced object properties.
+        // CPF_InstancedReference is on the FObjectProperty itself (single) or on
+        // the container's inner/element/value property (TArray, TSet, TMap).
+
+        // Single instanced object
+        if (IsInstancedObjectProperty(property))
+        {
+            if (const FObjectProperty* objectProp = CastField<FObjectProperty>(property))
+            {
+                TSharedPtr<FJsonValue> jsonValue = FSGDynamicTextAssetYamlSerializerInternals::YamlNodeToInstancedObjectJsonValue(dataNode[propName]);
+                if (!DeserializeValueToInstancedObject(jsonValue, objectProp, valuePtr, providerObject))
+                {
+                    UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                        TEXT("FSGDynamicTextAssetYamlSerializer: Failed to deserialize instanced property(%s) on OutProvider(%s)"),
+                        *property->GetName(), *GetNameSafe(providerObject));
+                }
+                continue;
+            }
+        }
+
+        // Array of instanced objects
+        if (const FArrayProperty* arrayProp = CastField<FArrayProperty>(property))
+        {
+            if (arrayProp->Inner && IsInstancedObjectProperty(arrayProp->Inner))
+            {
+                if (const FObjectProperty* innerObjProp = CastField<FObjectProperty>(arrayProp->Inner))
+                {
+                    const fkyaml::node& arrayNode = dataNode[propName];
+                    FScriptArrayHelper arrayHelper(arrayProp, valuePtr);
+
+                    if (arrayNode.is_sequence())
+                    {
+                        const auto& seq = arrayNode.as_seq();
+                        arrayHelper.Resize(static_cast<int32>(seq.size()));
+
+                        for (int32 i = 0; i < static_cast<int32>(seq.size()); ++i)
+                        {
+                            TSharedPtr<FJsonValue> elemValue = FSGDynamicTextAssetYamlSerializerInternals::YamlNodeToInstancedObjectJsonValue(seq[i]);
+                            if (!DeserializeValueToInstancedObject(elemValue, innerObjProp, arrayHelper.GetRawPtr(i), providerObject))
+                            {
+                                UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                                    TEXT("FSGDynamicTextAssetYamlSerializer: Failed to deserialize instanced array element [%d] of property(%s) on OutProvider(%s)"),
+                                    i, *property->GetName(), *GetNameSafe(providerObject));
+                            }
+                        }
+                    }
+                    continue;
+                }
+            }
+        }
+
+        // TSet of instanced objects
+        if (const FSetProperty* setProp = CastField<FSetProperty>(property))
+        {
+            if (setProp->ElementProp && IsInstancedObjectProperty(setProp->ElementProp))
+            {
+                if (const FObjectProperty* elemObjProp = CastField<FObjectProperty>(setProp->ElementProp))
+                {
+                    const fkyaml::node& setNode = dataNode[propName];
+                    FScriptSetHelper setHelper(setProp, valuePtr);
+                    setHelper.EmptyElements();
+
+                    if (setNode.is_sequence())
+                    {
+                        const auto& seq = setNode.as_seq();
+                        for (int32 i = 0; i < static_cast<int32>(seq.size()); ++i)
+                        {
+                            const int32 newIndex = setHelper.AddDefaultValue_Invalid_NeedsRehash();
+                            TSharedPtr<FJsonValue> elemValue = FSGDynamicTextAssetYamlSerializerInternals::YamlNodeToInstancedObjectJsonValue(seq[i]);
+                            if (!DeserializeValueToInstancedObject(elemValue, elemObjProp, setHelper.GetElementPtr(newIndex), providerObject))
+                            {
+                                UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                                    TEXT("FSGDynamicTextAssetYamlSerializer: Failed to deserialize instanced set element [%d] of property(%s) on OutProvider(%s)"),
+                                    i, *property->GetName(), *GetNameSafe(providerObject));
+                            }
+                        }
+                    }
+
+                    setHelper.Rehash();
+                    continue;
+                }
+            }
+        }
+
+        // TMap with instanced object values
+        if (const FMapProperty* mapProp = CastField<FMapProperty>(property))
+        {
+            if (mapProp->ValueProp && IsInstancedObjectProperty(mapProp->ValueProp))
+            {
+                if (const FObjectProperty* valueObjProp = CastField<FObjectProperty>(mapProp->ValueProp))
+                {
+                    const fkyaml::node& mapNode = dataNode[propName];
+                    FScriptMapHelper mapHelper(mapProp, valuePtr);
+                    mapHelper.EmptyValues();
+
+                    if (mapNode.is_mapping())
+                    {
+                        for (auto& pair : mapNode.map_items())
+                        {
+                            const int32 newIndex = mapHelper.AddDefaultValue_Invalid_NeedsRehash();
+                            const FString keyStr = FSGDynamicTextAssetYamlSerializerInternals::ToFString(pair.key().get_value<std::string>());
+
+                            uint8* keyPtr = mapHelper.GetKeyPtr(newIndex);
+                            mapProp->KeyProp->ImportText_Direct(*keyStr, keyPtr, nullptr, PPF_None);
+
+                            uint8* valPtr = mapHelper.GetValuePtr(newIndex);
+                            TSharedPtr<FJsonValue> elemValue = FSGDynamicTextAssetYamlSerializerInternals::YamlNodeToInstancedObjectJsonValue(pair.value());
+                            if (!DeserializeValueToInstancedObject(elemValue, valueObjProp, valPtr, providerObject))
+                            {
+                                UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                                    TEXT("FSGDynamicTextAssetYamlSerializer: Failed to deserialize instanced map value for key '%s' of property(%s)"),
+                                    *keyStr, *property->GetName());
+                            }
+                        }
+                    }
+
+                    mapHelper.Rehash();
+                    continue;
+                }
+            }
+        }
+
         TSharedPtr<FJsonValue> jsonValue = FSGDynamicTextAssetYamlSerializerInternals::YamlNodeToJsonValue(dataNode[propName], property);
         if (jsonValue.IsValid())
         {
-            void* valuePtr = property->ContainerPtrToValuePtr<void>(providerObject);
             if (!DeserializeValueToProperty(jsonValue, property, valuePtr))
             {
                 UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("FSGDynamicTextAssetYamlSerializer: Failed to deserialize property(%s) on OutProvider(%s)"),

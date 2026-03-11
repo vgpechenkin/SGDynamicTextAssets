@@ -2,7 +2,7 @@
 
 #include "Management/SGDynamicTextAssetCookManifestStringTable.h"
 
-#include "SGDynamicTextAssetsRuntimeModule.h"
+#include "SGDynamicTextAssetLogs.h"
 
 uint32 FSGDynamicTextAssetCookManifestStringTable::AddString(const FString& InString)
 {

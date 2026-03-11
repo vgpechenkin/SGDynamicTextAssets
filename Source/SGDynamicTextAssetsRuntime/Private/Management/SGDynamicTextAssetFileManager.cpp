@@ -197,10 +197,10 @@ void FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles(TArray<FString
     TArray<FString> extensions;
     GetAllRegisteredExtensions(extensions);
 
-    UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("FindAllDynamicTextAssetFiles: Scanning RootPath(%s) with %d registered extension(s)"), *rootPath, extensions.Num());
+    UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose, TEXT("FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles: Scanning RootPath(%s) with %d registered extension(s)"), *rootPath, extensions.Num());
     for (const FString& ext : extensions)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("  Registered extension: %s"), *ext);
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose, TEXT("  Registered extension: %s"), *ext);
     }
 
     for (const FString& ext : extensions)
@@ -214,7 +214,7 @@ void FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles(TArray<FString
     fileManager.FindFilesRecursive(binaryFiles, *rootPath, *(TEXT("*") + BINARY_EXTENSION), true, false);
     OutFilePaths.Append(binaryFiles);
 
-    UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("FindAllDynamicTextAssetFiles: Found %d total file(s)"), OutFilePaths.Num());
+    UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose, TEXT("FindAllDynamicTextAssetFiles: Found %d total file(s)"), OutFilePaths.Num());
 }
 
 FString FSGDynamicTextAssetFileManager::ExtractUserFacingIdFromPath(const FString& FilePath)

@@ -128,6 +128,64 @@ If `SGDynamicTextAssetsCooked` is missing from the staging list:
 
 If the directory is registered but files are still missing from the packaged build, confirm that the cook delegate or commandlet ran successfully by checking the Output Log for `LogSGDynamicTextAssetsEditor` messages during the cook.
 
+## Soft Reference Cook Inclusion
+
+### Problem
+
+Dynamic Text Assets are external JSON files — they are not UAssets in the Unreal asset registry. When a DTA has a `TSoftObjectPtr` or `TSoftClassPtr` property referencing a regular Unreal asset (mesh, material, texture, blueprint, etc.), the cooker cannot follow that reference the way it does for normal UObjects. If nothing else in the project hard-references that asset, the cooker excludes it from the packaged build. At runtime, the soft reference resolves to `nullptr`.
+
+### Solution
+
+The plugin subscribes to `UE::Cook::FDelegates::ModifyCook`, a multicast delegate that fires during `CollectFilesToCook`. This allows the plugin to declare additional packages the cooker should include.
+
+**Flow:**
+
+1. Cook starts → `CollectFilesToCook` → `ModifyCook` fires
+2. Plugin callback calls `FSGDynamicTextAssetCookUtils::GatherSoftReferencesFromAllFiles()`
+3. For each DTA file on disk:
+   - Deserialize into a transient UObject using the existing serializer pipeline
+   - Recursively walk all UProperties to find soft reference values
+   - Collect the package name from each valid soft reference path
+4. For each unique package name, add a `FPackageCookRule` with `EPackageCookRule::AddToCook`
+5. The cooker now includes those packages in the build
+
+### What Gets Gathered
+
+The property walker finds soft references in:
+
+- `TSoftObjectPtr<T>` / `FSoftObjectPath` properties
+- `TSoftClassPtr<T>` / `FSoftClassPath` properties
+- Nested inside `USTRUCT` properties (recursive)
+- Elements of `TArray` properties
+- Keys and values of `TMap` properties
+
+### What Gets Skipped
+
+- Empty/invalid soft reference paths
+- `/Script/` paths (native C++ classes are always available at runtime)
+- Duplicate package names (deduplicated via `TSet<FName>`)
+
+### Troubleshooting
+
+**Check cook log for added packages:**
+
+Look for the `SGDynamicTextAssets` instigator in the Output Log during a cook:
+
+```
+LogSGDynamicTextAssetsEditor: Added N soft-referenced packages to cook from DTA files
+```
+
+Where `N` is the number of unique packages added.
+
+**Verify a specific asset was included:**
+
+If a soft-referenced asset is still missing from a packaged build:
+
+1. Confirm the DTA file exists on disk and contains the soft reference path
+2. Check that the soft reference path is valid (e.g., `/Game/Weapons/Sword.Sword`)
+3. Verify the DTA's class is registered and can be deserialized
+4. Look for warnings in the cook log from `GatherSoftReferencesFromAllFiles`
+
 ## Source Control
 
 The `Content/SGDynamicTextAssetsCooked/` directory contains generated binary files that should NOT be committed to source control. These are build artifacts regenerated each time you package the project.
@@ -187,13 +245,6 @@ After pak staging, the handler deletes:
 |---------|----------|---------|-------------|
 | `CustomDeployment` | `DefaultEngine.ini` under platform target settings | - | Set to `SGDynamicTextAssetsCleanup` to activate the handler |
 | `bDeleteCookedAssetsAfterPackaging` | `DefaultGame.ini` under `[SGDynamicTextAssets]` | `true` | Set to `false` to disable cleanup |
-
-Here is an example of what you would add into `DefaultEngine.ini` 
-if you wanted it to automatically cook out your DTA's to packaged builds.
-```ini
-[/Script/WindowsTargetPlatform.WindowsTargetSettings]
-CustomDeployment=SGDynamicTextAssetsCleanup
-```
 
 ### Platform Support
 

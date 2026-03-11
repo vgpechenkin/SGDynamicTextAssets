@@ -14,8 +14,6 @@
 #include "Management/SGDynamicTextAssetEditorCache.h"
 #endif
 
-DEFINE_LOG_CATEGORY(LogSGDynamicTextAssetsRuntime);
-
 #define LOCTEXT_NAMESPACE "FSGDynamicTextAssetsRuntimeModule"
 
 /**

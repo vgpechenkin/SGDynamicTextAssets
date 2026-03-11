@@ -518,6 +518,24 @@ void FSGDynamicTextAssetCookUtils::GatherSoftReferencesFromProperty(const FPrope
 		return;
 	}
 
+	// Instanced object properties own sub-objects whose properties may contain soft references.
+	// Walk into the sub-object and recurse on its properties.
+	if (const FObjectProperty* objectProp = CastField<FObjectProperty>(Property))
+	{
+		if (Property->HasAllPropertyFlags(CPF_InstancedReference))
+		{
+			const void* valuePtr = objectProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+			if (const UObject* subObject = objectProp->GetObjectPropertyValue(valuePtr))
+			{
+				for (TFieldIterator<FProperty> innerIt(subObject->GetClass()); innerIt; ++innerIt)
+				{
+					GatherSoftReferencesFromProperty(*innerIt, subObject, OutPackageNames);
+				}
+			}
+			return;
+		}
+	}
+
 	if (const FSoftObjectProperty* softObjProp = CastField<FSoftObjectProperty>(Property))
 	{
 		const void* valuePtr = softObjProp->ContainerPtrToValuePtr<void>(ContainerPtr);

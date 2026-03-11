@@ -104,4 +104,143 @@ FSGDynamicTextAssetFileManager::RegisterSerializer<FSGDynamicTextAssetJsonSerial
 
 See [SerializerInterface.md](SerializerInterface.md) for the full registration pattern.
 
+## Instanced Object Serialization
+
+Properties declared with `UPROPERTY(Instanced)` are serialized inline within the `data` block. Each instanced sub-object is represented as a JSON object containing a reserved `SG_INST_OBJ_CLASS` key that stores the full class path, followed by the sub-object's own UPROPERTY fields.
+
+### Reserved Key
+
+| Key | Value | Description |
+|-----|-------|-------------|
+| `SG_INST_OBJ_CLASS` | Full class path string | Identifies the runtime UClass for deserialization |
+
+The class path is produced by `UClass::GetPathName()`:
+- **C++ classes:** `/Script/ModuleName.ClassName` (e.g., `/Script/MyGame.UFireDamageConfig`)
+- **Blueprint classes:** `/Game/Path/BP_Name.BP_Name_C` (e.g., `/Game/Configs/BP_IceDamage.BP_IceDamage_C`)
+
+Deserialization resolves the class via `LoadObject<UClass>`, which handles both formats and triggers asset loading for Blueprint classes not yet in memory.
+
+This key is defined as a static constant on `FSGDynamicTextAssetSerializerBase`:
+
+```cpp
+static const FString INSTANCED_OBJECT_CLASS_KEY; // = "SG_INST_OBJ_CLASS"
+```
+
+### Single Instanced Object
+
+A non-null instanced object is a JSON object with `SG_INST_OBJ_CLASS` plus its properties:
+
+```json
+{
+  "data": {
+    "DamageConfig": {
+      "SG_INST_OBJ_CLASS": "/Script/MyGame.UFireDamageConfig",
+      "BaseDamage": 50.0,
+      "BurnDuration": 3.0
+    }
+  }
+}
+```
+
+A null (unset) instanced object is `null`:
+
+```json
+{
+  "data": {
+    "DamageConfig": null
+  }
+}
+```
+
+### Polymorphic Instanced Objects
+
+Since `SG_INST_OBJ_CLASS` stores the actual runtime type, a property typed as a base class can hold any subclass:
+
+```json
+{
+  "data": {
+    "DamageConfig": {
+      "SG_INST_OBJ_CLASS": "/Script/MyGame.UPoisonDamageConfig",
+      "BaseDamage": 25.0,
+      "PoisonStacks": 5,
+      "TickInterval": 1.5
+    }
+  }
+}
+```
+
+Here `DamageConfig` is declared as `UPROPERTY(Instanced) UDamageConfig*` but holds a `UPoisonDamageConfig` subclass instance.
+
+### Array of Instanced Objects
+
+Arrays support mixed types and null entries:
+
+```json
+{
+  "data": {
+    "StatusEffects": [
+      {
+        "SG_INST_OBJ_CLASS": "/Script/MyGame.UBurnEffect",
+        "Duration": 5.0,
+        "DamagePerTick": 10.0
+      },
+      {
+        "SG_INST_OBJ_CLASS": "/Game/Effects/BP_FreezeEffect.BP_FreezeEffect_C",
+        "Duration": 3.0,
+        "SlowPercent": 0.5
+      },
+      null
+    ]
+  }
+}
+```
+
+### Map with Instanced Object Values
+
+Maps with instanced object values follow the standard UE JSON map format, where each value entry can be an instanced object:
+
+```json
+{
+  "data": {
+    "ElementalConfigs": {
+      "Fire": {
+        "SG_INST_OBJ_CLASS": "/Script/MyGame.UFireConfig",
+        "Intensity": 1.0
+      },
+      "Ice": {
+        "SG_INST_OBJ_CLASS": "/Script/MyGame.UIceConfig",
+        "FreezeChance": 0.3
+      }
+    }
+  }
+}
+```
+
+### Nested Instanced Objects
+
+Instanced objects can contain their own instanced sub-objects. Nesting is handled recursively:
+
+```json
+{
+  "data": {
+    "WeaponBehavior": {
+      "SG_INST_OBJ_CLASS": "/Script/MyGame.UMeleeWeaponBehavior",
+      "ComboCount": 3,
+      "HitEffect": {
+        "SG_INST_OBJ_CLASS": "/Script/MyGame.USlashEffect",
+        "ParticleScale": 1.5
+      }
+    }
+  }
+}
+```
+
+### Excluded Properties
+
+The following properties are excluded from instanced object serialization (same rules as the parent DTA):
+- Base metadata properties (`DynamicTextAssetId`, `UserFacingId`, `Version`)
+- Properties flagged as `CPF_Deprecated`
+
+The `ShouldSerializeProperty` filter on `FSGDynamicTextAssetSerializerBase` controls this behavior and can be overridden by custom serializers.
+
 [Back to Table of Contents](../TableOfContents.md)

@@ -313,6 +313,63 @@ Properties declared on the highest class in the hierarchy that implements `ISGDy
 
 `IsHardReferenceProperty()` recursively inspects container inner types. A `TArray<TObjectPtr<UStaticMesh>>` is detected as a violation even though the outer type is `TArray`, and `TMap<FName, TObjectPtr<UMaterial>>` triggers on the value type.
 
+### Instanced Object Properties
+
+`UPROPERTY(Instanced)` object properties are an allowed exception to the hard reference rule. Instanced objects are owned sub-objects serialized inline within the DTA file, not external asset references.
+
+**Conditions for Acceptance:**
+
+An instanced property passes validation only when all three conditions are met:
+
+| Condition | Check | Enforcement Layer |
+|-----------|-------|-------------------|
+| Has `CPF_InstancedReference` flag | `Property->HasAnyPropertyFlags(CPF_InstancedReference)` | Runtime + UHT |
+| Class has `EditInlineNew` | `PropertyClass->HasAnyClassFlags(CLASS_EditInlineNew)` | Runtime + UHT |
+| No nested hard references | Recursive `DetectHardReferenceProperties` on the instanced class | Runtime + UHT |
+
+If an instanced property's class does NOT have `EditInlineNew`, the UHT validator emits an error explaining the class cannot be instantiated inline and is treated as a hard reference. If the instanced class contains nested hard references (e.g., a `TObjectPtr<>` inside it), the property is rejected to prevent circumventing the soft-reference rule.
+
+**Helper Methods:**
+
+```cpp
+// Check if a property is an instanced object (CPF_InstancedReference flag)
+static bool IsInstancedObjectProperty(const FProperty* InProperty);
+
+// Resolve a UClass from a full class path string
+// Supports both C++ ("/Script/Module.ClassName") and Blueprint
+// ("/Game/Path/BP_Name.BP_Name_C") class paths
+static UClass* ResolveInstancedObjectClass(const FString& ClassIdentifier);
+
+// Recursively collect all UClass references used by instanced sub-objects
+// Scans single, TArray, TSet, and TMap instanced properties
+static void CollectInstancedObjectClasses(
+    const UObject* Object,
+    TSet<UClass*>& OutClasses);
+```
+
+These are static methods on `FSGDynamicTextAssetSerializerBase`.
+
+**Subsystem Class Tracking:**
+
+The `USGDynamicTextAssetSubsystem` tracks all `UClass` references used by instanced sub-objects across cached DTAs. This prevents garbage collection from unloading classes while any cached DTA depends on them.
+
+- `GetTrackedInstancedClassCount()` returns the total number of unique tracked classes
+- `GetAllTrackedInstancedClasses()` returns the deduplicated set of all tracked classes
+- `GetTrackedInstancedClassesForId(Id)` returns the tracked classes for a specific DTA
+
+When a DTA is removed from cache via `RemoveFromCache()`, the subsystem decrements reference counts for each instanced class. If any class drops to zero references, the subsystem broadcasts `OnInstancedClassesReleased` with an `FSGInstancedClassReleaseContext` containing:
+- The removed DTA Id
+- The list of released classes (now GC-eligible)
+- The remaining tracked class count
+
+External systems can bind to this delegate to trigger garbage collection, log diagnostics, or pre-load replacement classes as needed. The subsystem itself never force-unloads classes.
+
+**Soft Path Validation in Instanced Objects:**
+
+The `ValidateSoftPathsInProperty` walker recurses into instanced sub-objects, validating any `TSoftObjectPtr` or `TSoftClassPtr` properties found within them. This ensures soft references inside instanced sub-objects are checked during cook validation.
+
+Sub-object soft paths (e.g., references to level actors like `/Game/Lvl_Basic.Lvl_Basic:PersistentLevel.MyActor`) are validated by checking that the parent asset exists in the Asset Registry, since the Asset Registry only tracks top-level assets, not individual sub-objects within packages.
+
 See [Error Handling and Debugging](../Advanced/ErrorHandlingAndDebugging.md) for more on hard reference validation in practice.
 
 [Back to Table of Contents](../TableOfContents.md)

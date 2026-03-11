@@ -39,9 +39,8 @@ class SGDYNAMICTEXTASSETSRUNTIME_API USGDynamicTextAssetRegistry : public UEngin
     GENERATED_BODY()
 public:
 
-    /** Gets the singleton instance of the registry. */
+    /** Gets the singleton instance of the registry */
     static USGDynamicTextAssetRegistry* Get();
-    /** Version of Get() that will assert if you failed to get a valid registry. */
     static USGDynamicTextAssetRegistry& GetChecked();
 
     // USubsystem overrides

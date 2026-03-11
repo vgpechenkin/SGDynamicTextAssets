@@ -32,6 +32,15 @@ public:
 	 */
 	static bool DetectHardReferenceProperties(const UClass* InClass, TArray<FString>& OutViolations);
 
+	/**
+	 * Checks whether a property has the CPF_InstancedReference flag,
+	 * indicating it is a UPROPERTY(Instanced) sub-object owned inline.
+	 *
+	 * @param InProperty The property to check
+	 * @return True if the property has CPF_InstancedReference set
+	 */
+	static bool IsInstancedObjectProperty(const FProperty* InProperty);
+
 private:
 
 	/**

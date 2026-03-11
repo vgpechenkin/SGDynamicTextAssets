@@ -2,7 +2,7 @@
 
 #include "Core/SGDynamicTextAssetValidationUtils.h"
 
-#include "SGDynamicTextAssetsRuntimeModule.h"
+#include "SGDynamicTextAssetLogs.h"
 #include "Core/ISGDynamicTextAssetProvider.h"
 #include "Core/SGDynamicTextAssetRef.h"
 
@@ -100,7 +100,46 @@ bool FSGDynamicTextAssetValidationUtils::IsHardReferenceProperty(const FProperty
 		return true;
 	}
 
-	// TObjectPtr<> or raw UObject* — hard object reference
+	// Instanced objects `UPROPERTY(Instanced)1 are owned sub-objects serialized inline,
+	// not external asset references. Allow them if they meet two conditions:
+	// 1. The referenced class has EditInlineNew (required for instanced objects)
+	// 2. The referenced class itself has no nested hard references
+	if (InProperty->HasAnyPropertyFlags(CPF_InstancedReference))
+	{
+		const FObjectProperty* objectProp = CastField<FObjectProperty>(InProperty);
+		if (objectProp && objectProp->PropertyClass)
+		{
+			// Check 1: EditInlineNew is required for instanced sub-objects
+			if (!objectProp->PropertyClass->HasAnyClassFlags(CLASS_EditInlineNew))
+			{
+				OutViolations.Add(FString::Printf(
+					TEXT("%s (Instanced UObject) class %s does not have EditInlineNew, treated as hard reference which is not permitted. Either add EditInlineNew to the class or make this a soft reference."),
+					*InProperty->GetName(),
+					*objectProp->PropertyClass->GetName()));
+				return true;
+			}
+
+			// Check 2: Recursively check the instanced class for nested hard references
+			TArray<FString> nestedViolations;
+			if (DetectHardReferenceProperties(objectProp->PropertyClass, nestedViolations))
+			{
+				for (const FString& nested : nestedViolations)
+				{
+					OutViolations.Add(FString::Printf(
+						TEXT("%s (Instanced UObject %s) nested property -> %s"),
+						*InProperty->GetName(),
+						*objectProp->PropertyClass->GetName(),
+						*nested));
+				}
+				return true;
+			}
+
+			// Both checks passed, instanced object is allowed
+			return false;
+		}
+	}
+
+	// TObjectPtr<> or raw UObject* - hard object reference
 	if (InProperty->IsA<FObjectProperty>())
 	{
 		OutViolations.Add(FString::Printf(
@@ -192,4 +231,9 @@ bool FSGDynamicTextAssetValidationUtils::IsHardReferenceProperty(const FProperty
 
 	// All other property types (int32, float, FString, FName, enums, etc.) are fine
 	return false;
+}
+
+bool FSGDynamicTextAssetValidationUtils::IsInstancedObjectProperty(const FProperty* InProperty)
+{
+	return InProperty && InProperty->HasAnyPropertyFlags(CPF_InstancedReference);
 }

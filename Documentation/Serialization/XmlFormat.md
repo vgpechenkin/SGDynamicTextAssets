@@ -144,4 +144,121 @@ FSGDynamicTextAssetFileManager::RegisterSerializer<FSGDynamicTextAssetXmlSeriali
 
 See [SerializerInterface.md](SerializerInterface.md) for the full registration pattern.
 
+## Instanced Object Serialization
+
+Properties declared with `UPROPERTY(Instanced)` are serialized inline within the `<data>` block. Each instanced sub-object is represented as an XML element containing a `<SG_INST_OBJ_CLASS>` child element that stores the full class path, followed by child elements for the sub-object's own UPROPERTY fields.
+
+### Reserved Key
+
+| Element | Value | Description |
+|---------|-------|-------------|
+| `<SG_INST_OBJ_CLASS>` | Full class path string | Identifies the runtime UClass for deserialization |
+
+The class path is produced by `UClass::GetPathName()`:
+- **C++ classes:** `/Script/ModuleName.ClassName` (e.g., `/Script/MyGame.UFireDamageConfig`)
+- **Blueprint classes:** `/Game/Path/BP_Name.BP_Name_C` (e.g., `/Game/Configs/BP_IceDamage.BP_IceDamage_C`)
+
+`SG_INST_OBJ_CLASS` is always a **child element**, not an XML attribute. The XML serializer uses the JSON-intermediate architecture (`SerializeInstancedObjectToValue` / `DeserializeValueToInstancedObject` on `FSGDynamicTextAssetSerializerBase`), with `JsonValueToXmlElement` and `XmlNodeToJsonValue` bridging between formats.
+
+### Single Instanced Object
+
+A non-null instanced object is an element containing `<SG_INST_OBJ_CLASS>` plus its properties:
+
+```xml
+<data>
+    <DamageConfig>
+        <SG_INST_OBJ_CLASS>/Script/MyGame.UFireDamageConfig</SG_INST_OBJ_CLASS>
+        <BaseDamage>50.0</BaseDamage>
+        <BurnDuration>3.0</BurnDuration>
+    </DamageConfig>
+</data>
+```
+
+A null (unset) instanced object is a self-closing tag:
+
+```xml
+<data>
+    <DamageConfig/>
+</data>
+```
+
+### Polymorphic Instanced Objects
+
+Since `<SG_INST_OBJ_CLASS>` stores the actual runtime type, a property typed as a base class can hold any subclass:
+
+```xml
+<data>
+    <DamageConfig>
+        <SG_INST_OBJ_CLASS>/Script/MyGame.UPoisonDamageConfig</SG_INST_OBJ_CLASS>
+        <BaseDamage>25.0</BaseDamage>
+        <PoisonStacks>5</PoisonStacks>
+        <TickInterval>1.5</TickInterval>
+    </DamageConfig>
+</data>
+```
+
+### Array of Instanced Objects
+
+Arrays use repeated `<Item>` child elements. Supports mixed types and null entries (self-closing `<Item/>`):
+
+```xml
+<data>
+    <StatusEffects>
+        <Item>
+            <SG_INST_OBJ_CLASS>/Script/MyGame.UBurnEffect</SG_INST_OBJ_CLASS>
+            <Duration>5.0</Duration>
+            <DamagePerTick>10.0</DamagePerTick>
+        </Item>
+        <Item>
+            <SG_INST_OBJ_CLASS>/Game/Effects/BP_FreezeEffect.BP_FreezeEffect_C</SG_INST_OBJ_CLASS>
+            <Duration>3.0</Duration>
+            <SlowPercent>0.5</SlowPercent>
+        </Item>
+        <Item/>
+    </StatusEffects>
+</data>
+```
+
+### Map with Instanced Object Values
+
+Maps use `<Item>` elements with `<Key>` and `<Value>` children, where the `<Value>` contains the instanced object:
+
+```xml
+<data>
+    <ElementalConfigs>
+        <Item>
+            <Key>Fire</Key>
+            <Value>
+                <SG_INST_OBJ_CLASS>/Script/MyGame.UFireConfig</SG_INST_OBJ_CLASS>
+                <Intensity>1.0</Intensity>
+            </Value>
+        </Item>
+        <Item>
+            <Key>Ice</Key>
+            <Value>
+                <SG_INST_OBJ_CLASS>/Script/MyGame.UIceConfig</SG_INST_OBJ_CLASS>
+                <FreezeChance>0.3</FreezeChance>
+            </Value>
+        </Item>
+    </ElementalConfigs>
+</data>
+```
+
+### Nested Instanced Objects
+
+Instanced objects can contain their own instanced sub-objects. Nesting is handled recursively:
+
+```xml
+<data>
+    <WeaponBehavior>
+        <SG_INST_OBJ_CLASS>/Script/MyGame.UMeleeWeaponBehavior</SG_INST_OBJ_CLASS>
+        <ComboCount>3</ComboCount>
+        <HitEffect>
+            <SG_INST_OBJ_CLASS>/Script/MyGame.USlashEffect</SG_INST_OBJ_CLASS>
+            <ParticleScale>1.5</ParticleScale>
+        </HitEffect>
+    </WeaponBehavior>
+</data>
+```
+
 [Back to Table of Contents](../TableOfContents.md)

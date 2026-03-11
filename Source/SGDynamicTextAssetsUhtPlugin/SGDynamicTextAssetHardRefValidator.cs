@@ -142,15 +142,47 @@ namespace SGDynamicTextAssetsUhtPlugin
 			if (property is UhtClassProperty)
 			{
 				property.LogError(
-					ErrorPrefix + $"'{context}' is TSubclassOf<> — use TSoftClassPtr<> instead.");
+					ErrorPrefix + $"'{context}' is TSubclassOf<>. Use TSoftClassPtr<> instead.");
 				return;
+			}
+
+			// ALLOWED: Instanced objects (UPROPERTY(Instanced)) are owned sub-objects
+			// serialized inline, not external asset references
+			if (property is UhtObjectProperty objectProp
+				&& (property.PropertyFlags & EPropertyFlags.InstancedReference) != 0)
+			{
+				UhtClass? instancedClass = objectProp.Class;
+				if (instancedClass != null)
+				{
+					// Check 1: EditInlineNew is required for instanced sub-objects
+					if ((instancedClass.ClassFlags & EClassFlags.EditInlineNew) == 0)
+					{
+						property.LogError(
+							ErrorPrefix + $"Instanced property '{context}' references class {instancedClass.SourceName} which does not have EditInlineNew in its UCLASS. This is treated as a hard reference.");
+						return;
+					}
+
+					// Check 2: Recursively check the instanced class for nested hard references
+					foreach (UhtType child in instancedClass.Children)
+					{
+						if (child is UhtProperty nestedProp
+							&& !nestedProp.MetaData.ContainsKey(SkipMetaKey))
+						{
+							CheckPropertyForHardRef(nestedProp,
+								$"{context} (Instanced {instancedClass.SourceName}) -> {nestedProp.SourceName}");
+						}
+					}
+
+					// Both checks passed, instanced object is allowed
+					return;
+				}
 			}
 
 			// VIOLATION: TObjectPtr<> or raw UObject*
 			if (property is UhtObjectProperty)
 			{
 				property.LogError(
-					ErrorPrefix + $"'{context}' is TObjectPtr<>/UObject* — use TSoftObjectPtr<> instead.");
+					ErrorPrefix + $"'{context}' is TObjectPtr<>/UObject*. Use TSoftObjectPtr<> instead.");
 				return;
 			}
 

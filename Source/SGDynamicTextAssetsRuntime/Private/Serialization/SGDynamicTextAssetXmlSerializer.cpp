@@ -11,6 +11,7 @@
 #include "Dom/JsonObject.h"
 #include "Statics/SGDynamicTextAssetSlateStyles.h"
 #include "UObject/TextProperty.h"
+#include "UObject/UnrealType.h"
 #include "XmlFile.h"
 #include "XmlNode.h"
 
@@ -242,6 +243,88 @@ namespace FSGDynamicTextAssetXmlSerializerInternals
         return MakeShared<FJsonValueString>(XmlUnescape(Node->GetContent()));
     }
 
+    /**
+     * Converts an XML node representing an instanced sub-object to a FJsonValue.
+     *
+     * Reads the SG_INST_OBJ_CLASS child to determine the class, then uses the
+     * resolved class's property descriptors to convert each child XML node to
+     * the correct FJsonValue variant via XmlNodeToJsonValue. Handles nested
+     * instanced objects by recursion.
+     *
+     * @param Node  The XML node containing the instanced object data
+     * @return FJsonValueObject with class key and property values, or FJsonValueNull for null objects
+     */
+    TSharedPtr<FJsonValue> XmlNodeToInstancedObjectJsonValue(const FXmlNode* Node)
+    {
+        if (!Node)
+        {
+            return MakeShared<FJsonValueNull>();
+        }
+
+        // Self-closing tag or empty node means null sub-object
+        const TArray<FXmlNode*>& children = Node->GetChildrenNodes();
+        if (children.IsEmpty() && Node->GetContent().IsEmpty())
+        {
+            return MakeShared<FJsonValueNull>();
+        }
+
+        // Read class name from the reserved key child element
+        const FXmlNode* classNode = Node->FindChildNode(FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY);
+        if (!classNode)
+        {
+            return nullptr;
+        }
+
+        const FString className = XmlUnescape(classNode->GetContent());
+        if (className.IsEmpty())
+        {
+            return nullptr;
+        }
+
+        // Resolve class to get property type information for correct JSON variant conversion
+        UClass* resolvedClass = FindFirstObject<UClass>(*className, EFindFirstObjectOptions::ExactClass);
+        if (!resolvedClass)
+        {
+            return nullptr;
+        }
+
+        // Build JSON object with class key and typed property values
+        TSharedRef<FJsonObject> jsonObject = MakeShared<FJsonObject>();
+        jsonObject->SetStringField(FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY, className);
+
+        for (TFieldIterator<FProperty> propIt(resolvedClass); propIt; ++propIt)
+        {
+            FProperty* subProp = *propIt;
+            const FXmlNode* subNode = Node->FindChildNode(subProp->GetName());
+            if (!subNode)
+            {
+                continue;
+            }
+
+            // Handle nested single instanced objects recursively
+            if (FSGDynamicTextAssetSerializerBase::IsInstancedObjectProperty(subProp))
+            {
+                if (CastField<FObjectProperty>(subProp))
+                {
+                    TSharedPtr<FJsonValue> nestedValue = XmlNodeToInstancedObjectJsonValue(subNode);
+                    if (nestedValue.IsValid())
+                    {
+                        jsonObject->SetField(subProp->GetName(), nestedValue);
+                    }
+                    continue;
+                }
+            }
+
+            TSharedPtr<FJsonValue> fieldValue = XmlNodeToJsonValue(subNode, subProp);
+            if (fieldValue.IsValid())
+            {
+                jsonObject->SetField(subProp->GetName(), fieldValue);
+            }
+        }
+
+        return MakeShared<FJsonValueObject>(jsonObject);
+    }
+
 }
 
 #if WITH_EDITOR
@@ -360,6 +443,106 @@ bool FSGDynamicTextAssetXmlSerializer::SerializeProvider(const ISGDynamicTextAss
         }
 
         const void* valuePtr = property->ContainerPtrToValuePtr<void>(providerObject);
+
+        // Handle instanced object properties.
+        // CPF_InstancedReference is on the FObjectProperty itself (single) or on
+        // the container's inner/element/value property (TArray, TSet, TMap).
+
+        // Single instanced object
+        if (IsInstancedObjectProperty(property))
+        {
+            if (const FObjectProperty* objectProp = CastField<FObjectProperty>(property))
+            {
+                const UObject* subObject = objectProp->GetObjectPropertyValue(valuePtr);
+                TSharedPtr<FJsonValue> jsonValue = SerializeInstancedObjectToValue(objectProp, subObject);
+                if (jsonValue.IsValid())
+                {
+                    FSGDynamicTextAssetXmlSerializerInternals::JsonValueToXmlElement(xml, property->GetName(), jsonValue, 2);
+                }
+                continue;
+            }
+        }
+
+        // Array of instanced objects
+        if (const FArrayProperty* arrayProp = CastField<FArrayProperty>(property))
+        {
+            if (arrayProp->Inner && IsInstancedObjectProperty(arrayProp->Inner))
+            {
+                if (const FObjectProperty* innerObjProp = CastField<FObjectProperty>(arrayProp->Inner))
+                {
+                    FScriptArrayHelper arrayHelper(arrayProp, valuePtr);
+                    TArray<TSharedPtr<FJsonValue>> jsonArray;
+                    jsonArray.Reserve(arrayHelper.Num());
+
+                    for (int32 i = 0; i < arrayHelper.Num(); ++i)
+                    {
+                        const UObject* element = innerObjProp->GetObjectPropertyValue(arrayHelper.GetRawPtr(i));
+                        jsonArray.Add(SerializeInstancedObjectToValue(innerObjProp, element));
+                    }
+
+                    TSharedPtr<FJsonValue> arrayValue = MakeShared<FJsonValueArray>(jsonArray);
+                    FSGDynamicTextAssetXmlSerializerInternals::JsonValueToXmlElement(xml, property->GetName(), arrayValue, 2);
+                    continue;
+                }
+            }
+        }
+
+        // TSet of instanced objects
+        if (const FSetProperty* setProp = CastField<FSetProperty>(property))
+        {
+            if (setProp->ElementProp && IsInstancedObjectProperty(setProp->ElementProp))
+            {
+                if (const FObjectProperty* elemObjProp = CastField<FObjectProperty>(setProp->ElementProp))
+                {
+                    FScriptSetHelper setHelper(setProp, valuePtr);
+                    TArray<TSharedPtr<FJsonValue>> jsonArray;
+                    jsonArray.Reserve(setHelper.Num());
+
+                    for (int32 i = 0; i < setHelper.GetMaxIndex(); ++i)
+                    {
+                        if (setHelper.IsValidIndex(i))
+                        {
+                            const UObject* element = elemObjProp->GetObjectPropertyValue(setHelper.GetElementPtr(i));
+                            jsonArray.Add(SerializeInstancedObjectToValue(elemObjProp, element));
+                        }
+                    }
+
+                    TSharedPtr<FJsonValue> arrayValue = MakeShared<FJsonValueArray>(jsonArray);
+                    FSGDynamicTextAssetXmlSerializerInternals::JsonValueToXmlElement(xml, property->GetName(), arrayValue, 2);
+                    continue;
+                }
+            }
+        }
+
+        // TMap with instanced object values
+        if (const FMapProperty* mapProp = CastField<FMapProperty>(property))
+        {
+            if (mapProp->ValueProp && IsInstancedObjectProperty(mapProp->ValueProp))
+            {
+                if (const FObjectProperty* valueObjProp = CastField<FObjectProperty>(mapProp->ValueProp))
+                {
+                    FScriptMapHelper mapHelper(mapProp, valuePtr);
+                    TSharedRef<FJsonObject> mapObject = MakeShared<FJsonObject>();
+
+                    for (int32 i = 0; i < mapHelper.Num(); ++i)
+                    {
+                        if (mapHelper.IsValidIndex(i))
+                        {
+                            FString keyString;
+                            mapProp->KeyProp->ExportTextItem_Direct(keyString, mapHelper.GetKeyPtr(i), nullptr, nullptr, PPF_None);
+
+                            const UObject* valueObj = valueObjProp->GetObjectPropertyValue(mapHelper.GetValuePtr(i));
+                            mapObject->SetField(keyString, SerializeInstancedObjectToValue(valueObjProp, valueObj));
+                        }
+                    }
+
+                    TSharedPtr<FJsonValue> mapValue = MakeShared<FJsonValueObject>(mapObject);
+                    FSGDynamicTextAssetXmlSerializerInternals::JsonValueToXmlElement(xml, property->GetName(), mapValue, 2);
+                    continue;
+                }
+            }
+        }
+
         TSharedPtr<FJsonValue> jsonValue = SerializePropertyToValue(property, valuePtr);
 
         if (jsonValue.IsValid())
@@ -535,10 +718,118 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
             continue;
         }
 
+        void* valuePtr = property->ContainerPtrToValuePtr<void>(providerObject);
+
+        // Handle instanced object properties.
+        // CPF_InstancedReference is on the FObjectProperty itself (single) or on
+        // the container's inner/element/value property (TArray, TSet, TMap).
+
+        // Single instanced object
+        if (IsInstancedObjectProperty(property))
+        {
+            if (const FObjectProperty* objectProp = CastField<FObjectProperty>(property))
+            {
+                TSharedPtr<FJsonValue> jsonValue = FSGDynamicTextAssetXmlSerializerInternals::XmlNodeToInstancedObjectJsonValue(propNode);
+                if (!DeserializeValueToInstancedObject(jsonValue, objectProp, valuePtr, providerObject))
+                {
+                    UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                        TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize instanced property(%s) on OutProvider(%s)"),
+                        *property->GetName(), *GetNameSafe(providerObject));
+                }
+                continue;
+            }
+        }
+
+        // Array of instanced objects
+        if (const FArrayProperty* arrayProp = CastField<FArrayProperty>(property))
+        {
+            if (arrayProp->Inner && IsInstancedObjectProperty(arrayProp->Inner))
+            {
+                if (const FObjectProperty* innerObjProp = CastField<FObjectProperty>(arrayProp->Inner))
+                {
+                    const TArray<FXmlNode*>& childNodes = propNode->GetChildrenNodes();
+                    FScriptArrayHelper arrayHelper(arrayProp, valuePtr);
+                    arrayHelper.Resize(childNodes.Num());
+
+                    for (int32 i = 0; i < childNodes.Num(); ++i)
+                    {
+                        TSharedPtr<FJsonValue> elemValue = FSGDynamicTextAssetXmlSerializerInternals::XmlNodeToInstancedObjectJsonValue(childNodes[i]);
+                        if (!DeserializeValueToInstancedObject(elemValue, innerObjProp, arrayHelper.GetRawPtr(i), providerObject))
+                        {
+                            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                                TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize instanced array element [%d] of property(%s) on OutProvider(%s)"),
+                                i, *property->GetName(), *GetNameSafe(providerObject));
+                        }
+                    }
+                    continue;
+                }
+            }
+        }
+
+        // TSet of instanced objects
+        if (const FSetProperty* setProp = CastField<FSetProperty>(property))
+        {
+            if (setProp->ElementProp && IsInstancedObjectProperty(setProp->ElementProp))
+            {
+                if (const FObjectProperty* elemObjProp = CastField<FObjectProperty>(setProp->ElementProp))
+                {
+                    const TArray<FXmlNode*>& childNodes = propNode->GetChildrenNodes();
+                    FScriptSetHelper setHelper(setProp, valuePtr);
+                    setHelper.EmptyElements();
+
+                    for (int32 i = 0; i < childNodes.Num(); ++i)
+                    {
+                        const int32 newIndex = setHelper.AddDefaultValue_Invalid_NeedsRehash();
+                        TSharedPtr<FJsonValue> elemValue = FSGDynamicTextAssetXmlSerializerInternals::XmlNodeToInstancedObjectJsonValue(childNodes[i]);
+                        if (!DeserializeValueToInstancedObject(elemValue, elemObjProp, setHelper.GetElementPtr(newIndex), providerObject))
+                        {
+                            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                                TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize instanced set element [%d] of property(%s) on OutProvider(%s)"),
+                                i, *property->GetName(), *GetNameSafe(providerObject));
+                        }
+                    }
+
+                    setHelper.Rehash();
+                    continue;
+                }
+            }
+        }
+
+        // TMap with instanced object values
+        if (const FMapProperty* mapProp = CastField<FMapProperty>(property))
+        {
+            if (mapProp->ValueProp && IsInstancedObjectProperty(mapProp->ValueProp))
+            {
+                if (const FObjectProperty* valueObjProp = CastField<FObjectProperty>(mapProp->ValueProp))
+                {
+                    FScriptMapHelper mapHelper(mapProp, valuePtr);
+                    mapHelper.EmptyValues();
+
+                    for (const FXmlNode* child : propNode->GetChildrenNodes())
+                    {
+                        const int32 newIndex = mapHelper.AddDefaultValue_Invalid_NeedsRehash();
+                        uint8* keyPtr = mapHelper.GetKeyPtr(newIndex);
+                        mapProp->KeyProp->ImportText_Direct(*child->GetTag(), keyPtr, nullptr, PPF_None);
+
+                        uint8* valPtr = mapHelper.GetValuePtr(newIndex);
+                        TSharedPtr<FJsonValue> elemValue = FSGDynamicTextAssetXmlSerializerInternals::XmlNodeToInstancedObjectJsonValue(child);
+                        if (!DeserializeValueToInstancedObject(elemValue, valueObjProp, valPtr, providerObject))
+                        {
+                            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                                TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize instanced map value for key '%s' of property(%s)"),
+                                *child->GetTag(), *property->GetName());
+                        }
+                    }
+
+                    mapHelper.Rehash();
+                    continue;
+                }
+            }
+        }
+
         TSharedPtr<FJsonValue> jsonValue = FSGDynamicTextAssetXmlSerializerInternals::XmlNodeToJsonValue(propNode, property);
         if (jsonValue.IsValid())
         {
-            void* valuePtr = property->ContainerPtrToValuePtr<void>(providerObject);
             if (!DeserializeValueToProperty(jsonValue, property, valuePtr))
             {
                 UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize property(%s) on OutProvider(%s)"),

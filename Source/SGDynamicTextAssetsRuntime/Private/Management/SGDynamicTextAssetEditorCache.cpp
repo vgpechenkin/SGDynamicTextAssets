@@ -7,7 +7,7 @@
 #include "Core/ISGDynamicTextAssetProvider.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
-#include "SGDynamicTextAssetsRuntimeModule.h"
+#include "SGDynamicTextAssetLogs.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Editor.h"
 
