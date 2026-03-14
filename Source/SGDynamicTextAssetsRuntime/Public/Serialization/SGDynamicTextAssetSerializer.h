@@ -6,6 +6,7 @@
 
 #include "Core/SGDynamicTextAssetId.h"
 #include "Core/SGDynamicTextAssetTypeId.h"
+#include "Core/SGDynamicTextAssetBundleData.h"
 
 struct FSlateBrush;
 class ISGDynamicTextAssetProvider;
@@ -21,7 +22,7 @@ class ISGDynamicTextAssetProvider;
  * implementation. External plugins can register custom serializers
  * for additional formats.
  *
- * This is NOT a UInterface — it uses standard C++ polymorphism
+ * This is NOT a UInterface  - it uses standard C++ polymorphism
  * with TSharedPtr/TSharedRef semantics.
  */
 class SGDYNAMICTEXTASSETSRUNTIME_API ISGDynamicTextAssetSerializer : public TSharedFromThis<ISGDynamicTextAssetSerializer>
@@ -146,6 +147,16 @@ public:
 		const FSGDynamicTextAssetId& Id,
 		const FString& UserFacingId) const = 0;
 
+	/**
+	 * Extracts asset bundle metadata from a serialized string without full deserialization.
+	 * Parses the sgdtAssetBundles block and populates OutBundleData with the entries.
+	 *
+	 * @param InString The serialized string to extract from
+	 * @param OutBundleData The bundle data to populate
+	 * @return True if bundle data was found and extracted
+	 */
+	virtual bool ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData) const;
+
 	/** The invalid serializer type ID to avoid confusion of what the value is. */
 	static constexpr uint32 INVALID_SERIALIZER_TYPE_ID = 0;
 
@@ -191,4 +202,11 @@ public:
 	 * Value: "data"
 	 */
 	static const FString KEY_DATA;
+
+	/**
+	 * Key for the asset bundle metadata block at the root level.
+	 * Contains soft reference groupings extracted from UPROPERTY meta=(AssetBundles="...") tags.
+	 * Value: "sgdtAssetBundles"
+	 */
+	static const FString KEY_SGDT_ASSET_BUNDLES;
 };

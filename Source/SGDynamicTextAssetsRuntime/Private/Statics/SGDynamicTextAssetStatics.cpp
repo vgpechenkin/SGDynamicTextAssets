@@ -2,14 +2,18 @@
 
 #include "Statics/SGDynamicTextAssetStatics.h"
 
-#include "SGDynamicTextAssetLogs.h"
+#include "AssetRegistry/AssetData.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Core/SGDynamicTextAsset.h"
 #include "Core/SGDynamicTextAssetValidationResult.h"
+#include "Engine/Blueprint.h"
 #include "Engine/Engine.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Management/SGDynamicTextAssetFileMetadata.h"
+#include "SGDynamicTextAssetLogs.h"
 #include "Subsystem/SGDynamicTextAssetSubsystem.h"
+#include "Engine/AssetManager.h"
 #include "Engine/GameInstance.h"
 
 #if WITH_EDITOR
@@ -109,7 +113,8 @@ TScriptInterface<ISGDynamicTextAssetProvider> USGDynamicTextAssetStatics::GetDyn
 	return Ref.Get(WorldContextObject);
 }
 
-void USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync(const UObject* WorldContextObject, const FSGDynamicTextAssetRef& Ref, FOnDynamicTextAssetRefLoaded OnLoaded, const FString& FilePath)
+void USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync(const UObject* WorldContextObject, const FSGDynamicTextAssetRef& Ref,
+	FOnDynamicTextAssetRefLoaded OnLoaded, const TArray<FName>& BundleNames, const FString& FilePath)
 {
 	if (!Ref.IsValid())
 	{
@@ -117,12 +122,63 @@ void USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync(const UObject* Wor
 		OnLoaded.ExecuteIfBound(TScriptInterface<ISGDynamicTextAssetProvider>(), false);
 		return;
 	}
+
+	// Shared logic: after the DTA is loaded, optionally async-load the requested
+	// bundle assets before invoking the caller's delegate.
+	auto loadBundlesThenCallback = [](const TScriptInterface<ISGDynamicTextAssetProvider>& Provider, bool bSuccess,
+		FOnDynamicTextAssetRefLoaded Callback, const TArray<FName>& InBundleNames)
+	{
+		if (!bSuccess || InBundleNames.IsEmpty() || !Provider.GetInterface())
+		{
+			Callback.ExecuteIfBound(Provider, bSuccess);
+			return;
+		}
+
+		// Gather paths for all requested bundles
+		const FSGDynamicTextAssetBundleData& bundleData = Provider->GetSGDTAssetBundleData();
+
+		TArray<FSoftObjectPath> paths;
+		for (const FName& bundleName : InBundleNames)
+		{
+			bundleData.GetPathsForBundle(bundleName, paths);
+		}
+
+		if (paths.IsEmpty())
+		{
+			Callback.ExecuteIfBound(Provider, bSuccess);
+			return;
+		}
+
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
+			TEXT("LoadDynamicTextAssetRefAsync: Async-loading %d bundle asset(s) for DTA '%s'"),
+			paths.Num(), *GetNameSafe(Provider.GetObject()));
+
+		FStreamableManager& streamableManager = UAssetManager::Get().GetStreamableManager();
+		streamableManager.RequestAsyncLoad(paths,
+			FStreamableDelegate::CreateLambda([Provider, Callback, paths]()
+			{
+				for (int32 i = 0; i < paths.Num(); ++i)
+				{
+					UObject* resolved = paths[i].ResolveObject();
+					if (!resolved)
+					{
+						UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+							TEXT("LoadDynamicTextAssetRefAsync: Bundle asset failed to resolve after async load - Path='%s'. "
+								"Verify the asset is not a Blueprint (UBlueprint objects are stripped in packaged builds) "
+								"and that it is referenced by at least one cooked UE asset."),
+							*paths[i].ToString());
+					}
+				}
+				Callback.ExecuteIfBound(Provider, true);
+			}));
+	};
+
 	USGDynamicTextAssetSubsystem* subsystem = SGDynamicTextAssetStaticsInternal::GetSubsystem(WorldContextObject);
 	if (!subsystem)
 	{
 #if WITH_EDITOR
 		TScriptInterface<ISGDynamicTextAssetProvider> result = FSGDynamicTextAssetEditorCache::Get().LoadDynamicTextAsset(Ref.GetId());
-		OnLoaded.ExecuteIfBound(result, result.GetObject() != nullptr);
+		loadBundlesThenCallback(result, result.GetObject() != nullptr, OnLoaded, BundleNames);
 #else
 		OnLoaded.ExecuteIfBound(TScriptInterface<ISGDynamicTextAssetProvider>(), false);
 #endif
@@ -133,7 +189,7 @@ void USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync(const UObject* Wor
 	TScriptInterface<ISGDynamicTextAssetProvider> cached = subsystem->GetDynamicTextAsset(Ref.GetId());
 	if (cached.GetObject())
 	{
-		OnLoaded.ExecuteIfBound(cached, true);
+		loadBundlesThenCallback(cached, true, OnLoaded, BundleNames);
 		return;
 	}
 
@@ -141,18 +197,18 @@ void USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync(const UObject* Wor
 	if (FilePath.IsEmpty())
 	{
 		subsystem->LoadDynamicTextAssetAsync(Ref.GetId(), nullptr,
-			FOnDynamicTextAssetLoaded::CreateLambda([OnLoaded](const TScriptInterface<ISGDynamicTextAssetProvider>& Provider, bool bSuccess)
+			FOnDynamicTextAssetLoaded::CreateLambda([OnLoaded, BundleNames, loadBundlesThenCallback](const TScriptInterface<ISGDynamicTextAssetProvider>& Provider, bool bSuccess)
 			{
-				OnLoaded.ExecuteIfBound(Provider, bSuccess);
+				loadBundlesThenCallback(Provider, bSuccess, OnLoaded, BundleNames);
 			}));
 		return;
 	}
 
 	// Load async using the subsystem with provided path
 	subsystem->LoadDynamicTextAssetFromFileAsync(FilePath, nullptr,
-		FOnDynamicTextAssetLoaded::CreateLambda([OnLoaded](const TScriptInterface<ISGDynamicTextAssetProvider>& Provider, bool bSuccess)
+		FOnDynamicTextAssetLoaded::CreateLambda([OnLoaded, BundleNames, loadBundlesThenCallback](const TScriptInterface<ISGDynamicTextAssetProvider>& Provider, bool bSuccess)
 		{
-			OnLoaded.ExecuteIfBound(Provider, bSuccess);
+			loadBundlesThenCallback(Provider, bSuccess, OnLoaded, BundleNames);
 		}));
 }
 
@@ -488,6 +544,38 @@ FString USGDynamicTextAssetStatics::ValidationResultToString(const FSGDynamicTex
 	return Result.ToFormattedString();
 }
 
+bool USGDynamicTextAssetStatics::HasBundles(const FSGDynamicTextAssetBundleData& BundleData)
+{
+	return BundleData.HasBundles();
+}
+
+int32 USGDynamicTextAssetStatics::GetBundleCount(const FSGDynamicTextAssetBundleData& BundleData)
+{
+	return BundleData.Bundles.Num();
+}
+
+void USGDynamicTextAssetStatics::GetBundleNames(const FSGDynamicTextAssetBundleData& BundleData, TArray<FName>& OutBundleNames)
+{
+	BundleData.GetBundleNames(OutBundleNames);
+}
+
+bool USGDynamicTextAssetStatics::GetPathsForBundle(const FSGDynamicTextAssetBundleData& BundleData, FName BundleName, TArray<FSoftObjectPath>& OutPaths)
+{
+	return BundleData.GetPathsForBundle(BundleName, OutPaths);
+}
+
+bool USGDynamicTextAssetStatics::GetBundleEntries(const FSGDynamicTextAssetBundleData& BundleData, FName BundleName, TArray<FSGDynamicTextAssetBundleEntry>& OutEntries)
+{
+	const FSGDynamicTextAssetBundle* bundle = BundleData.FindBundle(BundleName);
+	if (!bundle)
+	{
+		return false;
+	}
+
+	OutEntries = bundle->Entries;
+	return true;
+}
+
 void USGDynamicTextAssetStatics::LogRegisteredSerializers()
 {
 #if !UE_BUILD_SHIPPING || SG_DYNAMIC_TEXT_ASSETS_LOG_SERIALIZERS_SHIPPING
@@ -529,4 +617,162 @@ TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerial
 uint32 USGDynamicTextAssetStatics::GetTypeIdForExtension(const FString& Extension)
 {
 	return FSGDynamicTextAssetFileManager::GetTypeIdForExtension(Extension);
+}
+
+void USGDynamicTextAssetStatics::ValidateSoftPathsInProperty(const FProperty* Property, const void* ContainerPtr,
+	const FString& PropertyPath, FSGDynamicTextAssetValidationResult& OutResult)
+{
+	if (!Property)
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("ValidateSoftPathsInProperty: Inputted NULL Property"));
+        return;
+    }
+    if (!ContainerPtr)
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("ValidateSoftPathsInProperty: Inputted NULL ContainerPtr"));
+        return;
+    }
+
+    auto validateAssetPath = [&OutResult, &PropertyPath](const FSoftObjectPath& AssetPath)
+    {
+        if (AssetPath.IsValid() && !AssetPath.IsNull())
+        {
+            FAssetRegistryModule& assetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+            FAssetData assetData = assetRegistryModule.Get().GetAssetByObjectPath(AssetPath);
+
+            // If it failed to find the asset, check if it's a Blueprint Class reference ending in "_C"
+            if (!assetData.IsValid())
+            {
+                FString pathString = AssetPath.ToString();
+                if (pathString.EndsWith(TEXT("_C")))
+                {
+                    pathString.RemoveFromEnd(TEXT("_C"));
+                    FSoftObjectPath strippedPath(pathString);
+                    assetData = assetRegistryModule.Get().GetAssetByObjectPath(strippedPath);
+                }
+            }
+
+            // If still not found, check if this is a sub-object path (e.g., a level actor instance).
+            // Sub-object paths use ':' to separate the top-level asset from the sub-object within it.
+            // The Asset Registry only tracks top-level assets, so validate the parent asset instead.
+            // Examples:
+            //   /Game/Lvl_Basic.Lvl_Basic:PersistentLevel.BP_TestActor_C_2 -> validates /Game/Lvl_Basic.Lvl_Basic
+            //   /Game/SomeBP.SomeBP:MyComponent -> validates /Game/SomeBP.SomeBP
+            if (!assetData.IsValid())
+            {
+                FString subPathString = AssetPath.GetSubPathString();
+                if (!subPathString.IsEmpty())
+                {
+                    FSoftObjectPath parentPath(AssetPath.GetAssetPath(), FString());
+                    assetData = assetRegistryModule.Get().GetAssetByObjectPath(parentPath);
+                }
+            }
+
+            if (!assetData.IsValid())
+            {
+                OutResult.AddError(
+                    FText::Format(INVTEXT("Missing asset for path: {0}"), FText::FromString(AssetPath.ToString())),
+                    PropertyPath,
+                    INVTEXT("The asset referenced by this soft path could not be found in the Asset Registry. It may have been deleted, moved, or renamed.")
+                );
+            }
+            else
+            {
+                // Check if the referenced asset is a UBlueprint type. UBlueprint objects are
+                // stripped during cooking, so TSoftObjectPtr references to them will resolve
+                // to null in packaged builds. Use TSoftClassPtr for Blueprint class references
+                // or reference a non-Blueprint asset instead.
+                if (assetData.IsInstanceOf<UBlueprint>())
+                {
+                    OutResult.AddWarning(
+                        FText::Format(
+                            INVTEXT("Soft reference to Blueprint asset: {0}"),
+                            FText::FromString(AssetPath.ToString())),
+                        PropertyPath,
+                        INVTEXT("UBlueprint objects are stripped in packaged builds, so this TSoftObjectPtr will resolve to null at runtime. "
+                        	"Use TSoftClassPtr to reference the Blueprint's generated class, or reference a non-Blueprint asset (DataAsset, Material, Texture, etc.) instead.")
+                    );
+                }
+            }
+        }
+    };
+
+    // Instanced object properties own sub-objects whose properties may contain soft paths.
+    // Walk into the sub-object and recurse on its properties.
+    if (const FObjectProperty* objectProp = CastField<FObjectProperty>(Property))
+    {
+        if (Property->HasAllPropertyFlags(CPF_InstancedReference))
+        {
+            const void* valuePtr = objectProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+            if (const UObject* subObject = objectProp->GetObjectPropertyValue(valuePtr))
+            {
+                for (TFieldIterator<FProperty> innerIt(subObject->GetClass()); innerIt; ++innerIt)
+                {
+                    const FProperty* innerProp = *innerIt;
+                    FString nestedPath = FString::Printf(TEXT("%s.%s"), *PropertyPath, *innerProp->GetName());
+                    ValidateSoftPathsInProperty(innerProp, subObject, nestedPath, OutResult);
+                }
+            }
+            return;
+        }
+    }
+
+    if (const FSoftObjectProperty* softObjProp = CastField<FSoftObjectProperty>(Property))
+    {
+        const void* valuePtr = softObjProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+        if (const FSoftObjectPtr* softPtr = static_cast<const FSoftObjectPtr*>(valuePtr))
+        {
+            validateAssetPath(softPtr->ToSoftObjectPath());
+        }
+        return;
+    }
+
+    if (const FSoftClassProperty* softClassProp = CastField<FSoftClassProperty>(Property))
+    {
+        const void* valuePtr = softClassProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+        if (const FSoftObjectPtr* softPtr = static_cast<const FSoftObjectPtr*>(valuePtr))
+        {
+            validateAssetPath(softPtr->ToSoftObjectPath());
+        }
+        return;
+    }
+
+    if (const FStructProperty* structProp = CastField<FStructProperty>(Property))
+    {
+        const void* structPtr = structProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+        for (TFieldIterator<FProperty> innerIt(structProp->Struct); innerIt; ++innerIt)
+        {
+            const FProperty* innerProp = *innerIt;
+            FString nestedPath = FString::Printf(TEXT("%s.%s"), *PropertyPath, *innerProp->GetName());
+            ValidateSoftPathsInProperty(innerProp, structPtr, nestedPath, OutResult);
+        }
+        return;
+    }
+
+    if (const FArrayProperty* arrayProp = CastField<FArrayProperty>(Property))
+    {
+        const void* arrayPtr = arrayProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+        FScriptArrayHelper arrayHelper(arrayProp, arrayPtr);
+
+        for (int32 index = 0; index < arrayHelper.Num(); ++index)
+        {
+            const void* elementPtr = arrayHelper.GetRawPtr(index);
+            FString elementPath = FString::Printf(TEXT("%s[%d]"), *PropertyPath, index);
+            ValidateSoftPathsInProperty(arrayProp->Inner, elementPtr, elementPath, OutResult);
+        }
+        return;
+    }
+
+    if (const FMapProperty* mapProp = CastField<FMapProperty>(Property))
+    {
+        const void* mapPtr = mapProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+        FScriptMapHelper mapHelper(mapProp, mapPtr);
+
+        for (FScriptMapHelper::FIterator itr = mapHelper.CreateIterator(); itr; ++itr)
+        {
+            const void* valuePtr = mapHelper.GetValuePtr(itr.GetInternalIndex());
+            FString valuePath = FString::Printf(TEXT("%s[Value]"), *PropertyPath);
+            ValidateSoftPathsInProperty(mapProp->ValueProp, valuePtr, valuePath, OutResult);
+        }
+    }
 }

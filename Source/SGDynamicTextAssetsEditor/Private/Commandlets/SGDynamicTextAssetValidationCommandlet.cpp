@@ -382,9 +382,9 @@ void USGDynamicTextAssetValidationCommandlet::ValidateRefsInProperty(
 		const void* mapPtr = mapProp->ContainerPtrToValuePtr<void>(ContainerPtr);
 		FScriptMapHelper mapHelper(mapProp, mapPtr);
 
-		for (FScriptMapHelper::FIterator it = mapHelper.CreateIterator(); it; ++it)
+		for (FScriptMapHelper::FIterator itr = mapHelper.CreateIterator(); itr; ++itr)
 		{
-			const void* valuePtr = mapHelper.GetValuePtr(it.GetInternalIndex());
+			const void* valuePtr = mapHelper.GetValuePtr(itr.GetInternalIndex());
 			FString valuePath = FString::Printf(TEXT("%s[Value]"), *PropertyPath);
 
 			if (const FStructProperty* valueStruct = CastField<FStructProperty>(mapProp->ValueProp))

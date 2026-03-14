@@ -49,4 +49,11 @@ public:
 	 */
 	UPROPERTY(Config, EditAnywhere, Category = "Reference Scanning", AdvancedDisplay)
 	FString ReferenceCacheFolderPath = TEXT("SGDynamicTextAssets/ReferenceCache");
+
+	/**
+	 * Whether to display asset bundle icons next to soft reference properties
+	 * that have meta=(AssetBundles="...") tags in the DTA editor details panel.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category = "Editor Display")
+	uint8 bShowAssetBundleIcons : 1 = 1;
 };

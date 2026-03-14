@@ -404,7 +404,8 @@ bool FSGDynamicTextAssetXmlSerializer::SerializeProvider(const ISGDynamicTextAss
     xml += FSGDynamicTextAssetXmlSerializerInternals::XML_DECLARATION;
     xml += FString::Printf(TEXT("<%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::XML_ROOT_TAG);
 
-    // Metadata block — write Asset Type ID GUID to the type element, fall back to class name if unavailable
+    // Write to metadata
+    // Write Asset Type ID GUID to the type element, fall back to class name if unavailable
     FString typeString;
     if (const USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
     {
@@ -557,6 +558,35 @@ bool FSGDynamicTextAssetXmlSerializer::SerializeProvider(const ISGDynamicTextAss
     }
 
     xml += FString::Printf(TEXT("%s</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_DATA);
+
+    // Extract and serialize asset bundle metadata from soft reference properties
+    FSGDynamicTextAssetBundleData bundleData;
+    bundleData.ExtractFromObject(providerObject);
+
+    if (bundleData.HasBundles())
+    {
+        xml += FString::Printf(TEXT("%s<%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_SGDT_ASSET_BUNDLES);
+
+        for (const FSGDynamicTextAssetBundle& bundle : bundleData.Bundles)
+        {
+            xml += FString::Printf(TEXT("%s<bundle name=\"%s\">\n"),
+                *FSGDynamicTextAssetXmlSerializerInternals::Indent(2),
+                *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(bundle.BundleName.ToString()));
+
+            for (const FSGDynamicTextAssetBundleEntry& entry : bundle.Entries)
+            {
+                xml += FString::Printf(TEXT("%s<entry property=\"%s\" path=\"%s\"/>\n"),
+                    *FSGDynamicTextAssetXmlSerializerInternals::Indent(3),
+                    *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(entry.PropertyName.ToString()),
+                    *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(entry.AssetPath.ToString()));
+            }
+
+            xml += FString::Printf(TEXT("%s</bundle>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(2));
+        }
+
+        xml += FString::Printf(TEXT("%s</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_SGDT_ASSET_BUNDLES);
+    }
+
     xml += FString::Printf(TEXT("</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::XML_ROOT_TAG);
 
     OutString = MoveTemp(xml);
@@ -603,7 +633,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
         UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer: XML missing <%s> block"), *KEY_METADATA);
         return false;
     }
-    // Validate class type — type element may contain a GUID (new format) or class name (legacy)
+    // Validate class type element may contain a GUID (new format) or class name (legacy)
     if (const FXmlNode* typeNode = metadataNode->FindChildNode(KEY_TYPE))
     {
         const FString typeFieldValue = FSGDynamicTextAssetXmlSerializerInternals::XmlUnescape(typeNode->GetContent());
@@ -672,7 +702,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
             TEXT("FSGDynamicTextAssetXmlSerializer: Migration required for Provider(%s): file version(%s) -> class version(%s)"),
             *OutProvider->GetDynamicTextAssetId().ToString(), *fileVersion.ToString(), *currentVersion.ToString());
 
-        // Migration passes a null FJsonObject — XML providers must handle that in MigrateFromVersion
+        // Migration passes a null FJsonObject and XML providers must handle that in MigrateFromVersion
         if (!OutProvider->MigrateFromVersion(fileVersion, currentVersion, nullptr))
         {
             UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
@@ -714,7 +744,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
         const FXmlNode* propNode = dataNode->FindChildNode(property->GetName());
         if (!propNode)
         {
-            // Missing optional field — tolerated gracefully
+            // Missing optional field
             continue;
         }
 
@@ -1044,4 +1074,69 @@ FString FSGDynamicTextAssetXmlSerializer::GetDefaultFileContent(const UClass* Dy
         *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_DATA,
         *FSGDynamicTextAssetXmlSerializerInternals::XML_ROOT_TAG
     );
+}
+
+bool FSGDynamicTextAssetXmlSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData) const
+{
+    OutBundleData.Reset();
+
+    if (InString.IsEmpty())
+    {
+        return false;
+    }
+
+    FXmlFile xmlFile(InString, EConstructMethod::ConstructFromBuffer);
+    if (!xmlFile.IsValid())
+    {
+        return false;
+    }
+
+    const FXmlNode* rootNode = xmlFile.GetRootNode();
+    if (!rootNode)
+    {
+        return false;
+    }
+
+    const FXmlNode* bundlesNode = rootNode->FindChildNode(KEY_SGDT_ASSET_BUNDLES);
+    if (!bundlesNode)
+    {
+        return false;
+    }
+
+    for (const FXmlNode* bundleNode : bundlesNode->GetChildrenNodes())
+    {
+        if (bundleNode->GetTag() != TEXT("bundle"))
+        {
+            continue;
+        }
+
+        const FString bundleNameStr = bundleNode->GetAttribute(TEXT("name"));
+        if (bundleNameStr.IsEmpty())
+        {
+            continue;
+        }
+
+        const FName bundleName = FName(*bundleNameStr);
+
+        FSGDynamicTextAssetBundle& bundle = OutBundleData.Bundles.AddDefaulted_GetRef();
+        bundle.BundleName = bundleName;
+
+        for (const FXmlNode* entryNode : bundleNode->GetChildrenNodes())
+        {
+            if (entryNode->GetTag() != TEXT("entry"))
+            {
+                continue;
+            }
+
+            const FString propertyName = entryNode->GetAttribute(TEXT("property"));
+            const FString pathStr = entryNode->GetAttribute(TEXT("path"));
+
+            if (!propertyName.IsEmpty() && !pathStr.IsEmpty())
+            {
+                bundle.Entries.Emplace(FSoftObjectPath(pathStr), FName(*propertyName));
+            }
+        }
+    }
+
+    return OutBundleData.HasBundles();
 }

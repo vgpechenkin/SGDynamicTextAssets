@@ -7,6 +7,7 @@
 #include "Core/SGDynamicTextAssetTypeId.h"
 #include "Core/SGDynamicTextAssetValidationResult.h"
 #include "Editor.h"
+#include "Editor/SGDynamicTextAssetBundleRowExtension.h"
 #include "Editor/SGDynamicTextAssetEditorCommands.h"
 #include "Editor/SSGDynamicTextAssetRawView.h"
 #include "Framework/Docking/TabManager.h"
@@ -211,6 +212,9 @@ void FSGDynamicTextAssetEditorToolkit::InitEditor(EToolkitMode::Type Mode,
     detailsViewArgs.NotifyHook         = this;
 
     DetailsView = propertyModule.CreateDetailView(detailsViewArgs);
+
+    // Set extension handler for asset bundle icons on soft reference properties
+    DetailsView->SetExtensionHandler(MakeShared<FSGDynamicTextAssetPropertyExtensionHandler>());
 
     // Wire property-change callback
     DetailsView->OnFinishedChangingProperties().AddSP(
@@ -493,16 +497,52 @@ bool FSGDynamicTextAssetEditorToolkit::SaveToFile()
         errorMessage += validationResult.ToFormattedString();
         errorMessage += TEXT("\nPlease fix the error(s) before saving.");
 
-        FMessageDialog::Open(EAppMsgType::Ok,
-            FText::FromString(errorMessage),
-            FText::FromString(TEXT("Validation Failed")));
+        for (const FSGDynamicTextAssetValidationEntry& error : validationResult.Errors)
+        {
+            UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+                TEXT("Validation error for '%s' [%s]: %s"),
+                *provider->GetUserFacingId(),
+                *error.PropertyPath,
+                *error.Message.ToString());
+        }
 
         UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
             TEXT("Cannot save '%s' (%s): validation failed with %d issue(s)"),
             *provider->GetUserFacingId(),
             *provider->GetDynamicTextAssetId().ToString(),
             validationResult.GetTotalCount());
+
+        FMessageDialog::Open(EAppMsgType::Ok,
+            FText::FromString(errorMessage),
+            INVTEXT("Validation Failed"));
+
         return false;
+    }
+
+    // Show warnings to the user and let them decide whether to proceed
+    if (validationResult.HasWarnings())
+    {
+        for (const FSGDynamicTextAssetValidationEntry& warning : validationResult.Warnings)
+        {
+            UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+                TEXT("Validation warning for '%s' [%s]: %s"),
+                *provider->GetUserFacingId(),
+                *warning.PropertyPath,
+                *warning.Message.ToString());
+        }
+
+        FString warningMessage = TEXT("Validation produced the following warnings:\n\n");
+        warningMessage += validationResult.ToFormattedString();
+        warningMessage += TEXT("\nDo you want to save anyway?");
+
+        EAppReturnType::Type userChoice = FMessageDialog::Open(EAppMsgType::YesNo,
+            FText::FromString(warningMessage),
+            INVTEXT("Validation Warnings"));
+
+        if (userChoice != EAppReturnType::Yes)
+        {
+            return false;
+        }
     }
 
     // Serialize via the provider interface
@@ -540,7 +580,7 @@ bool FSGDynamicTextAssetEditorToolkit::SaveToFile()
         {
             UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
                 TEXT("Failed to check out file from source control: %s"), *FilePath);
-            // Continue anyway — user may want to save locally
+            // Continue anyway  - user may want to save locally
         }
     }
 
@@ -791,7 +831,7 @@ bool FSGDynamicTextAssetEditorToolkit::SaveOpenEditor(const FString& InFilePath)
     TWeakPtr<FSGDynamicTextAssetEditorToolkit>* existing = OPEN_EDITORS.Find(InFilePath);
     if (!existing || !existing->IsValid())
     {
-        // No editor open — nothing to save
+        // No editor open  - nothing to save
         return true;
     }
 

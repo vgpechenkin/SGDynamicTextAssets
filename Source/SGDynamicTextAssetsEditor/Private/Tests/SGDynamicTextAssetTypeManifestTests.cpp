@@ -68,7 +68,7 @@ bool FTypeManifest_DefaultState_IsEmpty::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 2. AddType — Increases Count
+// 2. AddType  - Increases Count
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -93,7 +93,7 @@ bool FTypeManifest_AddType_IncreasesCount::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 3. AddType — Replaces Existing
+// 3. AddType  - Replaces Existing
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -128,7 +128,7 @@ bool FTypeManifest_AddType_ReplacesExisting::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 4. RemoveType — Decreases Count
+// 4. RemoveType  - Decreases Count
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -157,7 +157,7 @@ bool FTypeManifest_RemoveType_DecreasesCount::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 5. RemoveType — Not Found Returns False
+// 5. RemoveType  - Not Found Returns False
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -178,7 +178,7 @@ bool FTypeManifest_RemoveType_NotFoundReturnsFalse::RunTest(const FString& Param
 }
 
 // ---------------------------------------------------------------------------
-// 6. FindByTypeId — Found
+// 6. FindByTypeId  - Found
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -208,7 +208,7 @@ bool FTypeManifest_FindByTypeId_Found::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 7. FindByTypeId — Not Found
+// 7. FindByTypeId  - Not Found
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -229,7 +229,7 @@ bool FTypeManifest_FindByTypeId_NotFound::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 8. FindByClassName — Found
+// 8. FindByClassName  - Found
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -258,7 +258,7 @@ bool FTypeManifest_FindByClassName_Found::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 9. FindByClassName — Not Found
+// 9. FindByClassName  - Not Found
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -277,7 +277,7 @@ bool FTypeManifest_FindByClassName_NotFound::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 10. Clear — Resets State
+// 10. Clear  - Resets State
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -308,7 +308,7 @@ bool FTypeManifest_Clear_ResetsState::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 11. SaveToFile / LoadFromFile — Roundtrip
+// 11. SaveToFile / LoadFromFile  - Roundtrip
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -380,7 +380,7 @@ bool FTypeManifest_SaveLoadFile_Roundtrip::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 12. SaveToFile — Schema and Version
+// 12. SaveToFile  - Schema and Version
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -433,7 +433,7 @@ bool FTypeManifest_SaveLoadFile_SchemaAndVersion::RunTest(const FString& Paramet
 }
 
 // ---------------------------------------------------------------------------
-// 13. Server Overlay — Apply and Get Effective
+// 13. Server Overlay  - Apply and Get Effective
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -489,7 +489,7 @@ bool FTypeManifest_ServerOverlay_ApplyAndGetEffective::RunTest(const FString& Pa
 }
 
 // ---------------------------------------------------------------------------
-// 14. Server Overlay — Disable Entry
+// 14. Server Overlay  - Disable Entry
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -526,7 +526,7 @@ bool FTypeManifest_ServerOverlay_DisableEntry::RunTest(const FString& Parameters
 }
 
 // ---------------------------------------------------------------------------
-// 15. Server Overlay — Add New Entry
+// 15. Server Overlay  - Add New Entry
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -580,7 +580,7 @@ bool FTypeManifest_ServerOverlay_AddNewEntry::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 16. Server Overlay — Clear Restores Local
+// 16. Server Overlay  - Clear Restores Local
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -636,7 +636,7 @@ bool FTypeManifest_ServerOverlay_ClearRestoresLocal::RunTest(const FString& Para
 }
 
 // ---------------------------------------------------------------------------
-// 17. SetRootTypeId — Marks Dirty
+// 17. SetRootTypeId  - Marks Dirty
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(

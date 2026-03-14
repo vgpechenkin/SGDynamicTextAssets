@@ -98,7 +98,7 @@ TScriptInterface<ISGDynamicTextAssetProvider> FSGDynamicTextAssetRef::Get(const 
     }
 
 #if WITH_EDITOR
-    // No GameInstance available (editor non-PIE context) — check editor cache (cache-only, no loading)
+    // No GameInstance available (editor non-PIE context)  - check editor cache (cache-only, no loading)
     return FSGDynamicTextAssetEditorCache::Get().GetDynamicTextAsset(Id);
 #else
     return TScriptInterface<ISGDynamicTextAssetProvider>();

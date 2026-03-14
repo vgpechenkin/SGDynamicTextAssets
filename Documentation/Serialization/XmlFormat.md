@@ -144,6 +144,44 @@ FSGDynamicTextAssetFileManager::RegisterSerializer<FSGDynamicTextAssetXmlSeriali
 
 See [SerializerInterface.md](SerializerInterface.md) for the full registration pattern.
 
+## Asset Bundle Metadata
+
+When a dynamic text asset has soft reference properties tagged with `meta=(AssetBundles="...")`, the serializer writes an `<sgdtAssetBundles>` element at the root level alongside `<metadata>` and `<data>`. This element is a snapshot of the bundle data extracted from the object's UPROPERTY meta tags.
+
+### Format
+
+Each bundle is represented as a `<bundle>` element with a `name` attribute. Entries within a bundle are `<entry>` elements with `property` and `path` attributes.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<DynamicTextAsset>
+    <metadata> ... </metadata>
+    <data> ... </data>
+    <sgdtAssetBundles>
+        <bundle name="Visual">
+            <entry property="MeshAsset" path="/Game/Weapons/Meshes/Sword.Sword"/>
+            <entry property="ImpactMaterial" path="/Game/Weapons/Materials/ImpactMat.ImpactMat"/>
+        </bundle>
+        <bundle name="Audio">
+            <entry property="ImpactMaterial" path="/Game/Weapons/Materials/ImpactMat.ImpactMat"/>
+            <entry property="FireSound" path="/Game/Audio/Weapons/FireSFX.FireSFX"/>
+        </bundle>
+    </sgdtAssetBundles>
+</DynamicTextAsset>
+```
+
+### Behavior
+
+- The `<sgdtAssetBundles>` element is only written if the object has at least one bundled soft reference with a valid (non-null) path.
+- Properties tagged with multiple bundles (e.g., `meta=(AssetBundles="Visual,Audio")`) appear in each named bundle.
+- Properties without the `AssetBundles` meta tag are not included.
+- Container properties (`TArray`, `TMap`, `TSet`) tagged with `AssetBundles` propagate their bundle names to inner soft reference elements.
+- During deserialization, the `<sgdtAssetBundles>` element is informational only. Runtime bundle data is always extracted from UPROPERTY meta tags after properties are populated.
+
+### Extraction Without Full Deserialization
+
+The `ExtractSGDTAssetBundles()` method on the serializer can parse the `<sgdtAssetBundles>` element from an XML string without deserializing the full object. This is useful for cook pipelines and editor tooling.
+
 ## Instanced Object Serialization
 
 Properties declared with `UPROPERTY(Instanced)` are serialized inline within the `<data>` block. Each instanced sub-object is represented as an XML element containing a `<SG_INST_OBJ_CLASS>` child element that stores the full class path, followed by child elements for the sub-object's own UPROPERTY fields.

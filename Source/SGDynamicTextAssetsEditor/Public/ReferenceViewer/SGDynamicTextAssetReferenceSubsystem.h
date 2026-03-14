@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 
-#include "AssetRegistry/AssetData.h"
 #include "Containers/Ticker.h"
 #include "EditorSubsystem.h"
 #include "Core/SGDynamicTextAssetEnums.h"

@@ -27,7 +27,7 @@ bool FTypeId_DefaultState_IsInvalid::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 2. NewGeneratedId — Valid
+// 2. NewGeneratedId  - Valid
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -45,7 +45,7 @@ bool FTypeId_NewGeneratedId_IsValid::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 3. NewGeneratedId — Unique
+// 3. NewGeneratedId  - Unique
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -66,7 +66,7 @@ bool FTypeId_NewGeneratedId_ProducesUniqueIds::RunTest(const FString& Parameters
 }
 
 // ---------------------------------------------------------------------------
-// 4. FromGuid — Valid GUID
+// 4. FromGuid  - Valid GUID
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -86,7 +86,7 @@ bool FTypeId_FromGuid_ValidGuid::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 5. FromGuid — Invalid GUID
+// 5. FromGuid  - Invalid GUID
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -105,7 +105,7 @@ bool FTypeId_FromGuid_InvalidGuid::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 6. FromString — Valid String
+// 6. FromString  - Valid String
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -123,7 +123,7 @@ bool FTypeId_FromString_ValidString::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 7. FromString — Invalid String
+// 7. FromString  - Invalid String
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -143,7 +143,7 @@ bool FTypeId_FromString_InvalidString::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 8. ToString — Roundtrip
+// 8. ToString  - Roundtrip
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -186,7 +186,7 @@ bool FTypeId_Invalidate_BecomesInvalid::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 10. Equality — Same GUID
+// 10. Equality  - Same GUID
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -207,7 +207,7 @@ bool FTypeId_Equality_SameGuid::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 11. Equality — Different GUID
+// 11. Equality  - Different GUID
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -227,7 +227,7 @@ bool FTypeId_Equality_DifferentGuid::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 12. Equality — Two Invalid Are Equal
+// 12. Equality  - Two Invalid Are Equal
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -246,7 +246,7 @@ bool FTypeId_Equality_TwoInvalidAreEqual::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 13. Equality — TypeId vs Raw FGuid (cross-type operators)
+// 13. Equality  - TypeId vs Raw FGuid (cross-type operators)
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -272,7 +272,7 @@ bool FTypeId_Equality_TypeIdVsRawGuid::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 14. GetTypeHash — Consistent For Same Id
+// 14. GetTypeHash  - Consistent For Same Id
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -295,7 +295,7 @@ bool FTypeId_GetTypeHash_ConsistentForSameId::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 15. GetTypeHash — Different For Different Ids
+// 15. GetTypeHash  - Different For Different Ids
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -328,7 +328,7 @@ bool FTypeId_GetTypeHash_DifferentForDifferentIds::RunTest(const FString& Parame
 }
 
 // ---------------------------------------------------------------------------
-// 16. Serialize — Binary Roundtrip
+// 16. Serialize  - Binary Roundtrip
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -358,7 +358,7 @@ bool FTypeId_Serialize_BinaryRoundtrip::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 17. NetSerialize — Roundtrip
+// 17. NetSerialize  - Roundtrip
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -370,7 +370,7 @@ bool FTypeId_NetSerialize_Roundtrip::RunTest(const FString& Parameters)
 {
 	FSGDynamicTextAssetTypeId original = FSGDynamicTextAssetTypeId::NewGeneratedId();
 
-	// Write — FGuid is 16 bytes = 128 bits, allocate enough
+	// Write  - FGuid is 16 bytes = 128 bits, allocate enough
 	TArray<uint8> buffer;
 	buffer.SetNumZeroed(256);
 	FBitWriter writer(256 * 8);
@@ -392,7 +392,7 @@ bool FTypeId_NetSerialize_Roundtrip::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 18. ExportTextItem / ImportTextItem — Roundtrip
+// 18. ExportTextItem / ImportTextItem  - Roundtrip
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -424,7 +424,7 @@ bool FTypeId_ExportImportTextItem_Roundtrip::RunTest(const FString& Parameters)
 }
 
 // ---------------------------------------------------------------------------
-// 19. INVALID_TYPE_ID — Static Constant
+// 19. INVALID_TYPE_ID  - Static Constant
 // ---------------------------------------------------------------------------
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(

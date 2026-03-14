@@ -42,7 +42,7 @@ bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 		return false;
 	}
 
-	// Prepare header — SerializerTypeId is stored here so the loader can route
+	// Prepare header  - SerializerTypeId is stored here so the loader can route
 	// the decompressed payload to the correct deserializer without a string lookup.
 	// AssetTypeGuid enables class resolution directly from the header without decompression.
 	FSGBinaryDynamicTextAssetHeader header;
@@ -102,7 +102,7 @@ bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 	sha1.Final();
 	sha1.GetHash(header.ContentHash);
 
-	// Write header then compressed payload directly — no variable-length block
+	// Write header then compressed payload directly  - no variable-length block
 	OutBinaryData.Empty();
 	OutBinaryData.Reserve(FSGBinaryDynamicTextAssetHeader::HEADER_SIZE + compressedData.Num());
 
@@ -113,7 +113,7 @@ bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 	// Verify header serialized to exactly HEADER_SIZE bytes
 	check(OutBinaryData.Num() == FSGBinaryDynamicTextAssetHeader::HEADER_SIZE);
 
-	// Append compressed payload — always starts at byte offset HEADER_SIZE
+	// Append compressed payload  - always starts at byte offset HEADER_SIZE
 	OutBinaryData.Append(compressedData);
 
 	return true;
@@ -168,12 +168,12 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 	}
 
 	// BinaryData.GetData() returns a uint8* to the first byte of the array buffer.
-	// Adding HEADER_SIZE advances that pointer exactly 64 bytes forward — past the fixed
-	// header — to the first byte of the compressed payload. This is a memory location,
+	// Adding HEADER_SIZE advances that pointer exactly 64 bytes forward  - past the fixed
+	// header  - to the first byte of the compressed payload. This is a memory location,
 	// not a size count. Compare with BinaryData.Num() - HEADER_SIZE above, which is a count.
 	//
 	// reinterpret_cast is needed because FUTF8ToTCHAR expects ANSICHAR* but GetData()
-	// returns uint8*. Both are 1-byte types, so no data is actually reinterpreted — this
+	// returns uint8*. Both are 1-byte types, so no data is actually reinterpreted  - this
 	// is purely a type-system cast to satisfy the API signature.
 	const uint8* compressedDataPtr = BinaryData.GetData() + FSGBinaryDynamicTextAssetHeader::HEADER_SIZE;
 
@@ -243,7 +243,7 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 	FUTF8ToTCHAR utf8Converter(reinterpret_cast<const ANSICHAR*>(uncompressedData.GetData()), uncompressedData.Num());
 	OutPayloadString = FString(utf8Converter.Length(), utf8Converter.Get());
 
-	// Return the serializer type ID from the header — caller passes this to
+	// Return the serializer type ID from the header - caller passes this to
 	// FSGDynamicTextAssetFileManager::FindSerializerForTypeId() to get the right deserializer
 	OutSerializerTypeId = header.SerializerTypeId;
 
@@ -334,7 +334,7 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryReadSerializerTypeId(
 		return false;
 	}
 
-	// SerializerTypeId is a fixed uint32 inside the header — no variable-length data to skip.
+	// SerializerTypeId is a fixed uint32 inside the header  - no variable-length data to skip.
 	// The compressed payload always starts at exactly HEADER_SIZE bytes into the file,
 	// regardless of which serializer produced it.
 	// Pass this ID to FSGDynamicTextAssetFileManager::FindSerializerForTypeId() to get the

@@ -5,6 +5,7 @@
 #include "SGDynamicTextAssetLogs.h"
 #include "Async/Async.h"
 #include "Core/SGDynamicTextAsset.h"
+#include "Engine/AssetManager.h"
 #include "Core/SGDynamicTextAssetValidationResult.h"
 #include "Management/SGDynamicTextAssetCookManifest.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
@@ -254,6 +255,11 @@ void USGDynamicTextAssetSubsystem::Internal_LoadDynamicTextAssetFromFileAsync_Ga
         return;
     }
 
+    // Extract asset bundle data from the serialized text payload.
+    // In non-editor builds, property metadata is stripped so ExtractFromObject is a no-op.
+    // The serializer parses the bundle block directly from the text instead.
+    serializer->ExtractSGDTAssetBundles(TextPayload, dataObject->GetMutableSGDTAssetBundleData());
+
 #if WITH_EDITOR
     // If migration occurred, re-save the file with the updated version
     if (bMigrated)
@@ -428,6 +434,11 @@ TScriptInterface<ISGDynamicTextAssetProvider> USGDynamicTextAssetSubsystem::Load
         UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("Failed to deserialize dynamic text asset from FilePath(%s)"), *FilePath);
         return emptyProvider;
     }
+
+    // Extract asset bundle data from the serialized text payload.
+    // In non-editor builds, property metadata is stripped so ExtractFromObject is a no-op.
+    // The serializer parses the bundle block directly from the text instead.
+    serializer->ExtractSGDTAssetBundles(jsonContents, dataObject->GetMutableSGDTAssetBundleData());
 
 #if WITH_EDITOR
     // If migration occurred, re-save the file with the updated version
@@ -787,6 +798,143 @@ void USGDynamicTextAssetSubsystem::LoadDynamicTextAssetAsync(const FSGDynamicTex
             subsystem->Internal_LoadDynamicTextAssetFromFileAsync_GameThread(foundPath, classToUse, textContents, asyncSerializerTypeId, readSuccess, OnComplete);
         });
     });
+}
+
+bool USGDynamicTextAssetSubsystem::LoadSGDTAssetBundle(const FSGDynamicTextAssetId& Id, FName BundleName, FStreamableDelegate OnComplete)
+{
+	if (!Id.IsValid())
+	{
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+			TEXT("LoadSGDTAssetBundle: Invalid Id provided"));
+		return false;
+	}
+
+	if (BundleName.IsNone())
+	{
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+			TEXT("LoadSGDTAssetBundle: BundleName is NAME_None"));
+		return false;
+	}
+
+	TScriptInterface<ISGDynamicTextAssetProvider> provider = GetDynamicTextAsset(Id);
+	if (!provider.GetInterface())
+	{
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+			TEXT("LoadSGDTAssetBundle: DTA Id(%s) is not cached"), *Id.ToString());
+		return false;
+	}
+
+	TArray<FSoftObjectPath> paths;
+	if (!provider->GetSGDTAssetBundleData().GetPathsForBundle(BundleName, paths) || paths.IsEmpty())
+	{
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
+			TEXT("LoadSGDTAssetBundle: No paths found for bundle '%s' on DTA Id(%s)"),
+			*BundleName.ToString(), *Id.ToString());
+		return false;
+	}
+
+	FStreamableManager& streamableManager = UAssetManager::Get().GetStreamableManager();
+	streamableManager.RequestAsyncLoad(paths, OnComplete);
+
+	UE_LOG(LogSGDynamicTextAssetsRuntime, Log,
+		TEXT("LoadSGDTAssetBundle: Initiated async load of %d asset(s) for bundle '%s' on DTA Id(%s)"),
+		paths.Num(), *BundleName.ToString(), *Id.ToString());
+
+	return true;
+}
+
+int32 USGDynamicTextAssetSubsystem::LoadSGDTAssetBundleForAll(FName BundleName, FStreamableDelegate OnComplete)
+{
+	if (BundleName.IsNone())
+	{
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+			TEXT("LoadSGDTAssetBundleForAll: BundleName is NAME_None"));
+		return 0;
+	}
+
+	TArray<FSoftObjectPath> allPaths;
+	int32 matchingDTACount = 0;
+
+	for (const TPair<FSGDynamicTextAssetId, TScriptInterface<ISGDynamicTextAssetProvider>>& pair : LoadedObjects)
+	{
+		ISGDynamicTextAssetProvider* provider = pair.Value.GetInterface();
+		if (!provider)
+		{
+			continue;
+		}
+
+		const int32 pathCountBefore = allPaths.Num();
+		provider->GetSGDTAssetBundleData().GetPathsForBundle(BundleName, allPaths);
+
+		if (allPaths.Num() > pathCountBefore)
+		{
+			++matchingDTACount;
+		}
+	}
+
+	if (!allPaths.IsEmpty())
+	{
+		FStreamableManager& streamableManager = UAssetManager::Get().GetStreamableManager();
+		streamableManager.RequestAsyncLoad(allPaths, OnComplete);
+
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Log,
+			TEXT("LoadSGDTAssetBundleForAll: Initiated async load of %d asset(s) for bundle '%s' across %d DTA(s)"),
+			allPaths.Num(), *BundleName.ToString(), matchingDTACount);
+	}
+	else if (OnComplete.IsBound())
+	{
+		// No paths to load, invoke callback immediately
+		OnComplete.Execute();
+	}
+
+	return matchingDTACount;
+}
+
+const FSGDynamicTextAssetBundleData* USGDynamicTextAssetSubsystem::GetSGDTAssetBundleData(const FSGDynamicTextAssetId& Id) const
+{
+	if (!Id.IsValid())
+	{
+		return nullptr;
+	}
+
+	const TScriptInterface<ISGDynamicTextAssetProvider>* found = LoadedObjects.Find(Id);
+	if (!found || !found->GetInterface())
+	{
+		return nullptr;
+	}
+
+	return &found->GetInterface()->GetSGDTAssetBundleData();
+}
+
+bool USGDynamicTextAssetSubsystem::GetSGDTAssetBundleDataCopy(const FSGDynamicTextAssetId& Id, FSGDynamicTextAssetBundleData& OutBundleData) const
+{
+	const FSGDynamicTextAssetBundleData* bundleData = GetSGDTAssetBundleData(Id);
+	if (!bundleData)
+	{
+		return false;
+	}
+
+	OutBundleData = *bundleData;
+	return true;
+}
+
+void USGDynamicTextAssetSubsystem::GetAllPathsForSGDTBundle(FName BundleName, TArray<FSoftObjectPath>& OutPaths) const
+{
+	if (BundleName.IsNone())
+	{
+		return;
+	}
+
+	for (const TPair<FSGDynamicTextAssetId, TScriptInterface<ISGDynamicTextAssetProvider>>& pair : LoadedObjects)
+	{
+		ISGDynamicTextAssetProvider* provider = pair.Value.GetInterface();
+		if (!provider)
+		{
+			continue;
+		}
+
+		provider->GetSGDTAssetBundleData().GetPathsForBundle(BundleName, OutPaths);
+	}
 }
 
 void USGDynamicTextAssetSubsystem::ApplyServerTypeOverrides(const TSharedPtr<FJsonObject>& ServerData)

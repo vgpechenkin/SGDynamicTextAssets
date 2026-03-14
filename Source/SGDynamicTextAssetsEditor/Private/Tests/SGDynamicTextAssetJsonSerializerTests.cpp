@@ -259,7 +259,7 @@ bool FSGDynamicTextAssetJsonSerializer_SerializeProvider_ProducesValidJson::RunT
 	FSGDynamicTextAssetTypeId extractedTypeId;
 	serializer.ExtractMetadata(outJson, extractedId, extractedClassName, extractedUserFacingId, extractedVersion, extractedTypeId);
 
-	// Hidden test class has no TypeId — serializer falls back to class name
+	// Hidden test class has no TypeId  - serializer falls back to class name
 	TestFalse(TEXT("TypeId should be invalid for unregistered test class"), extractedTypeId.IsValid());
 	TestEqual(TEXT("Extracted class name should match"), extractedClassName, TEXT("SGDynamicTextAssetUnitTest"));
 	TestEqual(TEXT("Extracted ID should match"), extractedId, testId);
@@ -609,7 +609,7 @@ bool FSGDynamicTextAssetJsonSerializer_ExtractMetadata_LegacyClassName_NoTypeId:
 
 /**
  * Test: ValidateStructure accepts a GUID string in the type field.
- * The type field is format-agnostic — it only checks for presence, not whether
+ * The type field is format-agnostic  - it only checks for presence, not whether
  * the value is a class name or GUID.
  */
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(

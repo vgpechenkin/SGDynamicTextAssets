@@ -253,7 +253,7 @@ bool FSGDynamicTextAssetXmlSerializer_ExtractMetadata_ReturnsAllFields::RunTest(
 	const bool bExtracted = serializer.ExtractMetadata(outXml, outId, outClassName, outUserFacingId, outVersion, extractedTypeId);
 
 	TestTrue(TEXT("ExtractMetadata should succeed"), bExtracted);
-	// Hidden test class has no TypeId — serializer falls back to class name
+	// Hidden test class has no TypeId  - serializer falls back to class name
 	TestFalse(TEXT("TypeId should be invalid for unregistered test class"), extractedTypeId.IsValid());
 	TestEqual(TEXT("Extracted class name should match"), outClassName, TEXT("SGDynamicTextAssetXmlUnitTest"));
 	TestEqual(TEXT("Extracted ID should match"), outId, testId);

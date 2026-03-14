@@ -123,6 +123,49 @@ FSGDynamicTextAssetFileManager::RegisterSerializer<FSGDynamicTextAssetYamlSerial
 
 See [SerializerInterface.md](SerializerInterface.md) for the full registration pattern.
 
+## Asset Bundle Metadata
+
+When a dynamic text asset has soft reference properties tagged with `meta=(AssetBundles="...")`, the serializer writes an `sgdtAssetBundles` mapping at the root level alongside `metadata` and `data`. This mapping is a snapshot of the bundle data extracted from the object's UPROPERTY meta tags.
+
+### Format
+
+Bundle names are keys in the `sgdtAssetBundles` mapping. Each key maps to a sequence of entries, where each entry has a `property` and a `path`.
+
+```yaml
+metadata:
+  type: UWeaponData
+  version: 1.0.0
+  id: A1B2C3D4-E5F6-7890-ABCD-EF1234567890
+  userfacingid: excalibur
+data:
+  MeshAsset: /Game/Weapons/Meshes/Sword.Sword
+  ImpactMaterial: /Game/Weapons/Materials/ImpactMat.ImpactMat
+  FireSound: /Game/Audio/Weapons/FireSFX.FireSFX
+sgdtAssetBundles:
+  Visual:
+    - property: MeshAsset
+      path: /Game/Weapons/Meshes/Sword.Sword
+    - property: ImpactMaterial
+      path: /Game/Weapons/Materials/ImpactMat.ImpactMat
+  Audio:
+    - property: ImpactMaterial
+      path: /Game/Weapons/Materials/ImpactMat.ImpactMat
+    - property: FireSound
+      path: /Game/Audio/Weapons/FireSFX.FireSFX
+```
+
+### Behavior
+
+- The `sgdtAssetBundles` mapping is only written if the object has at least one bundled soft reference with a valid (non-null) path.
+- Properties tagged with multiple bundles (e.g., `meta=(AssetBundles="Visual,Audio")`) appear in each named bundle.
+- Properties without the `AssetBundles` meta tag are not included.
+- Container properties (`TArray`, `TMap`, `TSet`) tagged with `AssetBundles` propagate their bundle names to inner soft reference elements.
+- During deserialization, the `sgdtAssetBundles` mapping is informational only. Runtime bundle data is always extracted from UPROPERTY meta tags after properties are populated.
+
+### Extraction Without Full Deserialization
+
+The `ExtractSGDTAssetBundles()` method on the serializer can parse the `sgdtAssetBundles` mapping from a YAML string without deserializing the full object. This is useful for cook pipelines and editor tooling.
+
 ## Third-Party Attribution
 
 The YAML serializer uses the fkYAML library under the MIT license.

@@ -18,6 +18,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Core/SGDynamicTextAsset.h"
+#include "Core/SGDynamicTextAssetBundleData.h"
 
 bool FSGDynamicTextAssetCookUtils::CleanCookedDirectory()
 {
@@ -607,12 +608,137 @@ void FSGDynamicTextAssetCookUtils::GatherSoftReferencesFromProperty(const FPrope
 		const void* mapPtr = mapProp->ContainerPtrToValuePtr<void>(ContainerPtr);
 		FScriptMapHelper mapHelper(mapProp, mapPtr);
 
-		for (FScriptMapHelper::FIterator it = mapHelper.CreateIterator(); it; ++it)
+		for (FScriptMapHelper::FIterator itr = mapHelper.CreateIterator(); itr; ++itr)
 		{
-			GatherSoftReferencesFromProperty(mapProp->KeyProp, mapHelper.GetKeyPtr(it.GetInternalIndex()), OutPackageNames);
-			GatherSoftReferencesFromProperty(mapProp->ValueProp, mapHelper.GetValuePtr(it.GetInternalIndex()), OutPackageNames);
+			GatherSoftReferencesFromProperty(mapProp->KeyProp, mapHelper.GetKeyPtr(itr.GetInternalIndex()), OutPackageNames);
+			GatherSoftReferencesFromProperty(mapProp->ValueProp, mapHelper.GetValuePtr(itr.GetInternalIndex()), OutPackageNames);
 		}
 	}
+}
+
+int32 FSGDynamicTextAssetCookUtils::GatherSoftReferencesBySGDTBundle(TMap<FName, TArray<FName>>& OutBundlePackages)
+{
+	OutBundlePackages.Reset();
+
+	TArray<FString> allFiles;
+	FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles(allFiles);
+
+	if (allFiles.IsEmpty())
+	{
+		return 0;
+	}
+
+	// Track unique packages per bundle to avoid duplicates
+	TMap<FName, TSet<FName>> bundlePackageSets;
+	TSet<FName> allUniquePackages;
+	int32 filesProcessed = 0;
+
+	for (const FString& filePath : allFiles)
+	{
+		FSGDynamicTextAssetFileMetadata metadata = FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(filePath);
+		if (!metadata.bIsValid || metadata.ClassName.IsEmpty())
+		{
+			continue;
+		}
+
+		UClass* resolvedClass = FindFirstObject<UClass>(*metadata.ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
+		if (!resolvedClass)
+		{
+			continue;
+		}
+
+		UObject* tempObject = NewObject<UObject>(GetTransientPackage(), resolvedClass);
+		if (!tempObject)
+		{
+			continue;
+		}
+
+		TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FSGDynamicTextAssetFileManager::FindSerializerForFile(filePath);
+		if (!serializer.IsValid())
+		{
+			continue;
+		}
+
+		FString fileContents;
+		if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, fileContents))
+		{
+			continue;
+		}
+
+		TScriptInterface<ISGDynamicTextAssetProvider> provider(tempObject);
+		if (!provider.GetInterface())
+		{
+			continue;
+		}
+
+		bool bMigrated = false;
+		if (!serializer->DeserializeProvider(fileContents, provider.GetInterface(), bMigrated))
+		{
+			continue;
+		}
+
+		// Extract bundle data from the deserialized object
+		FSGDynamicTextAssetBundleData bundleData;
+		bundleData.ExtractFromObject(tempObject);
+
+		// Collect bundled soft references by bundle name
+		TSet<FName> bundledPackages;
+		for (const FSGDynamicTextAssetBundle& bundle : bundleData.Bundles)
+		{
+			TSet<FName>& packageSet = bundlePackageSets.FindOrAdd(bundle.BundleName);
+			for (const FSGDynamicTextAssetBundleEntry& entry : bundle.Entries)
+			{
+				if (entry.AssetPath.IsValid() && !entry.AssetPath.IsNull())
+				{
+					FName packageName = entry.AssetPath.GetLongPackageFName();
+					if (!packageName.IsNone())
+					{
+						FString packageStr = packageName.ToString();
+						if (!packageStr.StartsWith(TEXT("/Script/")))
+						{
+							packageSet.Add(packageName);
+							bundledPackages.Add(packageName);
+							allUniquePackages.Add(packageName);
+						}
+					}
+				}
+			}
+		}
+
+		// Gather all soft references and put unbundled ones under NAME_None
+		TSet<FName> allFilePackages;
+		for (TFieldIterator<FProperty> propertyIt(resolvedClass); propertyIt; ++propertyIt)
+		{
+			GatherSoftReferencesFromProperty(*propertyIt, tempObject, allFilePackages);
+		}
+
+		TSet<FName>& unbundledSet = bundlePackageSets.FindOrAdd(NAME_None);
+		for (const FName& packageName : allFilePackages)
+		{
+			if (!bundledPackages.Contains(packageName))
+			{
+				unbundledSet.Add(packageName);
+				allUniquePackages.Add(packageName);
+			}
+		}
+
+		filesProcessed++;
+	}
+
+	// Convert sets to output arrays
+	for (const TPair<FName, TSet<FName>>& pair : bundlePackageSets)
+	{
+		if (!pair.Value.IsEmpty())
+		{
+			OutBundlePackages.Add(pair.Key, pair.Value.Array());
+		}
+	}
+
+	UE_LOG(LogSGDynamicTextAssetsEditor, Log,
+		TEXT("FSGDynamicTextAssetCookUtils: Gathered %d unique soft reference(s) across %d bundle(s) from %d/%d DTA file(s)"),
+		allUniquePackages.Num(), OutBundlePackages.Num(), filesProcessed, allFiles.Num());
+
+	return allUniquePackages.Num();
 }
 
 int32 FSGDynamicTextAssetCookUtils::GatherSoftReferencesFromAllFiles(TArray<FName>& OutPackageNames)

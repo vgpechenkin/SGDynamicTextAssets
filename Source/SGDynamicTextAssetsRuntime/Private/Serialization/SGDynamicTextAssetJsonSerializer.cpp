@@ -242,10 +242,41 @@ bool FSGDynamicTextAssetJsonSerializer::SerializeProvider(const ISGDynamicTextAs
         }
     }
 
-    // Build root object: metadata wrapper + data block
+    // Extract and serialize asset bundle metadata from soft reference properties
+    FSGDynamicTextAssetBundleData bundleData;
+    bundleData.ExtractFromObject(providerObject);
+
+    TSharedPtr<FJsonObject> bundlesObject;
+    if (bundleData.HasBundles())
+    {
+        bundlesObject = MakeShared<FJsonObject>();
+
+        for (const FSGDynamicTextAssetBundle& bundle : bundleData.Bundles)
+        {
+            TArray<TSharedPtr<FJsonValue>> entryArray;
+            entryArray.Reserve(bundle.Entries.Num());
+
+            for (const FSGDynamicTextAssetBundleEntry& entry : bundle.Entries)
+            {
+                TSharedRef<FJsonObject> entryObj = MakeShared<FJsonObject>();
+                entryObj->SetStringField(TEXT("property"), entry.PropertyName.ToString());
+                entryObj->SetStringField(TEXT("path"), entry.AssetPath.ToString());
+                entryArray.Add(MakeShared<FJsonValueObject>(entryObj));
+            }
+
+            bundlesObject->SetField(bundle.BundleName.ToString(), MakeShared<FJsonValueArray>(entryArray));
+        }
+    }
+
+    // Build root object: metadata wrapper + data block + optional bundles
     TSharedRef<FJsonObject> rootObject = MakeShared<FJsonObject>();
     rootObject->SetObjectField(KEY_METADATA, metadataObject);
     rootObject->SetObjectField(KEY_DATA, dataObject);
+
+    if (bundlesObject.IsValid())
+    {
+        rootObject->SetObjectField(KEY_SGDT_ASSET_BUNDLES, bundlesObject.ToSharedRef());
+    }
 
     // Convert to string with pretty printing
     TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&OutString);
@@ -303,7 +334,7 @@ bool FSGDynamicTextAssetJsonSerializer::DeserializeProvider(const FString& InStr
 
     const TSharedPtr<FJsonObject>& metadataObject = *metadataObjectPtr;
 
-    // Validate class type matches — type field may contain a GUID (new format) or class name (legacy)
+    // Validate class type matches  - type field may contain a GUID (new format) or class name (legacy)
     FString typeFieldValue;
     if (metadataObject->TryGetStringField(KEY_TYPE, typeFieldValue))
     {
@@ -526,7 +557,7 @@ bool FSGDynamicTextAssetJsonSerializer::DeserializeProvider(const FString& InStr
                         FScriptMapHelper mapHelper(mapProp, valuePtr);
                         mapHelper.EmptyValues();
 
-                        for (const auto& pair : (*mapObjectPtr)->Values)
+                        for (const TPair<FString, TSharedPtr<FJsonValue>>& pair : (*mapObjectPtr)->Values)
                         {
                             const int32 newIndex = mapHelper.AddDefaultValue_Invalid_NeedsRehash();
                             uint8* keyPtr = mapHelper.GetKeyPtr(newIndex);
@@ -752,4 +783,79 @@ FString FSGDynamicTextAssetJsonSerializer::GetDefaultFileContent(const UClass* D
         *UserFacingId,
         *KEY_DATA
     );
+}
+
+bool FSGDynamicTextAssetJsonSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData) const
+{
+    OutBundleData.Reset();
+
+    if (InString.IsEmpty())
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("ExtractSGDTAssetBundles(JSON): InString is empty"));
+        return false;
+    }
+
+    TSharedRef<TJsonReader<>> reader = TJsonReaderFactory<>::Create(InString);
+    TSharedPtr<FJsonObject> rootObject;
+    if (!FJsonSerializer::Deserialize(reader, rootObject) || !rootObject.IsValid())
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("ExtractSGDTAssetBundles(JSON): Failed to parse JSON"));
+        return false;
+    }
+
+    const TSharedPtr<FJsonObject>* bundlesObject = nullptr;
+    if (!rootObject->TryGetObjectField(KEY_SGDT_ASSET_BUNDLES, bundlesObject) || !bundlesObject || !bundlesObject->IsValid())
+    {
+        return false;
+    }
+
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& bundlePair : (*bundlesObject)->Values)
+    {
+        const FName bundleName = FName(*bundlePair.Key);
+
+        const TArray<TSharedPtr<FJsonValue>>* entryArray = nullptr;
+        if (!bundlePair.Value.IsValid() || bundlePair.Value->Type != EJson::Array)
+        {
+            continue;
+        }
+
+        entryArray = &bundlePair.Value->AsArray();
+
+        for (const TSharedPtr<FJsonValue>& entryValue : *entryArray)
+        {
+            if (!entryValue.IsValid() || entryValue->Type != EJson::Object)
+            {
+                continue;
+            }
+
+            const TSharedPtr<FJsonObject>& entryObj = entryValue->AsObject();
+            FString propertyName;
+            FString pathString;
+
+            if (entryObj->TryGetStringField(TEXT("property"), propertyName) &&
+                entryObj->TryGetStringField(TEXT("path"), pathString))
+            {
+                FSGDynamicTextAssetBundle* targetBundle = nullptr;
+                for (FSGDynamicTextAssetBundle& bundle : OutBundleData.Bundles)
+                {
+                    if (bundle.BundleName == bundleName)
+                    {
+                        targetBundle = &bundle;
+                        break;
+                    }
+                }
+
+                if (!targetBundle)
+                {
+                    FSGDynamicTextAssetBundle& newBundle = OutBundleData.Bundles.AddDefaulted_GetRef();
+                    newBundle.BundleName = bundleName;
+                    targetBundle = &newBundle;
+                }
+
+                targetBundle->Entries.Emplace(FSoftObjectPath(pathString), FName(*propertyName));
+            }
+        }
+    }
+
+    return OutBundleData.HasBundles();
 }

@@ -145,7 +145,7 @@ public:
      * Pass the TypeId to FindSerializerForTypeId() to obtain the correct deserializer.
      *
      * @param FilePath             Absolute path to the file
-     * @param OutContents          Output string — always a text payload after return
+     * @param OutContents          Output string  - always a text payload after return
      * @param OutSerializerTypeId  For binary files: TypeId from the binary header.
      *                             For text files: 0. Pass nullptr to ignore.
      * @return True if file was read successfully
@@ -217,7 +217,7 @@ public:
      * AssetTypeId) is preserved through the round-trip.
      *
      * Source control operations (mark-for-add, mark-for-delete) are NOT handled
-     * by this method — the caller is responsible for managing source control state.
+     * by this method  - the caller is responsible for managing source control state.
      *
      * @param SourceFilePath   Absolute path to the source file
      * @param TargetExtension  Target format extension (e.g., ".dta.xml", ".dta.yaml")
@@ -415,7 +415,7 @@ private:
     /** Registered serializers keyed by file extension (case-insensitive) */
     static TMap<FString, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS;
 
-    /** Registered serializers keyed by integer type ID — used for binary file routing */
+    /** Registered serializers keyed by integer type ID  - used for binary file routing */
     static TMap<uint32, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS_BY_ID;
 };
 

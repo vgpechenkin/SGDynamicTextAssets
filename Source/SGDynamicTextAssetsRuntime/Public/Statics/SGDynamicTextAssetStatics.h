@@ -9,6 +9,7 @@
 #include "Core/SGDynamicTextAssetId.h"
 #include "Core/SGDynamicTextAssetTypeId.h"
 #include "Core/ISGDynamicTextAssetProvider.h"
+#include "Core/SGDynamicTextAssetBundleData.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "SGDynamicTextAssetDelegates.h"
 
@@ -108,15 +109,30 @@ public:
 	/**
 	 * Loads the dynamic text asset asynchronously.
 	 * The callback will be called when loading completes (or fails).
-	 * 
+	 *
+	 * When BundleNames is non-empty, the referenced assets for those bundles
+	 * are also async-loaded before the callback fires. The callback is only
+	 * invoked once both the DTA and all requested bundle assets are ready.
+	 *
 	 * @param WorldContextObject Object used to get the game instance
 	 * @param Ref The reference to load
 	 * @param OnLoaded Callback when loading completes
+	 * @param BundleNames [Optional] Bundle names to async-load after the DTA is cached. Empty loads no bundles.
 	 * @param FilePath [Optional] The file path to load from. If empty, the system will search for the file using the ID.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Reference", meta = (WorldContext = "WorldContextObject", AutoCreateRefTerm = "FilePath", AdvancedDisplay = "FilePath"))
+	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Reference", meta = (WorldContext = "WorldContextObject",
+		AutoCreateRefTerm = "BundleNames, FilePath", AdvancedDisplay = "BundleNames, FilePath"))
 	static void LoadDynamicTextAssetRefAsync(const UObject* WorldContextObject,
-		const FSGDynamicTextAssetRef& Ref, FOnDynamicTextAssetRefLoaded OnLoaded, const FString& FilePath = TEXT(""));
+		const FSGDynamicTextAssetRef& Ref, FOnDynamicTextAssetRefLoaded OnLoaded,
+		const TArray<FName>& BundleNames, const FString& FilePath = TEXT(""));
+
+	/** Shorthand version of ::LoadDynamicTextAssetRefAsync with empty BundleNames and FilePath. */
+	static void LoadDynamicTextAssetRefAsync(const UObject* WorldContextObject,
+		const FSGDynamicTextAssetRef& Ref, FOnDynamicTextAssetRefLoaded OnLoaded)
+	{
+		LoadDynamicTextAssetRefAsync(WorldContextObject, Ref, MoveTemp(OnLoaded),
+			TArray<FName>(), FString());
+	}
 
 	/**
 	 * Removes the referenced dynamic text asset from the cache (unloads it).
@@ -418,6 +434,51 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Validation")
 	static FString ValidationResultToString(const FSGDynamicTextAssetValidationResult& Result);
 
+	/** Returns true if the bundle data contains any bundles. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static bool HasBundles(const FSGDynamicTextAssetBundleData& BundleData);
+
+	/**
+	 * Returns the number of bundles in the bundle data.
+	 *
+	 * @param BundleData The bundle data to query
+	 * @return The number of bundles
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static int32 GetBundleCount(const FSGDynamicTextAssetBundleData& BundleData);
+
+	/**
+	 * Populates the output array with all bundle names.
+	 *
+	 * @param BundleData The bundle data to query
+	 * @param OutBundleNames Array populated with bundle names
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static void GetBundleNames(const FSGDynamicTextAssetBundleData& BundleData, TArray<FName>& OutBundleNames);
+
+	/**
+	 * Collects all soft object paths for a specific bundle.
+	 * Appends to OutPaths without clearing it first.
+	 *
+	 * @param BundleData The bundle data to query
+	 * @param BundleName The bundle to get paths for
+	 * @param OutPaths Array to append soft object paths to
+	 * @return True if the bundle was found and had entries
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static bool GetPathsForBundle(const FSGDynamicTextAssetBundleData& BundleData, FName BundleName, TArray<FSoftObjectPath>& OutPaths);
+
+	/**
+	 * Returns all entries for a specific bundle.
+	 *
+	 * @param BundleData The bundle data to query
+	 * @param BundleName The bundle to get entries for
+	 * @param OutEntries Array populated with bundle entries
+	 * @return True if the bundle was found
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static bool GetBundleEntries(const FSGDynamicTextAssetBundleData& BundleData, FName BundleName, TArray<FSGDynamicTextAssetBundleEntry>& OutEntries);
+
 	/**
 	 * Logs all registered serializer types and their IDs to the runtime log.
 	 * Useful for diagnosing registration issues or verifying plugin serializer load order.
@@ -440,7 +501,7 @@ public:
 
 	/**
 	 * Finds a registered serializer by its integer type ID.
-	 * C++ only — not Blueprint exposed (serializer instances are not UObjects).
+	 * C++ only  - not Blueprint exposed (serializer instances are not UObjects).
 	 * Use this to get the serializer for a payload extracted from a binary file.
 	 *
 	 * @param TypeId The serializer type ID to look up
@@ -463,9 +524,18 @@ public:
 	/**
 	 * Returns the integer TypeId for the serializer registered under the given file extension.
 	 * Returns 0 if no serializer is registered for that extension.
-	 * C++ only — use FindSerializerForTypeId to go the other direction.
+	 * C++ only  - use FindSerializerForTypeId to go the other direction.
 	 *
 	 * @param Extension File extension without leading dot (e.g., "dta.json")
 	 */
 	static uint32 GetTypeIdForExtension(const FString& Extension);
+
+	/**
+	 * Handles validating soft paths (soft objects and soft classes) properties on this dynamic text asset
+	 * with the goal of confirming if they are pointing to a real asset and the path isn't invalid.
+	 */
+	static void ValidateSoftPathsInProperty(const FProperty* Property,
+		const void* ContainerPtr,
+		const FString& PropertyPath,
+		FSGDynamicTextAssetValidationResult& OutResult);
 };

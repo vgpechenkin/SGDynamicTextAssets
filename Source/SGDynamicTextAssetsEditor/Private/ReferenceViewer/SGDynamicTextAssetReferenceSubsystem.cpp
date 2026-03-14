@@ -2,32 +2,33 @@
 
 #include "ReferenceViewer/SGDynamicTextAssetReferenceSubsystem.h"
 
-#include "AssetRegistry/IAssetRegistry.h"
-#include "Components/ActorComponent.h"
-#include "Containers/Ticker.h"
+#include "SGDynamicTextAssetEditorLogs.h"
+#include "Settings/SGDynamicTextAssetEditorSettings.h"
 #include "Core/ISGDynamicTextAssetProvider.h"
 #include "Core/SGDynamicTextAssetRef.h"
-#include "Dom/JsonObject.h"
-#include "Engine/Blueprint.h"
-#include "Engine/Level.h"
-#include "Engine/SimpleConstructionScript.h"
-#include "Engine/World.h"
-#include "GameFramework/Actor.h"
-#include "Framework/Notifications/NotificationManager.h"
-#include "HAL/FileManager.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Management/SGDynamicTextAssetFileMetadata.h"
+#include "Serialization/SGDynamicTextAssetJsonSerializer.h"
+#include "AssetRegistry/AssetData.h"
+#include "AssetRegistry/IAssetRegistry.h"
+#include "Components/ActorComponent.h"
+#include "Engine/Blueprint.h"
+#include "Engine/Level.h"
+#include "Engine/World.h"
+#include "UObject/Package.h"
+#include "GameFramework/Actor.h"
+#include "Containers/Ticker.h"
+#include "Dom/JsonObject.h"
+#include "Engine/SimpleConstructionScript.h"
+#include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "Misc/ScopedSlowTask.h"
+#include "Framework/Notifications/NotificationManager.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
-#include "Settings/SGDynamicTextAssetEditorSettings.h"
-#include "Serialization/SGDynamicTextAssetJsonSerializer.h"
-#include "SGDynamicTextAssetEditorLogs.h"
-#include "UObject/Package.h"
 
 void USGDynamicTextAssetReferenceSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -116,7 +117,7 @@ void USGDynamicTextAssetReferenceSubsystem::FindDependencies(const FSGDynamicTex
 		return;
 	}
 
-	// Skip abstract classes — they cannot be instantiated
+	// Skip abstract classes  - they cannot be instantiated
 	if (dataObjectClass->HasAnyClassFlags(CLASS_Abstract))
 	{
 		UE_LOG(LogSGDynamicTextAssetsEditor, Warning, TEXT("FindDependencies: Class '%s' is abstract, cannot instantiate for ID %s"), *metadata.ClassName, *Id.ToString());
@@ -630,7 +631,7 @@ void USGDynamicTextAssetReferenceSubsystem::ProcessDynamicTextAssetFile(const FS
 		return;
 	}
 
-	// Skip abstract classes — they cannot be instantiated
+	// Skip abstract classes  - they cannot be instantiated
 	if (dataObjectClass->HasAnyClassFlags(CLASS_Abstract))
 	{
 		return;
@@ -791,7 +792,7 @@ void USGDynamicTextAssetReferenceSubsystem::ScanDynamicTextAssetFiles()
 			continue;
 		}
 
-		// Skip abstract classes — they cannot be instantiated
+		// Skip abstract classes  - they cannot be instantiated
 		if (dataObjectClass->HasAnyClassFlags(CLASS_Abstract))
 		{
 			continue;
@@ -1028,10 +1029,10 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractRefsFromProperty(
 		const void* mapPtr = mapProp->ContainerPtrToValuePtr<void>(ContainerPtr);
 		FScriptMapHelper mapHelper(mapProp, mapPtr);
 
-		for (FScriptMapHelper::FIterator it = mapHelper.CreateIterator(); it; ++it)
+		for (FScriptMapHelper::FIterator itr = mapHelper.CreateIterator(); itr; ++itr)
 		{
 			// Check map values (keys are unlikely to be FSGDynamicTextAssetRef but check both)
-			const void* valuePtr = mapHelper.GetValuePtr(it.GetInternalIndex());
+			const void* valuePtr = mapHelper.GetValuePtr(itr.GetInternalIndex());
 			FString valuePath = FString::Printf(TEXT("%s[Value]"), *PropertyPath);
 
 			if (const FStructProperty* valueStruct = CastField<FStructProperty>(mapProp->ValueProp))
@@ -1216,9 +1217,9 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractDepsFromProperty(
 		const void* mapPtr = mapProp->ContainerPtrToValuePtr<void>(ContainerPtr);
 		FScriptMapHelper mapHelper(mapProp, mapPtr);
 
-		for (FScriptMapHelper::FIterator it = mapHelper.CreateIterator(); it; ++it)
+		for (FScriptMapHelper::FIterator itr = mapHelper.CreateIterator(); itr; ++itr)
 		{
-			const void* valuePtr = mapHelper.GetValuePtr(it.GetInternalIndex());
+			const void* valuePtr = mapHelper.GetValuePtr(itr.GetInternalIndex());
 			FString valuePath = FString::Printf(TEXT("%s[Value]"), *PropertyPath);
 
 			if (const FStructProperty* valueStruct = CastField<FStructProperty>(mapProp->ValueProp))

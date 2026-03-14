@@ -98,6 +98,17 @@ public:
 	static FString GetCookedOutputRootPath();
 
 	/**
+	 * Scans all DTA files and groups soft reference package names by their AssetBundles
+	 * metadata tag value. Deserializes each DTA into a transient UObject and uses
+	 * FSGDynamicTextAssetBundleData::ExtractFromObject() to collect bundle entries.
+	 * Soft references without AssetBundles metadata are grouped under NAME_None.
+	 *
+	 * @param OutBundlePackages Map of bundle name to array of package names
+	 * @return Total number of unique packages found across all bundles
+	 */
+	static int32 GatherSoftReferencesBySGDTBundle(TMap<FName, TArray<FName>>& OutBundlePackages);
+
+	/**
 	 * Scans all DTA files and gathers soft object/class references from their properties.
 	 * Used during cook to ensure referenced assets are included in packaged builds.
 	 *

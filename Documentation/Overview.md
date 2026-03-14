@@ -40,7 +40,7 @@ Dynamic text assets are read-only at runtime. They represent constant configurat
 The core contract is defined by the `ISGDynamicTextAssetProvider` interface. `USGDynamicTextAsset` is the default implementation, but any `UObject` that implements `ISGDynamicTextAssetProvider` can participate in the ecosystem. Registration guards prevent `AActor` and `UActorComponent` subclasses from being registered as providers.
 
 ### Soft References Only
-Dynamic text assets use `FSGDynamicTextAssetRef` (a lightweight `FSGDynamicTextAssetId` wrapper) for cross-references. There are no hard asset references or asset bundles. Hard reference UPROPERTYs (`TObjectPtr<>`, `TSubclassOf<>`) are prohibited at compile time by a UHT validator. Objects are loaded on-demand through the subsystem and resolved lazily.
+Dynamic text assets use `FSGDynamicTextAssetRef` (a lightweight `FSGDynamicTextAssetId` wrapper) for cross-references. Hard reference UPROPERTYs (`TObjectPtr<>`, `TSubclassOf<>`) are prohibited at compile time by a UHT validator. Soft references (`TSoftObjectPtr`, `TSoftClassPtr`) can be tagged with named asset bundles for selective batch loading. Objects are loaded on-demand through the subsystem and resolved lazily.
 
 ### Separation of Concerns
 The plugin is split into two modules:
@@ -62,10 +62,11 @@ Each dynamic text asset carries an `FSGDynamicTextAssetVersion` (Major.Minor.Pat
 |  Reference Viewer (UI)        |       |  FSGDynamicTextAssetId        |
 |  Property Customizations      |       |  FSGDynamicTextAssetRef       |
 |  Source Control Utils         |       |  FSGDynamicTextAssetVersion   |
-|  Cook Pipeline                |       |  USGDynamicTextAssetSubsystem |
-|  Cook Commandlet              |       |  USGDynamicTextAssetRegistry  |
-|  Editor Settings              |       |  FSGDynamicTextAssetFileManager|
-+-------------------------------+       |  JSON Serializer (TypeId=1)   |
+|  Cook Pipeline                |       |  FSGDynamicTextAssetBundleData|
+|  Cook Commandlet              |       |  USGDynamicTextAssetSubsystem |
+|  Editor Settings              |       |  USGDynamicTextAssetRegistry  |
++-------------------------------+       |  FSGDynamicTextAssetFileManager|
+                                        |  JSON Serializer (TypeId=1)   |
                                         |  XML Serializer  (TypeId=2)   |
                                         |  YAML Serializer (TypeId=3)   |
                                         |  Binary Serializer            |
@@ -87,6 +88,8 @@ Each dynamic text asset carries an `FSGDynamicTextAssetVersion` (Major.Minor.Pat
 | **UserFacingId** | A human-readable string identifier (e.g., `"excalibur"`) used as the filename and display name |
 | **GUID** | The raw `FGuid` inside an `FSGDynamicTextAssetId`. Assigned at creation, never changes. |
 | **FSGDynamicTextAssetRef** | A lightweight struct that references a dynamic text asset by `FSGDynamicTextAssetId`, resolved lazily at runtime |
+| **Asset Bundle** | A named group of soft references on a DTA, loaded selectively via `FStreamableManager`. Tagged with `meta=(AssetBundles="BundleName")`. |
+| **Instanced Sub-object** | A polymorphic `UObject` owned by a DTA via `UPROPERTY(Instanced)`. Serialized inline with full class type information. |
 | **`.dta.json`** | The default JSON source file format |
 | **`.dta.xml`** | The XML source file format |
 | **`.dta.yaml`** | The YAML source file format |

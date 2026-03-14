@@ -561,7 +561,7 @@ bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath
         return true;
     }
 
-    // JSON / text files are read directly — TypeId stays 0 (non-binary)
+    // JSON / text files are read directly  - TypeId stays 0 (non-binary)
     if (!FFileHelper::LoadFileToString(OutContents, *FilePath))
     {
         UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::ReadRawFileContents: Failed to read file at FilePath(%s)"), *FilePath);
@@ -619,7 +619,7 @@ bool FSGDynamicTextAssetFileManager::CreateDynamicTextAssetFile(const UClass* Dy
         return false;
     }
 
-    // Look up the registered serializer for this extension — fail early if none registered
+    // Look up the registered serializer for this extension  - fail early if none registered
     TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FindSerializerForExtension(Extension);
     if (!serializer.IsValid())
     {

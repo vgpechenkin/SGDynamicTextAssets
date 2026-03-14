@@ -12,6 +12,7 @@ const FString ISGDynamicTextAssetSerializer::KEY_VERSION = TEXT("version");
 const FString ISGDynamicTextAssetSerializer::KEY_ID = TEXT("id");
 const FString ISGDynamicTextAssetSerializer::KEY_USER_FACING_ID = TEXT("userfacingid");
 const FString ISGDynamicTextAssetSerializer::KEY_DATA = TEXT("data");
+const FString ISGDynamicTextAssetSerializer::KEY_SGDT_ASSET_BUNDLES = TEXT("sgdtAssetBundles");
 
 #if WITH_EDITOR
 const FSlateBrush* ISGDynamicTextAssetSerializer::GetIconBrush() const
@@ -21,6 +22,13 @@ const FSlateBrush* ISGDynamicTextAssetSerializer::GetIconBrush() const
 	return icon;
 }
 #endif
+
+bool ISGDynamicTextAssetSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData) const
+{
+	// Default implementation does not extract bundles.
+	// Format-specific serializers override this to parse their bundle block.
+	return false;
+}
 
 FString ISGDynamicTextAssetSerializer::GetFormatName_String() const
 {
