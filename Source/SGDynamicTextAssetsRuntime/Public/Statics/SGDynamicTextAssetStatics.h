@@ -99,7 +99,7 @@ public:
 	 * Gets the loaded dynamic text asset from the reference.
 	 * Returns an empty TScriptInterface if not loaded or ID is invalid.
 	 * 
-	 * @param WorldContextObject Object used to get the game instance
+	 * @param WorldContextObject Object used to get the game instance (allowed to be null in editor).
 	 * @param Ref The reference to resolve
 	 * @return The loaded provider, or empty TScriptInterface
 	 */
@@ -434,6 +434,31 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Validation")
 	static FString ValidationResultToString(const FSGDynamicTextAssetValidationResult& Result);
 
+	/**
+	 * Retrieves the asset bundle data for the dynamic text asset referenced by the given ref.
+	 * Resolves through the subsystem when available, falls back to the editor cache
+	 * outside of PIE so this works in editor tools and utilities.
+	 * Returns false if the ref is invalid or the asset is not loaded.
+	 *
+	 * @param WorldContextObject Object used to resolve the game instance subsystem (allowed to be null in editor).
+	 * @param Ref The dynamic text asset reference to look up.
+	 * @param OutBundleData Populated with the bundle data if found.
+	 * @return True if the asset was found and bundle data was copied.
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle", meta = (WorldContext = "WorldContextObject"))
+	static bool GetBundleDataFromRef(const UObject* WorldContextObject, const FSGDynamicTextAssetRef& Ref, FSGDynamicTextAssetBundleData& OutBundleData);
+
+	/**
+	 * Retrieves the asset bundle data directly from a dynamic text asset provider.
+	 * Returns false if the provider is null or has no bundle data.
+	 *
+	 * @param Provider The provider to extract bundle data from.
+	 * @param OutBundleData Populated with the provider's bundle data.
+	 * @return True if the provider was valid and had bundle data.
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static bool GetBundleDataFromProvider(const TScriptInterface<ISGDynamicTextAssetProvider>& Provider, FSGDynamicTextAssetBundleData& OutBundleData);
+
 	/** Returns true if the bundle data contains any bundles. */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
 	static bool HasBundles(const FSGDynamicTextAssetBundleData& BundleData);
@@ -478,6 +503,29 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
 	static bool GetBundleEntries(const FSGDynamicTextAssetBundleData& BundleData, FName BundleName, TArray<FSGDynamicTextAssetBundleEntry>& OutEntries);
+
+	/**
+	 * Extracts bundle metadata from a UObject by walking its UClass properties.
+	 *
+	 * Iterates all UPROPERTY fields using TFieldIterator. For each
+	 * FSoftObjectProperty or FSoftClassProperty that has
+	 * meta=(AssetBundles="..."), parses the comma-separated bundle
+	 * names and collects the current FSoftObjectPath value into
+	 * the corresponding bundles.
+	 *
+	 * Recursively handles FStructProperty, FArrayProperty,
+	 * FMapProperty, FSetProperty, and instanced sub-objects
+	 * (CPF_InstancedReference).
+	 *
+	 * @param Object The UObject to extract bundle data from.
+	 * @param BundleData The extracted bundle data.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Bundle")
+	static void ExtractBundleDataFromObject(UObject* Object, UPARAM(ref) FSGDynamicTextAssetBundleData& BundleData);
+
+	/** Resets the bundle data by clearing all bundle data in it. */
+	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Bundle")
+	static void ResetBundleData(UPARAM(ref) FSGDynamicTextAssetBundleData& BundleData);
 
 	/**
 	 * Logs all registered serializer types and their IDs to the runtime log.

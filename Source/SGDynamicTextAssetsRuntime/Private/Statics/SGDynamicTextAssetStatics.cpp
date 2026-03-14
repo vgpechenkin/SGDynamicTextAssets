@@ -26,7 +26,7 @@ namespace SGDynamicTextAssetStaticsInternal
 	{
 		if (!WorldContextObject)
 		{
-			UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("Inputted NULL WorldContextObject"));
+			UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("SGDynamicTextAssetStaticsInternal::GetSubsystem: Inputted NULL WorldContextObject"));
 			return nullptr;
 		}
 		const UWorld* world = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::LogAndReturnNull);
@@ -37,7 +37,7 @@ namespace SGDynamicTextAssetStaticsInternal
 		UGameInstance* gameInstance = world->GetGameInstance();
 		if (!gameInstance)
 		{
-			UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("NULL gameInstance from world(%s)"), *GetNameSafe(world));
+			UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("SGDynamicTextAssetStaticsInternal::GetSubsystem:NULL gameInstance from world(%s)"), *GetNameSafe(world));
 			return nullptr;
 		}
 		return gameInstance->GetSubsystem<USGDynamicTextAssetSubsystem>();
@@ -53,7 +53,7 @@ bool USGDynamicTextAssetStatics::IsDynamicTextAssetRefLoaded(const UObject* Worl
 {
 	if (!Ref.IsValid())
 	{
-		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("Inputted INVALID Ref"));
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::IsDynamicTextAssetRefLoaded: Inputted INVALID Ref"));
 		return false;
 	}
 	USGDynamicTextAssetSubsystem* subsystem = SGDynamicTextAssetStaticsInternal::GetSubsystem(WorldContextObject);
@@ -118,7 +118,7 @@ void USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync(const UObject* Wor
 {
 	if (!Ref.IsValid())
 	{
-		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("Inputted INVALID Ref"));
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync: Inputted INVALID Ref"));
 		OnLoaded.ExecuteIfBound(TScriptInterface<ISGDynamicTextAssetProvider>(), false);
 		return;
 	}
@@ -150,7 +150,7 @@ void USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync(const UObject* Wor
 		}
 
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
-			TEXT("LoadDynamicTextAssetRefAsync: Async-loading %d bundle asset(s) for DTA '%s'"),
+			TEXT("USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync: Async-loading %d bundle asset(s) for DTA '%s'"),
 			paths.Num(), *GetNameSafe(Provider.GetObject()));
 
 		FStreamableManager& streamableManager = UAssetManager::Get().GetStreamableManager();
@@ -163,7 +163,7 @@ void USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync(const UObject* Wor
 					if (!resolved)
 					{
 						UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-							TEXT("LoadDynamicTextAssetRefAsync: Bundle asset failed to resolve after async load - Path='%s'. "
+							TEXT("USGDynamicTextAssetStatics::LoadDynamicTextAssetRefAsync: Bundle asset failed to resolve after async load - Path='%s'. "
 								"Verify the asset is not a Blueprint (UBlueprint objects are stripped in packaged builds) "
 								"and that it is referenced by at least one cooked UE asset."),
 							*paths[i].ToString());
@@ -216,7 +216,7 @@ bool USGDynamicTextAssetStatics::UnloadDynamicTextAssetRef(const UObject* WorldC
 {
 	if (!Ref.IsValid())
 	{
-		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("Inputted INVALID Ref"));
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::UnloadDynamicTextAssetRef: Inputted INVALID Ref"));
 		return false;
 	}
 	USGDynamicTextAssetSubsystem* subsystem = SGDynamicTextAssetStaticsInternal::GetSubsystem(WorldContextObject);
@@ -292,7 +292,7 @@ void USGDynamicTextAssetStatics::GetAllDynamicTextAssetUserFacingIdsByClass(UCla
 
 	if (!DynamicTextAssetClass)
 	{
-		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("Inputted NULL DynamicTextAssetClass"));
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::GetAllDynamicTextAssetUserFacingIdsByClass: Inputted NULL DynamicTextAssetClass"));
 		return;
 	}
 
@@ -315,7 +315,7 @@ void USGDynamicTextAssetStatics::GetAllLoadedDynamicTextAssetsOfClass(const UObj
 
 	if (!DynamicTextAssetClass)
 	{
-		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("Inputted NULL DynamicTextAssetClass"));
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::GetAllLoadedDynamicTextAssetsOfClass: Inputted NULL DynamicTextAssetClass"));
 		return;
 	}
 	USGDynamicTextAssetSubsystem* subsystem = SGDynamicTextAssetStaticsInternal::GetSubsystem(WorldContextObject);
@@ -544,6 +544,44 @@ FString USGDynamicTextAssetStatics::ValidationResultToString(const FSGDynamicTex
 	return Result.ToFormattedString();
 }
 
+bool USGDynamicTextAssetStatics::GetBundleDataFromRef(const UObject* WorldContextObject, const FSGDynamicTextAssetRef& Ref, FSGDynamicTextAssetBundleData& OutBundleData)
+{
+	if (!Ref.IsValid())
+	{
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::GetBundleDataFromRef: Inputted INVALID Ref"));
+		return false;
+	}
+
+	USGDynamicTextAssetSubsystem* subsystem = SGDynamicTextAssetStaticsInternal::GetSubsystem(WorldContextObject);
+	if (subsystem)
+	{
+		return subsystem->GetSGDTAssetBundleDataCopy(Ref.GetId(), OutBundleData);
+	}
+
+#if WITH_EDITOR
+	TScriptInterface<ISGDynamicTextAssetProvider> provider = FSGDynamicTextAssetEditorCache::Get().LoadDynamicTextAsset(Ref.GetId());
+	if (provider.GetInterface())
+	{
+		OutBundleData = provider->GetSGDTAssetBundleData();
+		return OutBundleData.HasBundles();
+	}
+#endif
+
+	return false;
+}
+
+bool USGDynamicTextAssetStatics::GetBundleDataFromProvider(const TScriptInterface<ISGDynamicTextAssetProvider>& Provider, FSGDynamicTextAssetBundleData& OutBundleData)
+{
+	if (!Provider.GetInterface())
+	{
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::GetBundleDataFromProvider: Inputted NULL Provider"));
+		return false;
+	}
+
+	OutBundleData = Provider->GetSGDTAssetBundleData();
+	return OutBundleData.HasBundles();
+}
+
 bool USGDynamicTextAssetStatics::HasBundles(const FSGDynamicTextAssetBundleData& BundleData)
 {
 	return BundleData.HasBundles();
@@ -574,6 +612,21 @@ bool USGDynamicTextAssetStatics::GetBundleEntries(const FSGDynamicTextAssetBundl
 
 	OutEntries = bundle->Entries;
 	return true;
+}
+
+void USGDynamicTextAssetStatics::ExtractBundleDataFromObject(UObject* Object, FSGDynamicTextAssetBundleData& BundleData)
+{
+	if (!Object)
+	{
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::ExtractBundleDataFromObject: Inputted NULL Object"));
+		return;
+	}
+	BundleData.ExtractFromObject(Object);
+}
+
+void USGDynamicTextAssetStatics::ResetBundleData(FSGDynamicTextAssetBundleData& BundleData)
+{
+	BundleData.Reset();
 }
 
 void USGDynamicTextAssetStatics::LogRegisteredSerializers()
@@ -624,12 +677,12 @@ void USGDynamicTextAssetStatics::ValidateSoftPathsInProperty(const FProperty* Pr
 {
 	if (!Property)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("ValidateSoftPathsInProperty: Inputted NULL Property"));
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::ValidateSoftPathsInProperty: Inputted NULL Property"));
         return;
     }
     if (!ContainerPtr)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("ValidateSoftPathsInProperty: Inputted NULL ContainerPtr"));
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("USGDynamicTextAssetStatics::ValidateSoftPathsInProperty: Inputted NULL ContainerPtr"));
         return;
     }
 
