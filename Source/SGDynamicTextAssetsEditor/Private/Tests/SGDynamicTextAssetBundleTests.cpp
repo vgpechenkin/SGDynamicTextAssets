@@ -188,6 +188,30 @@ bool FBundle_ExtractFromObject_MapSoftRefs::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FBundle_ExtractFromObject_SetSoftRefs,
+	"SGDynamicTextAssets.Runtime.Bundle.ExtractFromObject.SetSoftRefs",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FBundle_ExtractFromObject_SetSoftRefs::RunTest(const FString& Parameters)
+{
+	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	asset->SetRefs.Add(TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Set0.Set0"))));
+	asset->SetRefs.Add(TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Set1.Set1"))));
+
+	FSGDynamicTextAssetBundleData bundleData;
+	bundleData.ExtractFromObject(asset);
+
+	const FSGDynamicTextAssetBundle* setBundle = bundleData.FindBundle(FName(TEXT("SetBundle")));
+	TestNotNull(TEXT("SetBundle should exist"), setBundle);
+	if (setBundle)
+	{
+		TestEqual(TEXT("SetBundle should have 2 entries"), setBundle->Entries.Num(), 2);
+	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FBundle_ExtractFromObject_InstancedSubObject,
 	"SGDynamicTextAssets.Runtime.Bundle.ExtractFromObject.InstancedSubObject",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)

@@ -77,6 +77,10 @@ public:
 	UPROPERTY(meta = (AssetBundles = "MapBundle"))
 	TMap<FName, TSoftObjectPtr<UObject>> MapRefs;
 
+	/** Set of bundled soft references. */
+	UPROPERTY(meta = (AssetBundles = "SetBundle"))
+	TSet<TSoftObjectPtr<UObject>> SetRefs;
+
 	/** Struct containing a bundled soft reference. */
 	UPROPERTY()
 	FSGBundleTestStruct StructWithBundle;

@@ -613,6 +613,18 @@ void FSGDynamicTextAssetCookUtils::GatherSoftReferencesFromProperty(const FPrope
 			GatherSoftReferencesFromProperty(mapProp->KeyProp, mapHelper.GetKeyPtr(itr.GetInternalIndex()), OutPackageNames);
 			GatherSoftReferencesFromProperty(mapProp->ValueProp, mapHelper.GetValuePtr(itr.GetInternalIndex()), OutPackageNames);
 		}
+		return;
+	}
+
+	if (const FSetProperty* setProp = CastField<FSetProperty>(Property))
+	{
+		const void* setPtr = setProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+		FScriptSetHelper setHelper(setProp, setPtr);
+
+		for (FScriptSetHelper::FIterator itr = setHelper.CreateIterator(); itr; ++itr)
+		{
+			GatherSoftReferencesFromProperty(setProp->ElementProp, setHelper.GetElementPtr(itr.GetInternalIndex()), OutPackageNames);
+		}
 	}
 }
 

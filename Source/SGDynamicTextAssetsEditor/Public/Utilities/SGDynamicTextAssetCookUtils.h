@@ -125,7 +125,7 @@ private:
 
 	/**
 	 * Recursively walks a property and collects soft object/class reference package names.
-	 * Handles FSoftObjectProperty, FSoftClassProperty, FStructProperty, FArrayProperty, FMapProperty.
+	 * Handles FSoftObjectProperty, FSoftClassProperty, FStructProperty, FArrayProperty, FMapProperty, FSetProperty.
 	 *
 	 * @param Property The property to inspect
 	 * @param ContainerPtr Pointer to the struct/object containing this property

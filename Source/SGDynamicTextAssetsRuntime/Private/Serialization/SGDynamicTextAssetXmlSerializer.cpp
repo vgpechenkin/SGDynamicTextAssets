@@ -272,19 +272,29 @@ namespace FSGDynamicTextAssetXmlSerializerInternals
         const FXmlNode* classNode = Node->FindChildNode(FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY);
         if (!classNode)
         {
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                TEXT("FSGDynamicTextAssetXmlSerializerInternals::XmlNodeToInstancedObjectJsonValue: XML node missing '%s' child element"),
+                *FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY);
             return nullptr;
         }
 
         const FString className = XmlUnescape(classNode->GetContent());
         if (className.IsEmpty())
         {
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                TEXT("FSGDynamicTextAssetXmlSerializerInternals::XmlNodeToInstancedObjectJsonValue: '%s' element is empty"),
+                *FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY);
             return nullptr;
         }
 
-        // Resolve class to get property type information for correct JSON variant conversion
-        UClass* resolvedClass = FindFirstObject<UClass>(*className, EFindFirstObjectOptions::ExactClass);
+        // Resolve class to get property type information for correct JSON variant conversion.
+        // Uses LoadObject (via ResolveInstancedObjectClass) instead of FindFirstObject to ensure
+        // the class can be loaded from disk in packaged builds where it may not yet be in memory.
+        UClass* resolvedClass = FSGDynamicTextAssetSerializerBase::ResolveInstancedObjectClass(className);
         if (!resolvedClass)
         {
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                TEXT("FSGDynamicTextAssetXmlSerializerInternals::XmlNodeToInstancedObjectJsonValue: Failed to resolve class '%s'"), *className);
             return nullptr;
         }
 
@@ -599,38 +609,38 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
 
     if (!OutProvider)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer: Inputted NULL OutProvider"));
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Inputted NULL OutProvider"));
         return false;
     }
 
     UObject* providerObject = OutProvider->_getUObject();
     if (!providerObject)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer: Provider is not a valid UObject"));
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Provider is not a valid UObject"));
         return false;
     }
     if (InString.IsEmpty())
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer: Inputted EMPTY InString"));
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Inputted EMPTY InString"));
         return false;
     }
     FXmlFile xmlFile(InString, EConstructMethod::ConstructFromBuffer);
     if (!xmlFile.IsValid())
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer: Failed to parse XML: %s"), *xmlFile.GetLastError());
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Failed to parse XML: %s"), *xmlFile.GetLastError());
         return false;
     }
     const FXmlNode* rootNode = xmlFile.GetRootNode();
     if (!rootNode)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer: XML has no root node"));
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: XML has no root node"));
         return false;
     }
     // Read metadata block
     const FXmlNode* metadataNode = rootNode->FindChildNode(KEY_METADATA);
     if (!metadataNode)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer: XML missing <%s> block"), *KEY_METADATA);
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: XML missing <%s> block"), *KEY_METADATA);
         return false;
     }
     // Validate class type element may contain a GUID (new format) or class name (legacy)
@@ -648,7 +658,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
                     if (resolvedClass != providerObject->GetClass())
                     {
                         UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-                            TEXT("FSGDynamicTextAssetXmlSerializer: XML Asset Type ID(%s) resolves to class(%s) but OutProvider is class(%s)"),
+                            TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: XML Asset Type ID(%s) resolves to class(%s) but OutProvider is class(%s)"),
                             *typeFieldValue, *resolvedClass->GetName(), *providerObject->GetClass()->GetName());
                         // Continue anyway, might be loading into a parent class
                     }
@@ -656,7 +666,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
                 else
                 {
                     UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-                        TEXT("FSGDynamicTextAssetXmlSerializer: Could not resolve Asset Type ID(%s) to a class"),
+                        TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Could not resolve Asset Type ID(%s) to a class"),
                         *typeFieldValue);
                 }
             }
@@ -667,7 +677,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
             if (typeFieldValue != providerObject->GetClass()->GetName())
             {
                 UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-                    TEXT("FSGDynamicTextAssetXmlSerializer: XML typeName(%s) does not match OutProvider(%s)"),
+                    TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: XML typeName(%s) does not match OutProvider(%s)"),
                     *typeFieldValue, *providerObject->GetClass()->GetName());
                 // Continue anyway, might be loading into a parent class
             }
@@ -699,14 +709,14 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
     if (fileVersion.Major < currentVersion.Major)
     {
         UE_LOG(LogSGDynamicTextAssetsRuntime, Log,
-            TEXT("FSGDynamicTextAssetXmlSerializer: Migration required for Provider(%s): file version(%s) -> class version(%s)"),
+            TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Migration required for Provider(%s): file version(%s) -> class version(%s)"),
             *OutProvider->GetDynamicTextAssetId().ToString(), *fileVersion.ToString(), *currentVersion.ToString());
 
         // Migration passes a null FJsonObject and XML providers must handle that in MigrateFromVersion
         if (!OutProvider->MigrateFromVersion(fileVersion, currentVersion, nullptr))
         {
             UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
-                TEXT("FSGDynamicTextAssetXmlSerializer: Migration failed for Provider(%s) from fileVersion(%s)"),
+                TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Migration failed for Provider(%s) from fileVersion(%s)"),
                 *OutProvider->GetDynamicTextAssetId().ToString(), *fileVersion.ToString());
             return false;
         }
@@ -715,20 +725,20 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
         bOutMigrated = true;
 
         UE_LOG(LogSGDynamicTextAssetsRuntime, Log,
-            TEXT("FSGDynamicTextAssetXmlSerializer: Migration succeeded for Provider(%s): version(%s)"),
+            TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Migration succeeded for Provider(%s): version(%s)"),
             *OutProvider->GetDynamicTextAssetId().ToString(), *OutProvider->GetVersion().ToString());
     }
     else if (fileVersion.Major > currentVersion.Major)
     {
         UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-            TEXT("FSGDynamicTextAssetXmlSerializer: Provider(%s) has file major version fileVersion Major(%d) which is newer than class currentVersion Major(%d). Loading with best-effort."),
+            TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Provider(%s) has file major version fileVersion Major(%d) which is newer than class currentVersion Major(%d). Loading with best-effort."),
             *OutProvider->GetDynamicTextAssetId().ToString(), fileVersion.Major, currentVersion.Major);
     }
     // Find data block
     const FXmlNode* dataNode = rootNode->FindChildNode(KEY_DATA);
     if (!dataNode)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer: XML missing <%s> block"), *KEY_DATA);
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: XML missing <%s> block"), *KEY_DATA);
         return false;
     }
 
@@ -763,7 +773,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
                 if (!DeserializeValueToInstancedObject(jsonValue, objectProp, valuePtr, providerObject))
                 {
                     UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-                        TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize instanced property(%s) on OutProvider(%s)"),
+                        TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Failed to deserialize instanced property(%s) on OutProvider(%s)"),
                         *property->GetName(), *GetNameSafe(providerObject));
                 }
                 continue;
@@ -778,6 +788,12 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
                 if (const FObjectProperty* innerObjProp = CastField<FObjectProperty>(arrayProp->Inner))
                 {
                     const TArray<FXmlNode*>& childNodes = propNode->GetChildrenNodes();
+                    if (childNodes.IsEmpty())
+                    {
+                        UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                            TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Instanced array property '%s' on OutProvider(%s) has no child XML nodes"),
+                            *property->GetName(), *GetNameSafe(providerObject));
+                    }
                     FScriptArrayHelper arrayHelper(arrayProp, valuePtr);
                     arrayHelper.Resize(childNodes.Num());
 
@@ -787,7 +803,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
                         if (!DeserializeValueToInstancedObject(elemValue, innerObjProp, arrayHelper.GetRawPtr(i), providerObject))
                         {
                             UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-                                TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize instanced array element [%d] of property(%s) on OutProvider(%s)"),
+                                TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Failed to deserialize instanced array element [%d] of property(%s) on OutProvider(%s)"),
                                 i, *property->GetName(), *GetNameSafe(providerObject));
                         }
                     }
@@ -814,7 +830,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
                         if (!DeserializeValueToInstancedObject(elemValue, elemObjProp, setHelper.GetElementPtr(newIndex), providerObject))
                         {
                             UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-                                TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize instanced set element [%d] of property(%s) on OutProvider(%s)"),
+                                TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Failed to deserialize instanced set element [%d] of property(%s) on OutProvider(%s)"),
                                 i, *property->GetName(), *GetNameSafe(providerObject));
                         }
                     }
@@ -846,7 +862,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
                         if (!DeserializeValueToInstancedObject(elemValue, valueObjProp, valPtr, providerObject))
                         {
                             UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-                                TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize instanced map value for key '%s' of property(%s)"),
+                                TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Failed to deserialize instanced map value for key '%s' of property(%s)"),
                                 *child->GetTag(), *property->GetName());
                         }
                     }
@@ -862,7 +878,7 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
         {
             if (!DeserializeValueToProperty(jsonValue, property, valuePtr))
             {
-                UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("FSGDynamicTextAssetXmlSerializer: Failed to deserialize property(%s) on OutProvider(%s)"),
+                UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Failed to deserialize property(%s) on OutProvider(%s)"),
                     *property->GetName(), *GetNameSafe(providerObject));
             }
         }

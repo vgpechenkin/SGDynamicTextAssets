@@ -33,6 +33,61 @@ namespace FSGDynamicTextAssetYamlSerializerInternals
     }
 
     /**
+     * Finds a key in a YAML mapping node using case-insensitive comparison.
+     *
+     * UE FName is case-insensitive but case-preserving (stores whichever casing
+     * was registered first). property->GetName() may therefore return different
+     * casings in editor vs packaged builds. YAML keys written in the editor
+     * preserve the original casing, so a direct std::string lookup can fail
+     * when the FName registration order differs between builds.
+     *
+     * @param MappingNode The YAML mapping node to search
+     * @param Key The key to find (case-insensitive)
+     * @param OutActualKey If found, set to the actual key string from the YAML node
+     * @return True if a matching key was found
+     */
+    bool FindKeyCaseInsensitive(const fkyaml::node& MappingNode, const std::string& Key, std::string& OutActualKey)
+    {
+        if (!MappingNode.is_mapping())
+        {
+            return false;
+        }
+
+        // Try exact match first (fast path)
+        if (MappingNode.contains(Key))
+        {
+            OutActualKey = Key;
+            return true;
+        }
+
+        // Fall back to case-insensitive search
+        for (auto& pair : MappingNode.map_items())
+        {
+            const std::string& nodeKey = pair.key().get_value<std::string>();
+            if (nodeKey.size() == Key.size())
+            {
+                bool bMatch = true;
+                for (size_t i = 0; i < Key.size(); ++i)
+                {
+                    if (std::tolower(static_cast<unsigned char>(nodeKey[i])) !=
+                        std::tolower(static_cast<unsigned char>(Key[i])))
+                    {
+                        bMatch = false;
+                        break;
+                    }
+                }
+                if (bMatch)
+                {
+                    OutActualKey = nodeKey;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Recursively converts a FJsonValue tree to a fkYAML node.
      *
      * @param Value The JSON value to convert
@@ -354,25 +409,36 @@ namespace FSGDynamicTextAssetYamlSerializerInternals
         const std::string classKey = ToStdString(FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY);
         if (!YamlNode.contains(classKey))
         {
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                TEXT("FSGDynamicTextAssetYamlSerializerInternals::YamlNodeToInstancedObjectJsonValue: YAML mapping missing '%s' key"),
+                *FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY);
             return nullptr;
         }
 
         const fkyaml::node& classNode = YamlNode[classKey];
         if (!classNode.is_string())
         {
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                TEXT("FSGDynamicTextAssetYamlSerializerInternals::YamlNodeToInstancedObjectJsonValue: '%s' value is not a string"),
+                *FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY);
             return nullptr;
         }
 
         const FString className = ToFString(classNode.get_value<std::string>());
         if (className.IsEmpty())
         {
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                TEXT("FSGDynamicTextAssetYamlSerializerInternals::YamlNodeToInstancedObjectJsonValue: '%s' value is empty"),
+                *FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY);
             return nullptr;
         }
 
-        // Resolve class to get property type information for correct JSON variant conversion
-        UClass* resolvedClass = FindFirstObject<UClass>(*className, EFindFirstObjectOptions::ExactClass);
+        // Resolve class to get property type information for correct JSON variant conversion.
+        UClass* resolvedClass = FSGDynamicTextAssetSerializerBase::ResolveInstancedObjectClass(className);
         if (!resolvedClass)
         {
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                TEXT("FSGDynamicTextAssetYamlSerializerInternals::YamlNodeToInstancedObjectJsonValue: Failed to resolve class '%s'"), *className);
             return nullptr;
         }
 
@@ -741,6 +807,7 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
         UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetYamlSerializer: Provider is not a valid UObject"));
         return false;
     }
+
     if (InString.IsEmpty())
     {
         UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetYamlSerializer: Inputted EMPTY InString"));
@@ -900,8 +967,13 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
             continue;
         }
 
-        const std::string propName = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(property->GetName());
-        if (!dataNode.contains(propName))
+        // Use case-insensitive lookup to match YAML keys against property names.
+        // FName is case-insensitive but case-preserving, so property->GetName()
+        // may return different casings in editor vs packaged builds. The YAML file
+        // preserves the original casing from when it was written (typically in the editor).
+        const std::string propNameFromReflection = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(property->GetName());
+        std::string propName;
+        if (!FSGDynamicTextAssetYamlSerializerInternals::FindKeyCaseInsensitive(dataNode, propNameFromReflection, propName))
         {
             // Missing optional field - tolerated gracefully
             continue;
@@ -955,6 +1027,12 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
                             }
                         }
                     }
+                    else
+                    {
+                        UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                            TEXT("FSGDynamicTextAssetYamlSerializer: Expected sequence for instanced array property '%s' on OutProvider(%s), got different YAML node type"),
+                            *property->GetName(), *GetNameSafe(providerObject));
+                    }
                     continue;
                 }
             }
@@ -985,6 +1063,12 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
                                     i, *property->GetName(), *GetNameSafe(providerObject));
                             }
                         }
+                    }
+                    else
+                    {
+                        UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                            TEXT("FSGDynamicTextAssetYamlSerializer: Expected sequence for instanced set property '%s' on OutProvider(%s), got different YAML node type"),
+                            *property->GetName(), *GetNameSafe(providerObject));
                     }
 
                     setHelper.Rehash();
@@ -1023,6 +1107,12 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
                                     *keyStr, *property->GetName());
                             }
                         }
+                    }
+                    else
+                    {
+                        UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
+                            TEXT("FSGDynamicTextAssetYamlSerializer: Expected mapping for instanced map property '%s' on OutProvider(%s), got different YAML node type"),
+                            *property->GetName(), *GetNameSafe(providerObject));
                     }
 
                     mapHelper.Rehash();
