@@ -49,7 +49,7 @@ void FSGDynamicTextAssetSlateStyles::Initialize()
 	StyleSet->Set(BRUSH_NAME_YAML, new IMAGE_BRUSH_PNG(TEXT("yaml_icon"),
 		FVector2D(FSGDynamicTextAssetSlateStylesInternal::REGULAR_ICON_SIZE)));
 
-	StyleSet->Set(BRUSH_NAME_ASSET_BUNDLE, new IMAGE_BRUSH_PNG(TEXT("json_icon"),
+	StyleSet->Set(BRUSH_NAME_ASSET_BUNDLE, new IMAGE_BRUSH_PNG(TEXT("asset_bundles_icon"),
 		FVector2D(FSGDynamicTextAssetSlateStylesInternal::REGULAR_ICON_SIZE)));
 
 	FSlateStyleRegistry::RegisterSlateStyle(*StyleSet);

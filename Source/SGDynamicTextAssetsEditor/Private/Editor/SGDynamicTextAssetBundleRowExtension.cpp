@@ -19,7 +19,6 @@ bool FSGDynamicTextAssetPropertyExtensionHandler::IsPropertyExtendable(
 	{
 		return false;
 	}
-
 	const FProperty* property = PropertyHandle.GetProperty();
 	if (!property)
 	{
@@ -41,10 +40,16 @@ void FSGDynamicTextAssetPropertyExtensionHandler::ExtendWidgetRow(
 	{
 		return;
 	}
+	// Grab the existing value widget and wrap it with the icon prepended on the left
+	TSharedPtr<SWidget> existingValueWidget = InWidgetRow.ValueWidget.Widget;
+	if (!existingValueWidget.IsValid())
+	{
+		return;
+	}
 
 	const FString& bundleMeta = property->GetMetaData(TEXT("AssetBundles"));
 
-	// Format each bundle name as a bulleted list entry
+	// Format each bundle name as a list entry
 	FString formattedBundles;
 	TArray<FString> bundleNames;
 	bundleMeta.ParseIntoArray(bundleNames, TEXT(","));
@@ -53,27 +58,23 @@ void FSGDynamicTextAssetPropertyExtensionHandler::ExtendWidgetRow(
 		bundleName.TrimStartAndEndInline();
 		formattedBundles += FString::Printf(TEXT("\n- %s"), *bundleName);
 	}
-	FText tooltipText = FText::FromString(FString::Printf(TEXT("Asset Bundles%s"), *formattedBundles));
+	const FText tooltipText = FText::FromString(FString::Printf(TEXT("Asset Bundles for %s:%s"),
+		*property->GetDisplayNameText().ToString(), *formattedBundles));
 
 	UE_LOG(LogSGDynamicTextAssetsEditor, Verbose,
 		TEXT("Adding asset bundle icon for property '%s' (bundles: %s)"),
 		*property->GetName(), *bundleMeta);
 
-	// Grab the existing value widget and wrap it with the icon prepended on the left
-	TSharedPtr<SWidget> existingValueWidget = InWidgetRow.ValueWidget.Widget;
-	if (!existingValueWidget.IsValid())
-	{
-		return;
-	}
-
-	// Shuffle the value content so the icon is infront of the actual property
+	// Reorganize the value content so the icon is in front of the actual property
 	InWidgetRow.ValueContent()
 	[
 		SNew(SHorizontalBox)
+
 		+ SHorizontalBox::Slot()
 		.AutoWidth()
 		.VAlign(VAlign_Center)
-		.Padding(0.0f, 0.0f, 5.0f, 0.0f)
+		// This gets placed within a constrained box so I can't get around the padding on the left side
+		.Padding(0.0f, 0.0f, 3.0f, 0.0f)
 		[
 			SNew(SBox)
 			.WidthOverride(16.0f)
@@ -84,6 +85,7 @@ void FSGDynamicTextAssetPropertyExtensionHandler::ExtendWidgetRow(
 				.ToolTipText(tooltipText)
 			]
 		]
+
 		+ SHorizontalBox::Slot()
 		.FillWidth(1.0f)
 		.VAlign(VAlign_Center)
