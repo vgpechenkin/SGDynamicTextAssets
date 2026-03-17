@@ -18,6 +18,12 @@
  *
  * To add additional property extensions, add new checks in IsPropertyExtendable()
  * and corresponding widget creation in ExtendWidgetRow().
+ *
+ * *NOTE*
+ * We're only checking the key's for TMap's to keep it simple. Unintended behavior can occur
+ * when trying to support both Key and Value's for TMaps with asset bundles in terms of intended design and intentional choice.
+ * If you want to add that support, its recommended to introduce a new meta tag for values such as `AssetBundles_TMapValues`
+ * to keep it explicit and clear. But then you're managing two types of asset bundle meta tags as a warning.
  */
 class SGDYNAMICTEXTASSETSEDITOR_API FSGDynamicTextAssetPropertyExtensionHandler
 	: public IDetailPropertyExtensionHandler

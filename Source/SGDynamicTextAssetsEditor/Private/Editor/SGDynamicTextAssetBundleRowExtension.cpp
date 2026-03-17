@@ -10,6 +10,33 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/SBoxPanel.h"
 
+namespace Internal_AssetBundleRowExtension
+{
+	/** Returns true if the property holds a soft reference type (TSoftObjectPtr or TSoftClassPtr). */
+	bool IsSoftRefProperty(const FProperty* Property)
+	{
+		return Property->IsA<FSoftObjectProperty>() || Property->IsA<FSoftClassProperty>();
+	}
+
+	/** Returns true if the property is a container (TArray/TMap/TSet) whose inner elements are soft references. */
+	bool IsContainerOfSoftRefs(const FProperty* Property)
+	{
+		if (const FArrayProperty* arrayProp = CastField<FArrayProperty>(Property))
+		{
+			return IsSoftRefProperty(arrayProp->Inner);
+		}
+		if (const FMapProperty* mapProp = CastField<FMapProperty>(Property))
+		{
+			return IsSoftRefProperty(mapProp->ValueProp);
+		}
+		if (const FSetProperty* setProp = CastField<FSetProperty>(Property))
+		{
+			return IsSoftRefProperty(setProp->ElementProp);
+		}
+		return false;
+	}
+}
+
 bool FSGDynamicTextAssetPropertyExtensionHandler::IsPropertyExtendable(
 	const UClass* InObjectClass, const IPropertyHandle& PropertyHandle) const
 {
@@ -25,8 +52,9 @@ bool FSGDynamicTextAssetPropertyExtensionHandler::IsPropertyExtendable(
 		return false;
 	}
 
-	const bool bIsSoftRef = property->IsA<FSoftObjectProperty>() || property->IsA<FSoftClassProperty>();
-	return bIsSoftRef && property->HasMetaData(TEXT("AssetBundles"));
+	const bool bIsSoftRef = Internal_AssetBundleRowExtension::IsSoftRefProperty(property);
+	const bool bIsContainerOfSoftRefs = Internal_AssetBundleRowExtension::IsContainerOfSoftRefs(property);
+	return (bIsSoftRef || bIsContainerOfSoftRefs) && property->HasMetaData(TEXT("AssetBundles"));
 }
 
 void FSGDynamicTextAssetPropertyExtensionHandler::ExtendWidgetRow(

@@ -269,7 +269,7 @@ Soft references without `AssetBundles` metadata are grouped under `NAME_None`.
 
 ## Editor Integration
 
-In the DTA editor's Details panel, soft reference properties with `AssetBundles` metadata display a bundle icon next to the property's value widget. Hovering over the icon shows a tooltip with the bundle names (e.g., "Asset Bundles: Visual, Audio").
+In the DTA editor's Details panel, properties with `AssetBundles` metadata display a bundle icon next to the property's value widget. This applies to soft reference properties (`TSoftObjectPtr`, `TSoftClassPtr`) and container properties (`TArray`, `TMap`, `TSet`) whose elements are soft references. Hovering over the icon shows a tooltip with the bundle names (e.g., "Asset Bundles: Visual, Audio").
 
 This icon display can be toggled via `bShowAssetBundleIcons` in `USGDynamicTextAssetEditorSettings` (default: true).
 

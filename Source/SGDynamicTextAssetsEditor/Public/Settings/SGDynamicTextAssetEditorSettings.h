@@ -53,6 +53,9 @@ public:
 	/**
 	 * Whether to display asset bundle icons next to soft reference properties
 	 * that have meta=(AssetBundles="...") tags in the DTA editor details panel.
+	 *
+	 * *NOTE*
+	 * You will have to close and reopen the open DTA's your editing to see the change applied.
 	 */
 	UPROPERTY(Config, EditAnywhere, Category = "Editor Display")
 	uint8 bShowAssetBundleIcons : 1 = 1;
