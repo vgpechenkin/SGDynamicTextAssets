@@ -354,6 +354,12 @@ bool USGDynamicTextAssetStatics::NotEqual_DynamicTextAssetVersionDynamicTextAsse
 	return A != B;
 }
 
+bool USGDynamicTextAssetStatics::IsVersionInRange(const FSGDynamicTextAssetVersion& Version,
+	const FSGDynamicTextAssetVersion& Min, const FSGDynamicTextAssetVersion& Max)
+{
+	return Version.IsInRange(Min, Max);
+}
+
 FSGDynamicTextAssetId USGDynamicTextAssetStatics::GetDynamicTextAssetId_Provider(const TScriptInterface<ISGDynamicTextAssetProvider>& Provider)
 {
 	if (!Provider)

@@ -210,15 +210,22 @@ public:
 	static constexpr uint32 INVALID_SERIALIZER_TYPE_ID = 0;
 
 	/**
-	 * Wrapper key for the metadata block (format-agnostic logical name).
+	 * Wrapper key for the file information block (format-agnostic logical name).
 	 * All identity fields (type, version, id, userfacingid) are nested under this block.
 	 * Each serializer format determines how this block is represented structurally:
-	 *   JSON  → "metadata": { ... }
-	 *   XML   → <metadata>...</metadata>
-	 *   YAML  → metadata: ...
+	 *   JSON  -> "sgFileInformation": { ... }
+	 *   XML   -> <sgFileInformation>...</sgFileInformation>
+	 *   YAML  -> sgFileInformation: ...
+	 * Value: "sgFileInformation"
+	 */
+	static const FString KEY_FILE_INFORMATION;
+
+	/**
+	 * Legacy key for the file information block, used for backward compatibility
+	 * with files created before format version 2.0.0.
 	 * Value: "metadata"
 	 */
-	static const FString KEY_METADATA;
+	static const FString KEY_METADATA_LEGACY;
 
 	/**
 	 * Key for the type identifier inside the metadata block.

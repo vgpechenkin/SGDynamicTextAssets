@@ -565,7 +565,7 @@ uint32 FSGDynamicTextAssetYamlSerializer::GetSerializerTypeId() const
 
 FSGDynamicTextAssetVersion FSGDynamicTextAssetYamlSerializer::GetFileFormatVersion() const
 {
-    static const FSGDynamicTextAssetVersion version(1, 0, 0);
+    static const FSGDynamicTextAssetVersion version(2, 0, 0);
     return version;
 }
 
@@ -620,7 +620,7 @@ bool FSGDynamicTextAssetYamlSerializer::SerializeProvider(const ISGDynamicTextAs
             fkyaml::node(FSGDynamicTextAssetYamlSerializerInternals::ToStdString(Provider->GetUserFacingId()));
         metadataNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_FORMAT_VERSION)] =
             fkyaml::node(FSGDynamicTextAssetYamlSerializerInternals::ToStdString(GetFileFormatVersion().ToString()));
-        rootNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA)] = metadataNode;
+        rootNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_INFORMATION)] = metadataNode;
 
         // Data block
         fkyaml::node dataNode = fkyaml::node::mapping();
@@ -837,23 +837,25 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
         return false;
     }
 
-    const std::string metadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA);
+    const std::string metadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_INFORMATION);
+    const std::string legacyMetadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA_LEGACY);
+    const std::string& activeMetadataKey = rootNode.contains(metadataKey) ? metadataKey : legacyMetadataKey;
     const std::string dataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_DATA);
     const std::string typeKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_TYPE);
     const std::string versionKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_VERSION);
     const std::string idKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_ID);
     const std::string userFacingIdKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_USER_FACING_ID);
 
-    // Read metadata block
-    if (!rootNode.contains(metadataKey))
+    // Read file information block (supports legacy "metadata" key)
+    if (!rootNode.contains(activeMetadataKey))
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetYamlSerializer: YAML missing '%s' block"), *KEY_METADATA);
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetYamlSerializer: YAML missing '%s' (or legacy '%s') block"), *KEY_FILE_INFORMATION, *KEY_METADATA_LEGACY);
         return false;
     }
-    const fkyaml::node& metadataNode = rootNode[metadataKey];
+    const fkyaml::node& metadataNode = rootNode[activeMetadataKey];
     if (!metadataNode.is_mapping())
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetYamlSerializer: '%s' block is not a mapping"), *KEY_METADATA);
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetYamlSerializer: '%s' block is not a mapping"), *KEY_FILE_INFORMATION);
         return false;
     }
 
@@ -1178,31 +1180,33 @@ bool FSGDynamicTextAssetYamlSerializer::ValidateStructure(const FString& InStrin
         return false;
     }
 
-    const std::string metadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA);
-    if (!rootNode.contains(metadataKey))
+    const std::string metadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_INFORMATION);
+    const std::string legacyMetadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA_LEGACY);
+    const std::string& activeMetadataKey = rootNode.contains(metadataKey) ? metadataKey : legacyMetadataKey;
+    if (!rootNode.contains(activeMetadataKey))
     {
-        OutErrorMessage = FString::Printf(TEXT("Missing required block '%s'"), *KEY_METADATA);
+        OutErrorMessage = FString::Printf(TEXT("Missing required block '%s' (or legacy '%s')"), *KEY_FILE_INFORMATION, *KEY_METADATA_LEGACY);
         return false;
     }
 
-    const fkyaml::node& metadataNode = rootNode[metadataKey];
+    const fkyaml::node& metadataNode = rootNode[activeMetadataKey];
     if (!metadataNode.is_mapping())
     {
-        OutErrorMessage = FString::Printf(TEXT("'%s' block is not a mapping"), *KEY_METADATA);
+        OutErrorMessage = FString::Printf(TEXT("'%s' block is not a mapping"), *KEY_FILE_INFORMATION);
         return false;
     }
 
     const std::string typeKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_TYPE);
     if (!metadataNode.contains(typeKey))
     {
-        OutErrorMessage = FString::Printf(TEXT("Missing required field '%s' inside '%s'"), *KEY_TYPE, *KEY_METADATA);
+        OutErrorMessage = FString::Printf(TEXT("Missing required field '%s' inside '%s'"), *KEY_TYPE, *KEY_FILE_INFORMATION);
         return false;
     }
 
     const fkyaml::node& typeNode = metadataNode[typeKey];
     if (!typeNode.is_string() || typeNode.get_value<std::string>().empty())
     {
-        OutErrorMessage = FString::Printf(TEXT("Field '%s' inside '%s' is empty or not a string"), *KEY_TYPE, *KEY_METADATA);
+        OutErrorMessage = FString::Printf(TEXT("Field '%s' inside '%s' is empty or not a string"), *KEY_TYPE, *KEY_FILE_INFORMATION);
         return false;
     }
 
@@ -1249,13 +1253,15 @@ bool FSGDynamicTextAssetYamlSerializer::ExtractMetadata(const FString& InString,
         return false;
     }
 
-    const std::string metadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA);
-    if (!rootNode.contains(metadataKey))
+    const std::string metadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_INFORMATION);
+    const std::string legacyMetadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA_LEGACY);
+    const std::string& activeMetadataKey = rootNode.contains(metadataKey) ? metadataKey : legacyMetadataKey;
+    if (!rootNode.contains(activeMetadataKey))
     {
         return false;
     }
 
-    const fkyaml::node& metadataNode = rootNode[metadataKey];
+    const fkyaml::node& metadataNode = rootNode[activeMetadataKey];
     if (!metadataNode.is_mapping())
     {
         return false;
@@ -1346,14 +1352,16 @@ bool FSGDynamicTextAssetYamlSerializer::UpdateFieldsInPlace(FString& InOutConten
         return false;
     }
 
-    const std::string metadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA);
-    if (!rootNode.contains(metadataKey) || !rootNode[metadataKey].is_mapping())
+    const std::string metadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_INFORMATION);
+    const std::string legacyMetadataKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA_LEGACY);
+    const std::string& activeMetadataKey = rootNode.contains(metadataKey) ? metadataKey : legacyMetadataKey;
+    if (!rootNode.contains(activeMetadataKey) || !rootNode[activeMetadataKey].is_mapping())
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetYamlSerializer::UpdateFieldsInPlace: Missing or invalid '%s' block"), *KEY_METADATA);
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetYamlSerializer::UpdateFieldsInPlace: Missing or invalid '%s' (or legacy '%s') block"), *KEY_FILE_INFORMATION, *KEY_METADATA_LEGACY);
         return false;
     }
 
-    fkyaml::node& metadataNode = rootNode[metadataKey];
+    fkyaml::node& metadataNode = rootNode[activeMetadataKey];
     bool bAnyUpdated = false;
 
     for (const TPair<FString, FString>& update : FieldUpdates)
@@ -1421,7 +1429,7 @@ FString FSGDynamicTextAssetYamlSerializer::GetDefaultFileContent(const UClass* D
             fkyaml::node(FSGDynamicTextAssetYamlSerializerInternals::ToStdString(UserFacingId));
         metadataNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_FORMAT_VERSION)] =
             fkyaml::node(FSGDynamicTextAssetYamlSerializerInternals::ToStdString(GetFileFormatVersion().ToString()));
-        rootNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_METADATA)] = metadataNode;
+        rootNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_INFORMATION)] = metadataNode;
 
         // Empty data block
         rootNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_DATA)] = fkyaml::node::mapping();
@@ -1547,7 +1555,54 @@ bool FSGDynamicTextAssetYamlSerializer::UpdateFileFormatVersion(FString& InOutFi
         return true;
     }
 
+    // Field not found - insert it before the "data:" key
+    // Look for either "sgFileInformation:" or "metadata:" block, then find the next top-level key to insert before
+    const FRegexPattern dataPattern(TEXT("(^|\\n)(data:\\s)"));
+    FRegexMatcher dataMatcher(dataPattern, InOutFileContents);
+
+    if (dataMatcher.FindNext())
+    {
+        // Insert the field as a child of the metadata block, right before "data:"
+        const FString insertion = FString::Printf(TEXT("  %s: %s\n"),
+            *KEY_FILE_FORMAT_VERSION, *NewVersion.ToString());
+
+        const int32 dataPos = dataMatcher.GetMatchBeginning();
+        // Skip the newline if matched
+        const int32 insertAt = InOutFileContents[dataPos] == TEXT('\n') ? dataPos + 1 : dataPos;
+
+        InOutFileContents = InOutFileContents.Left(insertAt) + insertion + InOutFileContents.Mid(insertAt);
+        return true;
+    }
+
     UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-        TEXT("FSGDynamicTextAssetYamlSerializer::UpdateFileFormatVersion: Could not find fileFormatVersion field in file contents"));
+        TEXT("FSGDynamicTextAssetYamlSerializer::UpdateFileFormatVersion: Could not find or insert fileFormatVersion field"));
     return false;
+}
+
+bool FSGDynamicTextAssetYamlSerializer::MigrateFileFormat(FString& InOutFileContents,
+    const FSGDynamicTextAssetVersion& CurrentFormatVersion,
+    const FSGDynamicTextAssetVersion& TargetFormatVersion) const
+{
+    if (CurrentFormatVersion == TargetFormatVersion)
+    {
+        return true;
+    }
+
+    // Migration from 1.x to 2.x: rename top-level "metadata:" key to "sgFileInformation:"
+    if (CurrentFormatVersion.Major < 2 && TargetFormatVersion.Major >= 2)
+    {
+        // Match "metadata:" at the start of a line (top-level YAML key)
+        const FRegexPattern pattern(TEXT("(^|\\n)(metadata)(:\\s)"));
+        FRegexMatcher matcher(pattern, InOutFileContents);
+
+        if (matcher.FindNext())
+        {
+            const int32 keyStart = matcher.GetMatchBeginning() + (InOutFileContents[matcher.GetMatchBeginning()] == TEXT('\n') ? 1 : 0);
+            const int32 keyEnd = keyStart + 8; // length of "metadata"
+
+            InOutFileContents = InOutFileContents.Left(keyStart) + KEY_FILE_INFORMATION + InOutFileContents.Mid(keyEnd);
+        }
+    }
+
+    return true;
 }

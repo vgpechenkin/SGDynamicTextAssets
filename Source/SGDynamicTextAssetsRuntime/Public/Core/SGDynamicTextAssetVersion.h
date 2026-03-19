@@ -67,6 +67,16 @@ public:
     /** Returns true if major versions match (compatible for loading) */
     bool IsCompatibleWith(const FSGDynamicTextAssetVersion& Other) const;
 
+    /**
+     * Returns true if this version falls within the given range (inclusive).
+     * Compares Major, Minor, and Patch components using standard ordering.
+     *
+     * @param Min The minimum version (inclusive).
+     * @param Max The maximum version (inclusive).
+     * @return True if Min <= this <= Max.
+     */
+    bool IsInRange(const FSGDynamicTextAssetVersion& Min, const FSGDynamicTextAssetVersion& Max) const;
+
     bool operator==(const FSGDynamicTextAssetVersion& Other) const;
     bool operator!=(const FSGDynamicTextAssetVersion& Other) const;
     bool operator<(const FSGDynamicTextAssetVersion& Other) const;

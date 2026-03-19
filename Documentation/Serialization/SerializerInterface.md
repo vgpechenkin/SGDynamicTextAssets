@@ -79,7 +79,8 @@ Metadata keys are defined as static `FString` constants on `ISGDynamicTextAssetS
 
 | Constant | Value | Usage |
 |----------|-------|-------|
-| `KEY_METADATA` | `"metadata"` | Wrapper block for identity fields |
+| `KEY_FILE_INFORMATION` | `"sgFileInformation"` | Wrapper block for identity fields (renamed from `KEY_METADATA`/`"metadata"` in format v2.0.0) |
+| `KEY_METADATA_LEGACY` | `"metadata"` | Legacy wrapper key for backward compatibility with pre-2.0.0 files |
 | `KEY_TYPE` | `"type"` | Class type name |
 | `KEY_VERSION` | `"version"` | Semantic version string |
 | `KEY_ID` | `"id"` | GUID identifier |
@@ -88,9 +89,9 @@ Metadata keys are defined as static `FString` constants on `ISGDynamicTextAssetS
 | `KEY_DATA` | `"data"` | Property data block |
 
 Each serializer format determines how these keys are structurally represented:
-- **JSON:** `"metadata": { ... }` and `"data": { ... }` as JSON objects
-- **XML:** `<metadata>...</metadata>` and `<data>...</data>` as XML elements
-- **YAML:** `metadata:` and `data:` as YAML mappings
+- **JSON:** `"sgFileInformation": { ... }` and `"data": { ... }` as JSON objects
+- **XML:** `<sgFileInformation>...</sgFileInformation>` and `<data>...</data>` as XML elements
+- **YAML:** `sgFileInformation:` and `data:` as YAML mappings
 
 ## FSGDynamicTextAssetSerializerBase
 

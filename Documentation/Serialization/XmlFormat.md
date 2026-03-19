@@ -19,13 +19,13 @@ Every `.dta.xml` file follows this structure:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <DynamicTextAsset>
-    <metadata>
+    <sgFileInformation>
         <type>UWeaponData</type>
         <version>1.0.0</version>
         <id>A1B2C3D4-E5F6-7890-ABCD-EF1234567890</id>
         <userfacingid>excalibur</userfacingid>
         <fileFormatVersion>1.0.0</fileFormatVersion>
-    </metadata>
+    </sgFileInformation>
     <data>
         <DisplayName>Excalibur</DisplayName>
         <BaseDamage>50.0</BaseDamage>
@@ -37,11 +37,11 @@ Every `.dta.xml` file follows this structure:
 
 ### Root Element
 
-The root element is always `<DynamicTextAsset>`. It contains exactly two child elements: `<metadata>` and `<data>`.
+The root element is always `<DynamicTextAsset>`. It contains exactly two child elements: `<sgFileInformation>` and `<data>`.
 
 ### Metadata Block
 
-The `<metadata>` element contains four child elements with the same keys used across all serializer formats:
+The `<sgFileInformation>` element contains four child elements with the same keys used across all serializer formats:
 
 | Element | Description |
 |---------|-------------|
@@ -130,8 +130,8 @@ All methods are inherited from `ISGDynamicTextAssetSerializer`. See [SerializerI
 |--------|-------------|
 | `SerializeProvider` | Converts a provider's properties to formatted XML with 4-space indentation (UTF-8) |
 | `DeserializeProvider` | Parses XML via `FXmlFile`, reconstructs `FJsonObject` tree from XML elements, then populates UPROPERTY fields via reflection |
-| `ValidateStructure` | Validates that an XML string parses correctly and has the required structure (`<DynamicTextAsset>` root with `<metadata>` and `<data>` children) |
-| `ExtractMetadata` | Extracts all four metadata fields from the `<metadata>` element without full deserialization |
+| `ValidateStructure` | Validates that an XML string parses correctly and has the required structure (`<DynamicTextAsset>` root with `<sgFileInformation>` and `<data>` children) |
+| `ExtractMetadata` | Extracts all four metadata fields from the `<sgFileInformation>` element without full deserialization |
 | `UpdateFieldsInPlace` | Updates metadata fields within an already-serialized XML string in-place |
 | `GetDefaultFileContent` | Generates the initial XML file content for a new dynamic text asset |
 | `GetSerializerTypeId` | Returns `2` |
@@ -148,7 +148,7 @@ See [SerializerInterface.md](SerializerInterface.md) for the full registration p
 
 ## Asset Bundle Metadata
 
-When a dynamic text asset has soft reference properties tagged with `meta=(AssetBundles="...")`, the serializer writes an `<sgdtAssetBundles>` element at the root level alongside `<metadata>` and `<data>`. This element is a snapshot of the bundle data extracted from the object's UPROPERTY meta tags.
+When a dynamic text asset has soft reference properties tagged with `meta=(AssetBundles="...")`, the serializer writes an `<sgdtAssetBundles>` element at the root level alongside `<sgFileInformation>` and `<data>`. This element is a snapshot of the bundle data extracted from the object's UPROPERTY meta tags.
 
 ### Format
 
@@ -157,7 +157,7 @@ Each bundle is represented as a `<bundle>` element with a `name` attribute. Entr
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <DynamicTextAsset>
-    <metadata> ... </metadata>
+    <sgFileInformation> ... </sgFileInformation>
     <data> ... </data>
     <sgdtAssetBundles>
         <bundle name="Visual">

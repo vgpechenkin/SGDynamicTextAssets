@@ -61,7 +61,8 @@ IDs must be globally unique. Duplicate registration is a fatal error.
 The interface defines standard metadata keys used across all formats:
 
 ```cpp
-static const FString KEY_METADATA;       // "metadata"
+static const FString KEY_FILE_INFORMATION; // "sgFileInformation"
+static const FString KEY_METADATA_LEGACY;  // "metadata" (backward compat)
 static const FString KEY_TYPE;           // "type"
 static const FString KEY_VERSION;        // "version"
 static const FString KEY_ID;             // "id"

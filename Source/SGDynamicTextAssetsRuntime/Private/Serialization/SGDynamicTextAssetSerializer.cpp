@@ -6,7 +6,8 @@
 #include "Styling/AppStyle.h"
 #endif
 
-const FString ISGDynamicTextAssetSerializer::KEY_METADATA = TEXT("metadata");
+const FString ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION = TEXT("sgFileInformation");
+const FString ISGDynamicTextAssetSerializer::KEY_METADATA_LEGACY = TEXT("metadata");
 const FString ISGDynamicTextAssetSerializer::KEY_TYPE = TEXT("type");
 const FString ISGDynamicTextAssetSerializer::KEY_VERSION = TEXT("version");
 const FString ISGDynamicTextAssetSerializer::KEY_ID = TEXT("id");

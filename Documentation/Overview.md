@@ -26,7 +26,7 @@ Primary Data Assets work well for many projects, but have limitations that SGDyn
 ## Core Design Principles
 
 ### Text Files as Source of Truth
-All dynamic text assets are authored and stored as text files in the editor. The default format is JSON (`.dta.json`), with XML (`.dta.xml`) and YAML (`.dta.yaml`) also supported through the pluggable serializer architecture. Each file includes a metadata section (`type`, `version`, `id`, `userfacingid`) and a `data` section containing the serialized UPROPERTY fields. Binary `.dta.bin` files are produced only during cooking for packaged builds.
+All dynamic text assets are authored and stored as text files in the editor. The default format is JSON (`.dta.json`), with XML (`.dta.xml`) and YAML (`.dta.yaml`) also supported through the pluggable serializer architecture. Each file includes a `sgFileInformation` section (`type`, `version`, `id`, `userfacingid`, `fileFormatVersion`) and a `data` section containing the serialized UPROPERTY fields. Binary `.dta.bin` files are produced only during cooking for packaged builds.
 
 Custom serialization formats can be added by implementing the `ISGDynamicTextAssetSerializer` interface and registering the serializer during module startup. See [Serializer Interface](Serialization/SerializerInterface.md).
 
@@ -51,13 +51,13 @@ The plugin is split into two modules:
 
 The plugin tracks two separate version numbers per file, each serving a distinct purpose:
 
-**Data Version** (`version` field in metadata)
+**Data Version** (`version` field in sgFileInformation)
 - Tracks asset schema changes (property renames, type changes, removed fields)
 - Incremented by the asset class author in their `USGDynamicTextAsset` subclass
 - Major version changes trigger `MigrateFromVersion()` on the asset class, which transforms old data JSON in-place before property deserialization
 - See [Versioning and Migration](Core/VersioningAndMigration.md)
 
-**File Format Version** (`fileFormatVersion` field in metadata)
+**File Format Version** (`fileFormatVersion` field in sgFileInformation)
 - Tracks serializer format structural changes (key renames, block reorganization, encoding changes)
 - Managed automatically by each serializer implementation
 - Major version changes are detected on editor startup and prompt for batch migration via `MigrateFileFormat()` and `UpdateFileFormatVersion()` on the serializer

@@ -76,7 +76,7 @@ uint32 FSGDynamicTextAssetJsonSerializer::GetSerializerTypeId() const
 
 FSGDynamicTextAssetVersion FSGDynamicTextAssetJsonSerializer::GetFileFormatVersion() const
 {
-    static const FSGDynamicTextAssetVersion version(1, 0, 0);
+    static const FSGDynamicTextAssetVersion version(2, 0, 0);
     return version;
 }
 
@@ -278,7 +278,7 @@ bool FSGDynamicTextAssetJsonSerializer::SerializeProvider(const ISGDynamicTextAs
 
     // Build root object: metadata wrapper + data block + optional bundles
     TSharedRef<FJsonObject> rootObject = MakeShared<FJsonObject>();
-    rootObject->SetObjectField(KEY_METADATA, metadataObject);
+    rootObject->SetObjectField(KEY_FILE_INFORMATION, metadataObject);
     rootObject->SetObjectField(KEY_DATA, dataObject);
 
     if (bundlesObject.IsValid())
@@ -334,9 +334,13 @@ bool FSGDynamicTextAssetJsonSerializer::DeserializeProvider(const FString& InStr
 
     // Extract metadata sub-object
     const TSharedPtr<FJsonObject>* metadataObjectPtr;
-    if (!rootObject->TryGetObjectField(KEY_METADATA, metadataObjectPtr) || !metadataObjectPtr->IsValid())
+    if (!rootObject->TryGetObjectField(KEY_FILE_INFORMATION, metadataObjectPtr))
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetJsonSerializer: JSON missing KEY_METADATA(%s) block"), *KEY_METADATA);
+        rootObject->TryGetObjectField(KEY_METADATA_LEGACY, metadataObjectPtr);
+    }
+    if (!metadataObjectPtr || !metadataObjectPtr->IsValid())
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetJsonSerializer: JSON missing '%s' (or legacy '%s') block"), *KEY_FILE_INFORMATION, *KEY_METADATA_LEGACY);
         return false;
     }
 
@@ -628,9 +632,13 @@ bool FSGDynamicTextAssetJsonSerializer::ValidateStructure(const FString& InStrin
 
     // Check for metadata wrapper
     const TSharedPtr<FJsonObject>* metadataObjectPtr;
-    if (!rootObject->TryGetObjectField(KEY_METADATA, metadataObjectPtr) || !metadataObjectPtr->IsValid())
+    if (!rootObject->TryGetObjectField(KEY_FILE_INFORMATION, metadataObjectPtr))
     {
-        OutErrorMessage = FString::Printf(TEXT("Missing required block KEY_METADATA(%s)"), *KEY_METADATA);
+        rootObject->TryGetObjectField(KEY_METADATA_LEGACY, metadataObjectPtr);
+    }
+    if (!metadataObjectPtr || !metadataObjectPtr->IsValid())
+    {
+        OutErrorMessage = FString::Printf(TEXT("Missing required block '%s' (or legacy '%s')"), *KEY_FILE_INFORMATION, *KEY_METADATA_LEGACY);
         return false;
     }
 
@@ -680,7 +688,11 @@ bool FSGDynamicTextAssetJsonSerializer::ExtractMetadata(const FString& InString,
 
     // Extract from metadata sub-object
     const TSharedPtr<FJsonObject>* metadataObjectPtr;
-    if (!rootObject->TryGetObjectField(KEY_METADATA, metadataObjectPtr) || !metadataObjectPtr->IsValid())
+    if (!rootObject->TryGetObjectField(KEY_FILE_INFORMATION, metadataObjectPtr))
+    {
+        rootObject->TryGetObjectField(KEY_METADATA_LEGACY, metadataObjectPtr);
+    }
+    if (!metadataObjectPtr || !metadataObjectPtr->IsValid())
     {
         return false;
     }
@@ -759,9 +771,13 @@ bool FSGDynamicTextAssetJsonSerializer::UpdateFieldsInPlace(FString& InOutConten
 
     // Get metadata sub-object
     const TSharedPtr<FJsonObject>* metadataObjectPtr;
-    if (!rootObject->TryGetObjectField(KEY_METADATA, metadataObjectPtr) || !metadataObjectPtr->IsValid())
+    if (!rootObject->TryGetObjectField(KEY_FILE_INFORMATION, metadataObjectPtr))
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetJsonSerializer::UpdateFieldsInPlace: Missing metadata block"));
+        rootObject->TryGetObjectField(KEY_METADATA_LEGACY, metadataObjectPtr);
+    }
+    if (!metadataObjectPtr || !metadataObjectPtr->IsValid())
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetJsonSerializer::UpdateFieldsInPlace: Missing file information block"));
         return false;
     }
 
@@ -818,7 +834,7 @@ FString FSGDynamicTextAssetJsonSerializer::GetDefaultFileContent(const UClass* D
 
     return FString::Printf(
         TEXT("{\n    \"%s\": {\n        \"%s\": \"%s\",\n        \"%s\": \"1.0.0\",\n        \"%s\": \"%s\",\n        \"%s\": \"%s\",\n        \"%s\": \"%s\"\n    },\n    \"%s\": {}\n}"),
-        *KEY_METADATA,
+        *KEY_FILE_INFORMATION,
         *KEY_TYPE,
         *typeString,
         *KEY_VERSION,
@@ -924,7 +940,84 @@ bool FSGDynamicTextAssetJsonSerializer::UpdateFileFormatVersion(FString& InOutFi
         return true;
     }
 
+    // Field not found - insert it into the file information block
+    // Find the closing brace of the sgFileInformation (or metadata) object
+    // by locating the block key and then finding the first "}" after it
+    const FRegexPattern blockPattern(TEXT("\"(?:sgFileInformation|metadata)\"\\s*:\\s*\\{"));
+    FRegexMatcher blockMatcher(blockPattern, InOutFileContents);
+
+    if (blockMatcher.FindNext())
+    {
+        // Find the first "}" that closes this block
+        int32 braceDepth = 1;
+        int32 searchPos = blockMatcher.GetMatchEnding();
+        int32 closingBrace = INDEX_NONE;
+
+        for (int32 i = searchPos; i < InOutFileContents.Len(); ++i)
+        {
+            if (InOutFileContents[i] == TEXT('{'))
+            {
+                braceDepth++;
+            }
+            else if (InOutFileContents[i] == TEXT('}'))
+            {
+                braceDepth--;
+                if (braceDepth == 0)
+                {
+                    closingBrace = i;
+                    break;
+                }
+            }
+        }
+
+        if (closingBrace != INDEX_NONE)
+        {
+            // Insert before the closing brace with a comma separator
+            const FString insertion = FString::Printf(TEXT(",\n\t\t\"%s\": \"%s\"\n\t"),
+                *KEY_FILE_FORMAT_VERSION, *NewVersion.ToString());
+
+            // Find the last non-whitespace character before the closing brace to place the comma correctly
+            int32 lastContent = closingBrace - 1;
+            while (lastContent >= 0 && FChar::IsWhitespace(InOutFileContents[lastContent]))
+            {
+                lastContent--;
+            }
+
+            InOutFileContents = InOutFileContents.Left(lastContent + 1) + insertion + InOutFileContents.Mid(closingBrace);
+            return true;
+        }
+    }
+
     UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-        TEXT("FSGDynamicTextAssetJsonSerializer::UpdateFileFormatVersion: Could not find fileFormatVersion field in file contents"));
+        TEXT("FSGDynamicTextAssetJsonSerializer::UpdateFileFormatVersion: Could not find or insert fileFormatVersion field"));
     return false;
+}
+
+bool FSGDynamicTextAssetJsonSerializer::MigrateFileFormat(FString& InOutFileContents,
+    const FSGDynamicTextAssetVersion& CurrentFormatVersion,
+    const FSGDynamicTextAssetVersion& TargetFormatVersion) const
+{
+    if (CurrentFormatVersion == TargetFormatVersion)
+    {
+        return true;
+    }
+
+    // Migration from 1.x to 2.x: rename "metadata" key to "sgFileInformation"
+    if (CurrentFormatVersion.Major < 2 && TargetFormatVersion.Major >= 2)
+    {
+        const FRegexPattern pattern(TEXT("\"metadata\"(\\s*:)"));
+        FRegexMatcher matcher(pattern, InOutFileContents);
+
+        if (matcher.FindNext())
+        {
+            const FString suffix = matcher.GetCaptureGroup(1);
+            const FString replacement = FString::Printf(TEXT("\"%s\"%s"), *KEY_FILE_INFORMATION, *suffix);
+            const int32 matchBegin = matcher.GetMatchBeginning();
+            const int32 matchEnd = matcher.GetMatchEnding();
+
+            InOutFileContents = InOutFileContents.Left(matchBegin) + replacement + InOutFileContents.Mid(matchEnd);
+        }
+    }
+
+    return true;
 }

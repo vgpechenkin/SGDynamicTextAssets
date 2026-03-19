@@ -318,6 +318,19 @@ public:
 		CompactNodeTitle = "!=", Keywords = "!= not equal"))
 	static bool NotEqual_DynamicTextAssetVersionDynamicTextAssetVersion(const FSGDynamicTextAssetVersion& A, const FSGDynamicTextAssetVersion& B);
 
+	/**
+	 * Returns true if Version falls within the range [Min, Max] (inclusive).
+	 * Compares Major, Minor, and Patch components using standard ordering.
+	 *
+	 * Min <= Version <= Max
+	 *
+	 * @param Version The version to evaluate.
+	 * @param Min The minimum version (inclusive).
+	 * @param Max The maximum version (inclusive).
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Version", meta = (DisplayName = "Is Version In Range"))
+	static bool IsVersionInRange(const FSGDynamicTextAssetVersion& Version, const FSGDynamicTextAssetVersion& Min, const FSGDynamicTextAssetVersion& Max);
+
 	/** Returns the unique dynamic text asset ID for this provider. */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Provider", meta = (DisplayName = "Get Dynamic Text Asset ID (DTA Provider)"))
 	static FSGDynamicTextAssetId GetDynamicTextAssetId_Provider(const TScriptInterface<ISGDynamicTextAssetProvider>& Provider);

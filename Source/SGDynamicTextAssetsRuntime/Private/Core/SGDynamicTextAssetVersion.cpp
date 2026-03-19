@@ -82,6 +82,11 @@ bool FSGDynamicTextAssetVersion::IsCompatibleWith(const FSGDynamicTextAssetVersi
 	return Major == Other.Major;
 }
 
+bool FSGDynamicTextAssetVersion::IsInRange(const FSGDynamicTextAssetVersion& Min, const FSGDynamicTextAssetVersion& Max) const
+{
+	return *this >= Min && *this <= Max;
+}
+
 bool FSGDynamicTextAssetVersion::operator==(const FSGDynamicTextAssetVersion& Other) const
 {
 	return Major == Other.Major && Minor == Other.Minor && Patch == Other.Patch;

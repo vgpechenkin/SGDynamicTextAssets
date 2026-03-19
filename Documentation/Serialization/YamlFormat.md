@@ -17,7 +17,7 @@ Content/SGDynamicTextAssets/QuestData/main_quest_001.dta.yaml
 Every `.dta.yaml` file follows this structure:
 
 ```yaml
-metadata:
+sgFileInformation:
   type: UWeaponData
   version: 1.0.0
   id: A1B2C3D4-E5F6-7890-ABCD-EF1234567890
@@ -32,7 +32,7 @@ data:
 
 ### Metadata Block
 
-The `metadata` mapping contains four keys with the same names used across all serializer formats:
+The `sgFileInformation` mapping contains the following keys (shared across all serializer formats):
 
 | Key | Description |
 |-----|-------------|
@@ -109,8 +109,8 @@ All methods are inherited from `ISGDynamicTextAssetSerializer`. See [SerializerI
 |--------|-------------|
 | `SerializeProvider` | Converts a provider's properties to YAML via fkYAML's emitter |
 | `DeserializeProvider` | Parses YAML via `fkyaml::node::deserialize()`, reconstructs `FJsonObject` tree from YAML nodes, then populates UPROPERTY fields via reflection |
-| `ValidateStructure` | Validates that a YAML string parses correctly and has the required structure (`metadata` and `data` mappings at root level) |
-| `ExtractMetadata` | Extracts all four metadata fields from the `metadata` mapping without full deserialization |
+| `ValidateStructure` | Validates that a YAML string parses correctly and has the required structure (`sgFileInformation` and `data` mappings at root level) |
+| `ExtractMetadata` | Extracts all four file information fields from the `sgFileInformation` mapping without full deserialization |
 | `UpdateFieldsInPlace` | Updates metadata fields within an already-serialized YAML string in-place |
 | `GetDefaultFileContent` | Generates the initial YAML file content for a new dynamic text asset |
 | `GetSerializerTypeId` | Returns `3` |
@@ -127,14 +127,14 @@ See [SerializerInterface.md](SerializerInterface.md) for the full registration p
 
 ## Asset Bundle Metadata
 
-When a dynamic text asset has soft reference properties tagged with `meta=(AssetBundles="...")`, the serializer writes an `sgdtAssetBundles` mapping at the root level alongside `metadata` and `data`. This mapping is a snapshot of the bundle data extracted from the object's UPROPERTY meta tags.
+When a dynamic text asset has soft reference properties tagged with `meta=(AssetBundles="...")`, the serializer writes an `sgdtAssetBundles` mapping at the root level alongside `sgFileInformation` and `data`. This mapping is a snapshot of the bundle data extracted from the object's UPROPERTY meta tags.
 
 ### Format
 
 Bundle names are keys in the `sgdtAssetBundles` mapping. Each key maps to a sequence of entries, where each entry has a `property` and a `path`.
 
 ```yaml
-metadata:
+sgFileInformation:
   type: UWeaponData
   version: 1.0.0
   id: A1B2C3D4-E5F6-7890-ABCD-EF1234567890

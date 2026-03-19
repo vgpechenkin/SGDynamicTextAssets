@@ -244,6 +244,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_JsonRoundTrip_PreservesBundleMetadata::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Setup: create a DTA with bundled soft references
 	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
 	asset->SetDynamicTextAssetId(FSGDynamicTextAssetId(FGuid::NewGuid()));

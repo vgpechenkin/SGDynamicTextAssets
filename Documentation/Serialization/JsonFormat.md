@@ -18,7 +18,7 @@ Every `.dta.json` file follows this structure:
 
 ```json
 {
-  "metadata": {
+  "sgFileInformation": {
     "type": "UWeaponData",
     "version": "1.0.0",
     "id": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
@@ -36,7 +36,7 @@ Every `.dta.json` file follows this structure:
 
 ### Metadata Block
 
-All identity fields are nested under a `"metadata"` object at the root level, alongside the `"data"` object.
+All identity fields are nested under a `"sgFileInformation"` object at the root level, alongside the `"data"` object.
 
 | Field | Key | Type | Description |
 |-------|-----|------|-------------|
@@ -89,7 +89,8 @@ Metadata keys are defined as static constants on `ISGDynamicTextAssetSerializer`
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `KEY_METADATA` | `"metadata"` | Wrapper key for the metadata block |
+| `KEY_FILE_INFORMATION` | `"sgFileInformation"` | Wrapper key for the file information block |
+| `KEY_METADATA_LEGACY` | `"metadata"` | Legacy wrapper key (backward compat) |
 | `KEY_TYPE` | `"type"` | Class type name key |
 | `KEY_VERSION` | `"version"` | Semantic version key |
 | `KEY_ID` | `"id"` | GUID key |
@@ -118,7 +119,7 @@ The `sgdtAssetBundles` object uses bundle names as keys. Each key maps to an arr
 
 ```json
 {
-  "metadata": { ... },
+  "sgFileInformation": { ... },
   "data": { ... },
   "sgdtAssetBundles": {
     "Visual": [

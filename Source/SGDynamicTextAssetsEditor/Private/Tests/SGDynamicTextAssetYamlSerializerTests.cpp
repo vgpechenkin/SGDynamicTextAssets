@@ -4,6 +4,7 @@
 
 #include "Serialization/SGDynamicTextAssetYamlSerializer.h"
 #include "Core/SGDynamicTextAssetTypeId.h"
+#include "Management/SGDynamicTextAssetFileMetadata.h"
 #include "Tests/SGDynamicTextAssetYamlUnitTest.h"
 
 // Helper utilities shared across YAML serializer tests.
@@ -20,7 +21,21 @@ namespace SGYamlSerializerTestUtils
 	{
 		return FString::Printf(
 			TEXT("%s:\n  %s: %s\n  %s: %s\n  %s: %s\n%s: {}\n"),
-			*ISGDynamicTextAssetSerializer::KEY_METADATA,
+			*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
+			*ISGDynamicTextAssetSerializer::KEY_TYPE, *TypeName,
+			*ISGDynamicTextAssetSerializer::KEY_VERSION, *VersionString,
+			*ISGDynamicTextAssetSerializer::KEY_ID, *IdString,
+			*ISGDynamicTextAssetSerializer::KEY_DATA);
+	}
+	/** Builds a valid YAML string using the legacy "metadata" key for backward-compat testing. */
+	FString BuildLegacyYaml(
+		const FString& TypeName = TEXT("USGDynamicTextAsset"),
+		const FString& IdString = TEXT("A1B2C3D4-E5F67890-ABCDEF12-34567890"),
+		const FString& VersionString = TEXT("1.0.0"))
+	{
+		return FString::Printf(
+			TEXT("%s:\n  %s: %s\n  %s: %s\n  %s: %s\n%s: {}\n"),
+			*ISGDynamicTextAssetSerializer::KEY_METADATA_LEGACY,
 			*ISGDynamicTextAssetSerializer::KEY_TYPE, *TypeName,
 			*ISGDynamicTextAssetSerializer::KEY_VERSION, *VersionString,
 			*ISGDynamicTextAssetSerializer::KEY_ID, *IdString,
@@ -82,7 +97,7 @@ bool FSGDynamicTextAssetYamlSerializer_ValidateStructure_MissingTypeFails::RunTe
 	// Has metadata block and data block but no type inside metadata
 	const FString yaml = FString::Printf(
 		TEXT("%s:\n  %s: A1B2C3D4-E5F67890-ABCDEF12-34567890\n%s: {}\n"),
-		*ISGDynamicTextAssetSerializer::KEY_METADATA,
+		*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
 		*ISGDynamicTextAssetSerializer::KEY_ID,
 		*ISGDynamicTextAssetSerializer::KEY_DATA);
 
@@ -110,7 +125,7 @@ bool FSGDynamicTextAssetYamlSerializer_ValidateStructure_MissingDataFails::RunTe
 	// Has metadata block with type but no data block
 	const FString yaml = FString::Printf(
 		TEXT("%s:\n  %s: USGDynamicTextAsset\n"),
-		*ISGDynamicTextAssetSerializer::KEY_METADATA,
+		*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
 		*ISGDynamicTextAssetSerializer::KEY_TYPE);
 
 	FString errorMessage;
@@ -198,6 +213,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_SerializeProvider_ProducesValidYaml::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	USGDynamicTextAssetYamlUnitTest* dummy = NewObject<USGDynamicTextAssetYamlUnitTest>();
 
 	FSGDynamicTextAssetId testId;
@@ -230,6 +246,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_ExtractMetadata_ReturnsAllFields::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	USGDynamicTextAssetYamlUnitTest* dummy = NewObject<USGDynamicTextAssetYamlUnitTest>();
 
 	FSGDynamicTextAssetId testId;
@@ -268,6 +285,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_Roundtrip_PreservesBasicProperties::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	USGDynamicTextAssetYamlUnitTest* source = NewObject<USGDynamicTextAssetYamlUnitTest>();
 
 	FSGDynamicTextAssetId testId;
@@ -309,6 +327,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_Roundtrip_PreservesUserFacingId::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	USGDynamicTextAssetYamlUnitTest* source = NewObject<USGDynamicTextAssetYamlUnitTest>();
 	source->SetUserFacingId(TEXT("thunder_hammer"));
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
@@ -336,6 +355,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_Roundtrip_PreservesTArray::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	USGDynamicTextAssetYamlUnitTest* source = NewObject<USGDynamicTextAssetYamlUnitTest>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 	source->TestTags = { TEXT("fire"), TEXT("ice"), TEXT("lightning") };
@@ -367,6 +387,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_Roundtrip_PreservesTMap::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	USGDynamicTextAssetYamlUnitTest* source = NewObject<USGDynamicTextAssetYamlUnitTest>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 	source->TestAttributes.Add(TEXT("speed"),  5);
@@ -400,6 +421,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_Roundtrip_PreservesTSet::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	USGDynamicTextAssetYamlUnitTest* source = NewObject<USGDynamicTextAssetYamlUnitTest>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 	source->TestKeywords.Add(TEXT("rare"));
@@ -431,6 +453,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_Roundtrip_PreservesNestedStruct::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	USGDynamicTextAssetYamlUnitTest* source = NewObject<USGDynamicTextAssetYamlUnitTest>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 	source->TestStats.BaseArmor     = 50;
@@ -461,6 +484,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_Roundtrip_PreservesSoftObjectPtr::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	USGDynamicTextAssetYamlUnitTest* source = NewObject<USGDynamicTextAssetYamlUnitTest>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 	source->TestMeshRef = FSoftObjectPath(TEXT("/Game/Test/SwordMesh.SwordMesh"));
@@ -495,7 +519,7 @@ bool FSGDynamicTextAssetYamlSerializer_Deserialize_MissingOptionalFieldGraceful:
 	// Build YAML that has TestDamage in the data block but omits TestName and TestCount entirely.
 	const FString yaml = FString::Printf(
 		TEXT("%s:\n  %s: SGDynamicTextAssetYamlUnitTest\n  %s: 1.0.0\n  %s: A1B2C3D4-E5F67890-ABCDEF12-34567890\n%s:\n  TestDamage: 99.0\n"),
-		*ISGDynamicTextAssetSerializer::KEY_METADATA,
+		*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
 		*ISGDynamicTextAssetSerializer::KEY_TYPE,
 		*ISGDynamicTextAssetSerializer::KEY_VERSION,
 		*ISGDynamicTextAssetSerializer::KEY_ID,
@@ -534,6 +558,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetYamlSerializer_Roundtrip_PreservesFSGDynamicTextAssetRef::RunTest(const FString& Parameters)
 {
+	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Arrange: create a source object with a known FSGDynamicTextAssetRef ID.
 	USGDynamicTextAssetYamlUnitTest* source = NewObject<USGDynamicTextAssetYamlUnitTest>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
@@ -608,6 +633,45 @@ bool FSGDynamicTextAssetYamlSerializer_ExtractMetadata_LegacyClassName_NoTypeId:
 	TestTrue(TEXT("ExtractMetadata should succeed with legacy class name"), bExtracted);
 	TestFalse(TEXT("TypeId should be invalid for legacy class name format"), outMeta.AssetTypeId.IsValid());
 	TestEqual(TEXT("Class name should match the type field value"), outMeta.ClassName, TEXT("USGDynamicTextAsset"));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSGDynamicTextAssetYamlSerializer_LegacyMetadataKey_ValidateStructurePasses,
+	"SGDynamicTextAssets.Runtime.Serialization.YamlSerializer.LegacyMetadataKey.ValidateStructurePasses",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSGDynamicTextAssetYamlSerializer_LegacyMetadataKey_ValidateStructurePasses::RunTest(const FString& Parameters)
+{
+	FString errorMessage;
+	FSGDynamicTextAssetYamlSerializer serializer;
+	const bool bResult = serializer.ValidateStructure(
+		SGYamlSerializerTestUtils::BuildLegacyYaml(), errorMessage);
+
+	TestTrue(TEXT("Legacy metadata key should pass validation"), bResult);
+	TestTrue(TEXT("Error message should be empty"), errorMessage.IsEmpty());
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSGDynamicTextAssetYamlSerializer_LegacyMetadataKey_ExtractMetadataSucceeds,
+	"SGDynamicTextAssets.Runtime.Serialization.YamlSerializer.LegacyMetadataKey.ExtractMetadataSucceeds",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSGDynamicTextAssetYamlSerializer_LegacyMetadataKey_ExtractMetadataSucceeds::RunTest(const FString& Parameters)
+{
+	FSGDynamicTextAssetYamlSerializer serializer;
+	FSGDynamicTextAssetFileMetadata metadata;
+
+	const bool bResult = serializer.ExtractMetadata(
+		SGYamlSerializerTestUtils::BuildLegacyYaml(), metadata);
+
+	TestTrue(TEXT("ExtractMetadata should succeed with legacy key"), bResult);
+	TestTrue(TEXT("Metadata should be valid"), metadata.bIsValid);
+	TestEqual(TEXT("ID should be extracted correctly"),
+		metadata.Id.ToString(), TEXT("A1B2C3D4-E5F6-7890-ABCD-EF1234567890"));
 
 	return true;
 }

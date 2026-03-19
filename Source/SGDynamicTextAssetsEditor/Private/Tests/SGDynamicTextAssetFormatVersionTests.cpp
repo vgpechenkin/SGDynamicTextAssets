@@ -20,7 +20,7 @@ namespace SGFormatVersionTestUtils
 	{
 		return FString::Printf(
 			TEXT("{ \"%s\": { \"%s\": \"USGDynamicTextAsset\", \"%s\": \"A1B2C3D4-E5F67890-ABCDEF12-34567890\", \"%s\": \"1.0.0\", \"%s\": \"%s\" }, \"%s\": {} }"),
-			*ISGDynamicTextAssetSerializer::KEY_METADATA,
+			*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
 			*ISGDynamicTextAssetSerializer::KEY_TYPE,
 			*ISGDynamicTextAssetSerializer::KEY_ID,
 			*ISGDynamicTextAssetSerializer::KEY_VERSION,
@@ -33,7 +33,7 @@ namespace SGFormatVersionTestUtils
 	{
 		return FString::Printf(
 			TEXT("{ \"%s\": { \"%s\": \"USGDynamicTextAsset\", \"%s\": \"A1B2C3D4-E5F67890-ABCDEF12-34567890\", \"%s\": \"1.0.0\" }, \"%s\": {} }"),
-			*ISGDynamicTextAssetSerializer::KEY_METADATA,
+			*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
 			*ISGDynamicTextAssetSerializer::KEY_TYPE,
 			*ISGDynamicTextAssetSerializer::KEY_ID,
 			*ISGDynamicTextAssetSerializer::KEY_VERSION,
@@ -45,12 +45,12 @@ namespace SGFormatVersionTestUtils
 	{
 		return FString::Printf(
 			TEXT("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<DynamicTextAsset>\n    <%s>\n        <%s>USGDynamicTextAsset</%s>\n        <%s>1.0.0</%s>\n        <%s>A1B2C3D4-E5F67890-ABCDEF12-34567890</%s>\n        <%s>%s</%s>\n    </%s>\n    <data/>\n</DynamicTextAsset>"),
-			*ISGDynamicTextAssetSerializer::KEY_METADATA,
+			*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
 			*ISGDynamicTextAssetSerializer::KEY_TYPE, *ISGDynamicTextAssetSerializer::KEY_TYPE,
 			*ISGDynamicTextAssetSerializer::KEY_VERSION, *ISGDynamicTextAssetSerializer::KEY_VERSION,
 			*ISGDynamicTextAssetSerializer::KEY_ID, *ISGDynamicTextAssetSerializer::KEY_ID,
 			*ISGDynamicTextAssetSerializer::KEY_FILE_FORMAT_VERSION, *Version, *ISGDynamicTextAssetSerializer::KEY_FILE_FORMAT_VERSION,
-			*ISGDynamicTextAssetSerializer::KEY_METADATA);
+			*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION);
 	}
 
 	/** Builds valid XML without a fileFormatVersion element. */
@@ -58,11 +58,11 @@ namespace SGFormatVersionTestUtils
 	{
 		return FString::Printf(
 			TEXT("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<DynamicTextAsset>\n    <%s>\n        <%s>USGDynamicTextAsset</%s>\n        <%s>1.0.0</%s>\n        <%s>A1B2C3D4-E5F67890-ABCDEF12-34567890</%s>\n    </%s>\n    <data/>\n</DynamicTextAsset>"),
-			*ISGDynamicTextAssetSerializer::KEY_METADATA,
+			*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
 			*ISGDynamicTextAssetSerializer::KEY_TYPE, *ISGDynamicTextAssetSerializer::KEY_TYPE,
 			*ISGDynamicTextAssetSerializer::KEY_VERSION, *ISGDynamicTextAssetSerializer::KEY_VERSION,
 			*ISGDynamicTextAssetSerializer::KEY_ID, *ISGDynamicTextAssetSerializer::KEY_ID,
-			*ISGDynamicTextAssetSerializer::KEY_METADATA);
+			*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION);
 	}
 
 	/** Builds valid YAML with a specific fileFormatVersion. */
@@ -70,7 +70,7 @@ namespace SGFormatVersionTestUtils
 	{
 		return FString::Printf(
 			TEXT("%s:\n  %s: USGDynamicTextAsset\n  %s: 1.0.0\n  %s: A1B2C3D4-E5F67890-ABCDEF12-34567890\n  %s: %s\n%s: {}\n"),
-			*ISGDynamicTextAssetSerializer::KEY_METADATA,
+			*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
 			*ISGDynamicTextAssetSerializer::KEY_TYPE,
 			*ISGDynamicTextAssetSerializer::KEY_VERSION,
 			*ISGDynamicTextAssetSerializer::KEY_ID,
@@ -83,7 +83,7 @@ namespace SGFormatVersionTestUtils
 	{
 		return FString::Printf(
 			TEXT("%s:\n  %s: USGDynamicTextAsset\n  %s: 1.0.0\n  %s: A1B2C3D4-E5F67890-ABCDEF12-34567890\n%s: {}\n"),
-			*ISGDynamicTextAssetSerializer::KEY_METADATA,
+			*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION,
 			*ISGDynamicTextAssetSerializer::KEY_TYPE,
 			*ISGDynamicTextAssetSerializer::KEY_VERSION,
 			*ISGDynamicTextAssetSerializer::KEY_ID,
@@ -464,6 +464,94 @@ bool FFormatVersion_Commandlet_MigrateSingleFile_UpToDateReturnsTrue::RunTest(co
 
 	// Cleanup
 	SGFormatVersionTestUtils::CleanupTestTempDir();
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFormatVersion_MigrateFileFormat_Json_RenamesMetadataKey,
+	"SGDynamicTextAssets.Editor.FormatVersion.MigrateFileFormat.Json.RenamesMetadataKey",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FFormatVersion_MigrateFileFormat_Json_RenamesMetadataKey::RunTest(const FString& Parameters)
+{
+	FSGDynamicTextAssetJsonSerializer serializer;
+	FString content = TEXT("{ \"metadata\": { \"type\": \"Test\", \"id\": \"ABC\", \"version\": \"1.0.0\" }, \"data\": {} }");
+
+	const FSGDynamicTextAssetVersion oldVersion(1, 0, 0);
+	const FSGDynamicTextAssetVersion newVersion(2, 0, 0);
+	const bool bResult = serializer.MigrateFileFormat(content, oldVersion, newVersion);
+
+	TestTrue(TEXT("MigrateFileFormat should succeed"), bResult);
+	TestTrue(TEXT("Content should contain new key"), content.Contains(TEXT("\"sgFileInformation\"")));
+	TestFalse(TEXT("Content should not contain old key"), content.Contains(TEXT("\"metadata\"")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFormatVersion_MigrateFileFormat_Xml_RenamesMetadataTag,
+	"SGDynamicTextAssets.Editor.FormatVersion.MigrateFileFormat.Xml.RenamesMetadataTag",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FFormatVersion_MigrateFileFormat_Xml_RenamesMetadataTag::RunTest(const FString& Parameters)
+{
+	FSGDynamicTextAssetXmlSerializer serializer;
+	FString content = TEXT("<?xml version=\"1.0\"?>\n<DynamicTextAsset>\n    <metadata>\n        <type>Test</type>\n    </metadata>\n    <data/>\n</DynamicTextAsset>");
+
+	const FSGDynamicTextAssetVersion oldVersion(1, 0, 0);
+	const FSGDynamicTextAssetVersion newVersion(2, 0, 0);
+	const bool bResult = serializer.MigrateFileFormat(content, oldVersion, newVersion);
+
+	TestTrue(TEXT("MigrateFileFormat should succeed"), bResult);
+	TestTrue(TEXT("Content should contain new opening tag"), content.Contains(TEXT("<sgFileInformation>")));
+	TestTrue(TEXT("Content should contain new closing tag"), content.Contains(TEXT("</sgFileInformation>")));
+	TestFalse(TEXT("Content should not contain old opening tag"), content.Contains(TEXT("<metadata>")));
+	TestFalse(TEXT("Content should not contain old closing tag"), content.Contains(TEXT("</metadata>")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFormatVersion_MigrateFileFormat_Yaml_RenamesMetadataKey,
+	"SGDynamicTextAssets.Editor.FormatVersion.MigrateFileFormat.Yaml.RenamesMetadataKey",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FFormatVersion_MigrateFileFormat_Yaml_RenamesMetadataKey::RunTest(const FString& Parameters)
+{
+	FSGDynamicTextAssetYamlSerializer serializer;
+	FString content = TEXT("metadata:\n  type: Test\n  version: 1.0.0\n  id: ABC\ndata: {}\n");
+
+	const FSGDynamicTextAssetVersion oldVersion(1, 0, 0);
+	const FSGDynamicTextAssetVersion newVersion(2, 0, 0);
+	const bool bResult = serializer.MigrateFileFormat(content, oldVersion, newVersion);
+
+	TestTrue(TEXT("MigrateFileFormat should succeed"), bResult);
+	TestTrue(TEXT("Content should contain new key"), content.Contains(TEXT("sgFileInformation:")));
+	TestFalse(TEXT("Content should not contain old key at root level"), content.StartsWith(TEXT("metadata:")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFormatVersion_UpdateFileFormatVersion_InsertsWhenMissing,
+	"SGDynamicTextAssets.Editor.FormatVersion.UpdateFileFormatVersion.InsertsWhenMissing",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FFormatVersion_UpdateFileFormatVersion_InsertsWhenMissing::RunTest(const FString& Parameters)
+{
+	FSGDynamicTextAssetJsonSerializer serializer;
+	// JSON content without fileFormatVersion field
+	FString content = FString::Printf(
+		TEXT("{ \"%s\": { \"type\": \"Test\", \"id\": \"ABC\", \"version\": \"1.0.0\" }, \"data\": {} }"),
+		*ISGDynamicTextAssetSerializer::KEY_FILE_INFORMATION);
+
+	const FSGDynamicTextAssetVersion newVersion(2, 0, 0);
+	const bool bResult = serializer.UpdateFileFormatVersion(content, newVersion);
+
+	TestTrue(TEXT("UpdateFileFormatVersion should succeed by inserting"), bResult);
+	TestTrue(TEXT("Content should now contain fileFormatVersion"),
+		content.Contains(TEXT("\"fileFormatVersion\": \"2.0.0\"")));
 
 	return true;
 }
