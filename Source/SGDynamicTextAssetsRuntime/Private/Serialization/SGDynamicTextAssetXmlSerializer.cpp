@@ -1244,10 +1244,20 @@ bool FSGDynamicTextAssetXmlSerializer::UpdateFileFormatVersion(FString& InOutFil
 
     if (insertPos != INDEX_NONE)
     {
-        const FString insertion = FString::Printf(TEXT("        <%s>%s</%s>\n    "),
+        // Walk back from the closing tag to the start of its line so the new
+        // element is inserted on its own line with correct depth-2 indentation
+        // instead of appending to the existing leading whitespace.
+        int32 lineStart = insertPos;
+        while (lineStart > 0 && InOutFileContents[lineStart - 1] != TEXT('\n'))
+        {
+            lineStart--;
+        }
+
+        const FString insertion = FString::Printf(TEXT("%s<%s>%s</%s>\n"),
+            *FSGDynamicTextAssetXmlSerializerInternals::Indent(2),
             *KEY_FILE_FORMAT_VERSION, *NewVersion.ToString(), *KEY_FILE_FORMAT_VERSION);
 
-        InOutFileContents = InOutFileContents.Left(insertPos) + insertion + InOutFileContents.Mid(insertPos);
+        InOutFileContents = InOutFileContents.Left(lineStart) + insertion + InOutFileContents.Mid(lineStart);
         return true;
     }
 

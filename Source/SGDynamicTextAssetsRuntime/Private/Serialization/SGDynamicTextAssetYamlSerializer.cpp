@@ -1555,20 +1555,16 @@ bool FSGDynamicTextAssetYamlSerializer::UpdateFileFormatVersion(FString& InOutFi
         return true;
     }
 
-    // Field not found - insert it before the "data:" key
-    // Look for either "sgFileInformation:" or "metadata:" block, then find the next top-level key to insert before
-    const FRegexPattern dataPattern(TEXT("(^|\\n)(data:\\s)"));
-    FRegexMatcher dataMatcher(dataPattern, InOutFileContents);
+    // Field not found - insert it as a child of the sgFileInformation (or legacy metadata) block
+    const FRegexPattern fileInfoPattern(TEXT("(^|\\n)(sgFileInformation|metadata):(\\s*\\n)"));
+    FRegexMatcher fileInfoMatcher(fileInfoPattern, InOutFileContents);
 
-    if (dataMatcher.FindNext())
+    if (fileInfoMatcher.FindNext())
     {
-        // Insert the field as a child of the metadata block, right before "data:"
+        // Insert right after the "sgFileInformation:\n" line as a child entry
+        const int32 insertAt = fileInfoMatcher.GetMatchEnding();
         const FString insertion = FString::Printf(TEXT("  %s: %s\n"),
             *KEY_FILE_FORMAT_VERSION, *NewVersion.ToString());
-
-        const int32 dataPos = dataMatcher.GetMatchBeginning();
-        // Skip the newline if matched
-        const int32 insertAt = InOutFileContents[dataPos] == TEXT('\n') ? dataPos + 1 : dataPos;
 
         InOutFileContents = InOutFileContents.Left(insertAt) + insertion + InOutFileContents.Mid(insertAt);
         return true;
