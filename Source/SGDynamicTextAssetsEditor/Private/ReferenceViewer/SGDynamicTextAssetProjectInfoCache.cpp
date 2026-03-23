@@ -23,7 +23,7 @@ bool FSGDynamicTextAssetProjectInfoCache::SaveToFile(const FString& FilePath) co
 
 	TSharedRef<FJsonObject> formatVersionsObject = MakeShared<FJsonObject>();
 
-	for (const TPair<uint32, FSGSerializerFormatVersionInfo>& pair : FormatVersionsBySerializerId)
+	for (const TPair<FSGSerializerFormat, FSGSerializerFormatVersionInfo>& pair : FormatVersionsBySerializerId)
 	{
 		const FSGSerializerFormatVersionInfo& info = pair.Value;
 		TSharedRef<FJsonObject> serializerObject = MakeShared<FJsonObject>();
@@ -42,7 +42,7 @@ bool FSGDynamicTextAssetProjectInfoCache::SaveToFile(const FString& FilePath) co
 		}
 		serializerObject->SetObjectField(TEXT("countByVersion"), countByVersionObject);
 
-		formatVersionsObject->SetObjectField(FString::FromInt(pair.Key), serializerObject);
+		formatVersionsObject->SetObjectField(pair.Key.ToString(), serializerObject);
 	}
 
 	rootObject->SetObjectField(TEXT("formatVersions"), formatVersionsObject);
@@ -111,7 +111,7 @@ bool FSGDynamicTextAssetProjectInfoCache::LoadFromFile(const FString& FilePath)
 	{
 		for (const TPair<FString, TSharedPtr<FJsonValue>>& pair : (*formatVersionsPtr)->Values)
 		{
-			uint32 serializerTypeId = static_cast<uint32>(FCString::Atoi(*pair.Key));
+			FSGSerializerFormat serializerFormat(static_cast<uint32>(FCString::Atoi(*pair.Key)));
 			const TSharedPtr<FJsonObject>& serializerObject = pair.Value->AsObject();
 			if (!serializerObject.IsValid())
 			{
@@ -119,7 +119,7 @@ bool FSGDynamicTextAssetProjectInfoCache::LoadFromFile(const FString& FilePath)
 			}
 
 			FSGSerializerFormatVersionInfo info;
-			info.SerializerTypeId = serializerTypeId;
+			info.SerializerFormat = serializerFormat;
 			serializerObject->TryGetStringField(TEXT("serializerName"), info.SerializerName);
 			serializerObject->TryGetStringField(TEXT("fileExtension"), info.FileExtension);
 
@@ -148,7 +148,7 @@ bool FSGDynamicTextAssetProjectInfoCache::LoadFromFile(const FString& FilePath)
 				}
 			}
 
-			FormatVersionsBySerializerId.Add(serializerTypeId, MoveTemp(info));
+			FormatVersionsBySerializerId.Add(serializerFormat, MoveTemp(info));
 		}
 	}
 
@@ -182,22 +182,22 @@ void FSGDynamicTextAssetProjectInfoCache::MarkDirty()
 	bIsDirty = true;
 }
 
-void FSGDynamicTextAssetProjectInfoCache::RecordFileVersion(uint32 SerializerTypeId, const FSGDynamicTextAssetVersion& FileFormatVersion)
+void FSGDynamicTextAssetProjectInfoCache::RecordFileVersion(const FSGSerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion)
 {
-	if (SerializerTypeId == ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
+	if (!SerializerFormat.IsValid())
 	{
 		return;
 	}
 
-	FSGSerializerFormatVersionInfo& info = FormatVersionsBySerializerId.FindOrAdd(SerializerTypeId);
+	FSGSerializerFormatVersionInfo& info = FormatVersionsBySerializerId.FindOrAdd(SerializerFormat);
 
 	// Initialize if new entry
-	if (info.SerializerTypeId == 0)
+	if (!info.SerializerFormat.IsValid())
 	{
-		info.SerializerTypeId = SerializerTypeId;
+		info.SerializerFormat = SerializerFormat;
 
 		// Populate serializer metadata from registered serializer
-		TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FSGDynamicTextAssetFileManager::FindSerializerForTypeId(SerializerTypeId);
+		TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FSGDynamicTextAssetFileManager::FindSerializerForFormat(SerializerFormat);
 		if (serializer.IsValid())
 		{
 			info.SerializerName = serializer->GetFormatName_String();
@@ -230,9 +230,9 @@ void FSGDynamicTextAssetProjectInfoCache::RecordFileVersion(uint32 SerializerTyp
 
 void FSGDynamicTextAssetProjectInfoCache::PopulateCurrentSerializerVersions()
 {
-	for (TPair<uint32, FSGSerializerFormatVersionInfo>& pair : FormatVersionsBySerializerId)
+	for (TPair<FSGSerializerFormat, FSGSerializerFormatVersionInfo>& pair : FormatVersionsBySerializerId)
 	{
-		TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FSGDynamicTextAssetFileManager::FindSerializerForTypeId(pair.Key);
+		TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FSGDynamicTextAssetFileManager::FindSerializerForFormat(pair.Key);
 		if (serializer.IsValid())
 		{
 			pair.Value.CurrentSerializerVersion = serializer->GetFileFormatVersion();
@@ -242,12 +242,12 @@ void FSGDynamicTextAssetProjectInfoCache::PopulateCurrentSerializerVersions()
 	}
 }
 
-const FSGSerializerFormatVersionInfo* FSGDynamicTextAssetProjectInfoCache::GetInfoForSerializer(uint32 SerializerTypeId) const
+const FSGSerializerFormatVersionInfo* FSGDynamicTextAssetProjectInfoCache::GetInfoForSerializer(const FSGSerializerFormat& SerializerFormat) const
 {
-	return FormatVersionsBySerializerId.Find(SerializerTypeId);
+	return FormatVersionsBySerializerId.Find(SerializerFormat);
 }
 
-const TMap<uint32, FSGSerializerFormatVersionInfo>& FSGDynamicTextAssetProjectInfoCache::GetAllFormatVersions() const
+const TMap<FSGSerializerFormat, FSGSerializerFormatVersionInfo>& FSGDynamicTextAssetProjectInfoCache::GetAllFormatVersions() const
 {
 	return FormatVersionsBySerializerId;
 }

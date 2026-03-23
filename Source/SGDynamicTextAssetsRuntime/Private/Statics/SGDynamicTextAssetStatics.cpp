@@ -10,6 +10,9 @@
 #include "Engine/Engine.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
+#include "Serialization/SGDynamicTextAssetJsonSerializer.h"
+#include "Serialization/SGDynamicTextAssetXmlSerializer.h"
+#include "Serialization/SGDynamicTextAssetYamlSerializer.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 #include "SGDynamicTextAssetLogs.h"
 #include "Subsystem/SGDynamicTextAssetSubsystem.h"
@@ -564,9 +567,82 @@ void USGDynamicTextAssetStatics::GetRegisteredSerializerDescriptions(TArray<FStr
 	FSGDynamicTextAssetFileManager::GetAllRegisteredSerializerDescriptions(OutDescriptions);
 }
 
+FSGSerializerFormat USGDynamicTextAssetStatics::MakeSerializerFormat(int32 TypeId)
+{
+	return FSGSerializerFormat(static_cast<uint32>(TypeId));
+}
+
+FSGSerializerFormat USGDynamicTextAssetStatics::MakeSerializerFormatFromExtension(const FString& Extension)
+{
+	return FSGSerializerFormat::FromExtension(Extension);
+}
+
+bool USGDynamicTextAssetStatics::IsValidSerializerFormat(const FSGSerializerFormat& Format)
+{
+	return Format.IsValid();
+}
+
+int32 USGDynamicTextAssetStatics::GetSerializerFormatTypeId(FSGSerializerFormat Format)
+{
+	return static_cast<int32>(Format.GetTypeId());
+}
+
+FText USGDynamicTextAssetStatics::GetSerializerFormatName(const FSGSerializerFormat& Format)
+{
+	return Format.GetFormatName();
+}
+
+FString USGDynamicTextAssetStatics::GetSerializerFormatExtension(const FSGSerializerFormat& Format)
+{
+	return Format.GetFileExtension();
+}
+
+FSGSerializerFormat USGDynamicTextAssetStatics::GetJsonSerializerFormat()
+{
+	return FSGDynamicTextAssetJsonSerializer::FORMAT;
+}
+
+FSGSerializerFormat USGDynamicTextAssetStatics::GetXmlSerializerFormat()
+{
+	return FSGDynamicTextAssetXmlSerializer::FORMAT;
+}
+
+FSGSerializerFormat USGDynamicTextAssetStatics::GetYamlSerializerFormat()
+{
+	return FSGDynamicTextAssetYamlSerializer::FORMAT;
+}
+
+bool USGDynamicTextAssetStatics::EqualEqual_SerializerFormat(const FSGSerializerFormat& A, const FSGSerializerFormat& B)
+{
+	return A == B;
+}
+
+bool USGDynamicTextAssetStatics::NotEqual_SerializerFormat(const FSGSerializerFormat& A, const FSGSerializerFormat& B)
+{
+	return A != B;
+}
+
+void USGDynamicTextAssetStatics::GetAllRegisteredSerializerFormats(TArray<FSGSerializerFormat>& OutFormats)
+{
+	TArray<TSharedPtr<ISGDynamicTextAssetSerializer>> serializers = FSGDynamicTextAssetFileManager::GetAllRegisteredSerializers();
+	OutFormats.Reset(serializers.Num());
+	for (const TSharedPtr<ISGDynamicTextAssetSerializer>& serializer : serializers)
+	{
+		if (serializer.IsValid())
+		{
+			OutFormats.Emplace(serializer->GetSerializerFormat());
+		}
+	}
+}
+
+TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerializerForFormat(FSGSerializerFormat Format)
+{
+	return FSGDynamicTextAssetFileManager::FindSerializerForFormat(Format);
+}
+
 TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerializerForTypeId(uint32 TypeId)
 {
-	return FSGDynamicTextAssetFileManager::FindSerializerForTypeId(TypeId);
+	return FindSerializerForFormat(FSGSerializerFormat(TypeId));
 }
 
 TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerializerForDynamicTextAssetId(const FSGDynamicTextAssetId& Id)
@@ -579,9 +655,14 @@ TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerial
 	return FSGDynamicTextAssetFileManager::FindSerializerForFile(filePath);
 }
 
+FSGSerializerFormat USGDynamicTextAssetStatics::GetFormatForExtension(const FString& Extension)
+{
+	return FSGDynamicTextAssetFileManager::GetFormatForExtension(Extension);
+}
+
 uint32 USGDynamicTextAssetStatics::GetTypeIdForExtension(const FString& Extension)
 {
-	return FSGDynamicTextAssetFileManager::GetTypeIdForExtension(Extension);
+	return GetFormatForExtension(Extension).GetTypeId();
 }
 
 void USGDynamicTextAssetStatics::ValidateSoftPathsInProperty(const FProperty* Property, const void* ContainerPtr,

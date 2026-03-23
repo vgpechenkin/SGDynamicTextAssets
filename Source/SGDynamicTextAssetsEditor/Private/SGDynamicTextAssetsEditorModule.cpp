@@ -7,6 +7,7 @@
 #include "Editor/FSGDynamicTextAssetIdCustomization.h"
 #include "Editor/SGDynamicTextAssetIdentityCustomization.h"
 #include "Customization/SGAssetTypeIdCustomization.h"
+#include "Customization/SGSerializerFormatCustomization.h"
 #include "Browser/SGDynamicTextAssetBrowserCommands.h"
 #include "Editor/SGDynamicTextAssetEditorCommands.h"
 #include "Editor/SGDynamicTextAssetRefCustomization.h"
@@ -279,6 +280,11 @@ private:
             TEXT("SGDynamicTextAssetTypeId"),
             FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGAssetTypeIdCustomization::MakeInstance));
 
+        // Property type customization for FSGSerializerFormat (serializer format dropdown)
+        propertyModule.RegisterCustomPropertyTypeLayout(
+            TEXT("SGSerializerFormat"),
+            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGSerializerFormatCustomization::MakeInstance));
+
         UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Registered detail customizations"));
     }
 
@@ -292,6 +298,7 @@ private:
             propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDynamicTextAssetId"));
             propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDynamicTextAssetRef"));
             propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDynamicTextAssetTypeId"));
+            propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGSerializerFormat"));
         }
     }
 
@@ -368,7 +375,7 @@ private:
         }
 
         const FSGDynamicTextAssetProjectInfoCache& cache = scanSubsystem->GetProjectInfoCache();
-        const TMap<uint32, FSGSerializerFormatVersionInfo>& allVersions = cache.GetAllFormatVersions();
+        const TMap<FSGSerializerFormat, FSGSerializerFormatVersionInfo>& allVersions = cache.GetAllFormatVersions();
 
         // Collect serializers that need a major version upgrade
         struct FUpgradeInfo
@@ -380,7 +387,7 @@ private:
         };
         TArray<FUpgradeInfo> upgradesNeeded;
 
-        for (const TPair<uint32, FSGSerializerFormatVersionInfo>& pair : allVersions)
+        for (const TPair<FSGSerializerFormat, FSGSerializerFormatVersionInfo>& pair : allVersions)
         {
             const FSGSerializerFormatVersionInfo& info = pair.Value;
             if (info.TotalFileCount > 0

@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 
+#include "Core/SGSerializerFormat.h"
+
 /**
  * Quick-reference snapshot of a registered serializer's identity.
  * Populated from ISGDynamicTextAssetSerializer accessors for use in
@@ -14,14 +16,14 @@ struct SGDYNAMICTEXTASSETSRUNTIME_API FSGDynamicTextAssetSerializerMetadata
 public:
 	FSGDynamicTextAssetSerializerMetadata() = default;
 
-	/** Returns true if SerializerTypeId is not INVALID_SERIALIZER_TYPE_ID (0). */
+	/** Returns true if the serializer format is valid (non-zero TypeId). */
 	bool IsValidId() const;
 
 	/**
-	 * Globally unique integer ID for the serializer format.
+	 * The serializer format for this metadata entry.
 	 * Built-in range [1, 99] (1=JSON, 2=XML, 3=YAML). Third-party serializers use 100+.
 	 */
-	uint32 SerializerTypeId;
+	FSGSerializerFormat SerializerFormat;
 
 	/** Full file extension handled by this serializer (e.g., ".dta.json", ".dta.xml"). */
 	FString FileExtension;

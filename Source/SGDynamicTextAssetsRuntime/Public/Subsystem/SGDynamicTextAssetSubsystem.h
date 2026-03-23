@@ -6,6 +6,7 @@
 
 #include "Core/ISGDynamicTextAssetProvider.h"
 #include "Core/SGDynamicTextAssetId.h"
+#include "Core/SGSerializerFormat.h"
 #include "Engine/StreamableManager.h"
 #include "Server/ISGDynamicTextAssetServerInterface.h"
 #include "UObject/ScriptInterface.h"
@@ -444,14 +445,14 @@ private:
      * @param FilePath          Absolute path to the source file
      * @param ClassPtr          Class to instantiate for the dynamic text asset
      * @param TextPayload      Text payload read on the background thread (decompressed if binary)
-     * @param SerializerTypeId  TypeId from binary header (non-zero) or 0 for plain text files
+     * @param SerializerFormat  Format from binary header (valid) or default-constructed for plain text files
      * @param bReadSuccess      True if the file read succeeded
      * @param OnComplete        Delegate invoked with the loaded provider (or empty on failure)
      */
     void Internal_LoadDynamicTextAssetFromFileAsync_GameThread(const FString& FilePath,
         const UClass* ClassPtr,
         const FString& TextPayload,
-        uint32 SerializerTypeId,
+        FSGSerializerFormat SerializerFormat,
         const bool& bReadSuccess,
         const FOnDynamicTextAssetLoaded& OnComplete);
 };

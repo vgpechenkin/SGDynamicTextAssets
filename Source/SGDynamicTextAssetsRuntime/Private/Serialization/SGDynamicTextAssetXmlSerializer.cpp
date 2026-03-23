@@ -16,6 +16,8 @@
 #include "XmlFile.h"
 #include "XmlNode.h"
 
+const FSGSerializerFormat FSGDynamicTextAssetXmlSerializer::FORMAT(SGDynamicTextAssetConstants::XML_SERIALIZER_TYPE_ID);
+
 namespace FSGDynamicTextAssetXmlSerializerInternals
 {
     /** XML element name for the root wrapper element. */
@@ -391,9 +393,9 @@ XML format uses a file information block (sgFileInformation), for example:
 #endif
 }
 
-uint32 FSGDynamicTextAssetXmlSerializer::GetSerializerTypeId() const
+FSGSerializerFormat FSGDynamicTextAssetXmlSerializer::GetSerializerFormat() const
 {
-    return TYPE_ID;
+    return FORMAT;
 }
 
 FSGDynamicTextAssetVersion FSGDynamicTextAssetXmlSerializer::GetFileFormatVersion() const
@@ -976,7 +978,7 @@ bool FSGDynamicTextAssetXmlSerializer::ValidateStructure(const FString& InString
 bool FSGDynamicTextAssetXmlSerializer::ExtractFileInfo(const FString& InString, FSGDynamicTextAssetFileInfo& OutFileInfo) const
 {
     OutFileInfo = FSGDynamicTextAssetFileInfo();
-    OutFileInfo.SerializerTypeId = TYPE_ID;
+    OutFileInfo.SerializerFormat = FORMAT;
 
     FXmlFile xmlFile(InString, EConstructMethod::ConstructFromBuffer);
     if (!xmlFile.IsValid())

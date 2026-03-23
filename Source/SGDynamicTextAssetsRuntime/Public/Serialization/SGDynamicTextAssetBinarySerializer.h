@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 
+#include "Core/SGSerializerFormat.h"
 #include "Settings/SGDynamicTextAssetSettings.h"
 #include "SGBinaryDynamicTextAssetHeader.h"
 
@@ -50,17 +51,17 @@ public:
 		TArray<uint8>& OutBinaryData);
 
 	/**
-	 * Extracts payload string and serializer type ID from compressed binary data.
+	 * Extracts payload string and serializer format from compressed binary data.
 	 *
 	 * @param BinaryData The binary data to decompress
 	 * @param OutPayloadString Output string containing the decompressed payload
-	 * @param OutSerializerTypeId The serializer type ID stored in the header  - pass to FSGDynamicTextAssetFileManager::FindSerializerForTypeId() to get the deserializer
+	 * @param OutSerializerFormat The serializer format stored in the header - pass to FSGDynamicTextAssetFileManager::FindSerializerForFormat() to get the deserializer
 	 * @return True if extraction succeeded
 	 */
 	static bool BinaryToString(
 		const TArray<uint8>& BinaryData,
 		FString& OutPayloadString,
-		uint32& OutSerializerTypeId);
+		FSGSerializerFormat& OutSerializerFormat);
 
 	/**
 	 * Reads the header from binary data without decompressing the payload.
@@ -110,14 +111,20 @@ public:
 		ESGDynamicTextAssetCompressionMethod CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib);
 
 	/**
-	 * Reads the serializer type ID from binary data without decompressing the payload.
+	 * Reads the serializer format from binary data without decompressing the payload.
 	 * Use this when you only need to identify the format without fully loading the file.
-	 * Pass the returned ID to FSGDynamicTextAssetFileManager::FindSerializerForTypeId() to resolve the serializer.
+	 * Pass the returned format to FSGDynamicTextAssetFileManager::FindSerializerForFormat() to resolve the serializer.
 	 *
 	 * @param BinaryData The binary data to read
-	 * @param OutSerializerTypeId The serializer type ID stored in the header
+	 * @param OutSerializerFormat The serializer format stored in the header
 	 * @return True if the header was valid and the read succeeded
 	 */
+	static bool BinaryReadSerializerFormat(
+		const TArray<uint8>& BinaryData,
+		FSGSerializerFormat& OutSerializerFormat);
+
+	/** @deprecated Use BinaryReadSerializerFormat instead. Will be removed in UE 5.7. */
+	UE_DEPRECATED(5.6, "Use BinaryReadSerializerFormat instead. Will be removed in UE 5.7.")
 	static bool BinaryReadSerializerTypeId(
 		const TArray<uint8>& BinaryData,
 		uint32& OutSerializerTypeId);

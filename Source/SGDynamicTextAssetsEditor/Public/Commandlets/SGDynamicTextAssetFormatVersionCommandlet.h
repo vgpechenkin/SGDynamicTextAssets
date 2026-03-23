@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Commandlets/Commandlet.h"
 #include "Core/SGDynamicTextAssetVersion.h"
+#include "Core/SGSerializerFormat.h"
 
 #include "SGDynamicTextAssetFormatVersionCommandlet.generated.h"
 
@@ -23,8 +24,8 @@ struct SGDYNAMICTEXTASSETSEDITOR_API FSGFormatVersionValidationResult
 	/** The serializer's current format version */
 	FSGDynamicTextAssetVersion SerializerVersion;
 
-	/** The serializer type ID that owns this file */
-	uint32 SerializerTypeId = 0;
+	/** The serializer format that owns this file */
+	FSGSerializerFormat SerializerFormat;
 
 	/** True if the major version matches but minor/patch differs */
 	uint8 bIsMinorMismatch : 1;

@@ -243,7 +243,7 @@ bool FSGDynamicTextAssetCookUtils::CookDynamicTextAssetFile(
 	// Convert string to binary, storing the serializer's type ID and asset type ID for routing on load
 	FSGBinaryEncodeParams encodeParams;
 	encodeParams.Id = cookFileInfo.Id;
-	encodeParams.SerializerTypeId = serializer->GetSerializerTypeId();
+	encodeParams.SerializerFormat = serializer->GetSerializerFormat();
 	encodeParams.AssetTypeId = cookFileInfo.AssetTypeId;
 	encodeParams.CompressionMethod = CompressionMethod;
 

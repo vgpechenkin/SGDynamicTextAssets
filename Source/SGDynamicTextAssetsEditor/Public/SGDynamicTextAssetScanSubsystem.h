@@ -100,7 +100,7 @@ public:
 	 * Incrementally update the project info cache for a single file.
 	 * Called after a DTA file is saved to keep the cache current without a full rescan.
 	 */
-	void UpdateProjectInfoForFile(uint32 SerializerTypeId, const FSGDynamicTextAssetVersion& FileFormatVersion);
+	void UpdateProjectInfoForFile(const FSGSerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion);
 
 	/**
 	 * Get the list of DTA files discovered during the current scan.

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/SGDynamicTextAssetId.h"
+#include "Core/SGSerializerFormat.h"
 
 class USGDynamicTextAsset;
 class FSGDynamicTextAssetCookManifest;
@@ -140,18 +141,22 @@ public:
     /**
      * Reads raw file contents from a dynamic text asset file.
      * For binary (.dta.bin) files the payload is decompressed before returning, and
-     * the serializer TypeId embedded in the binary header is written to OutSerializerTypeId.
-     * For plain text files (e.g. .dta.json) OutSerializerTypeId is set to 0.
-     * Pass the TypeId to FindSerializerForTypeId() to obtain the correct deserializer.
+     * the serializer format embedded in the binary header is written to OutSerializerFormat.
+     * For plain text files (e.g. .dta.json) OutSerializerFormat is set to invalid.
+     * Pass the format to FindSerializerForFormat() to obtain the correct deserializer.
      *
      * @param FilePath             Absolute path to the file
-     * @param OutContents          Output string  - always a text payload after return
-     * @param OutSerializerTypeId  For binary files: TypeId from the binary header.
-     *                             For text files: 0. Pass nullptr to ignore.
+     * @param OutContents          Output string - always a text payload after return
+     * @param OutSerializerFormat  For binary files: format from the binary header.
+     *                             For text files: invalid. Pass nullptr to ignore.
      * @return True if file was read successfully
      */
     static bool ReadRawFileContents(const FString& FilePath, FString& OutContents,
-        uint32* OutSerializerTypeId = nullptr);
+        FSGSerializerFormat* OutSerializerFormat = nullptr);
+
+    UE_DEPRECATED(5.6, "Use ReadRawFileContents with FSGSerializerFormat* instead. Will be removed in UE 5.7")
+    static bool ReadRawFileContents(const FString& FilePath, FString& OutContents,
+        uint32* OutSerializerTypeId);
 
     /**
      * Writes raw file contents to a dynamic text asset file.
@@ -315,21 +320,27 @@ public:
     static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForExtension(FStringView Extension);
 
     /**
-     * Finds a registered serializer by its integer type ID.
+     * Finds a registered serializer by its format identifier.
      * Used when loading binary (.dta.bin) files to route the payload to the correct deserializer.
      *
-     * @param TypeId The serializer type ID stored in the binary file header
+     * @param Format The serializer format to look up
      * @return The serializer, or nullptr if not found
      */
+    static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForFormat(FSGSerializerFormat Format);
+
+    UE_DEPRECATED(5.6, "Use FindSerializerForFormat instead. Will be removed in UE 5.7")
     static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForTypeId(uint32 TypeId);
 
     /**
-     * Returns the integer TypeId for the serializer registered under the given file extension.
-     * Returns 0 if no serializer is registered for that extension.
-     * Use this to convert a known extension string to a binary-format TypeId.
+     * Returns the serializer format for the serializer registered under the given file extension.
+     * Returns an invalid format if no serializer is registered for that extension.
      *
-     * @param Extension File extension without leading dot (e.g., "dta.json")
+     * @param Extension File extension (e.g., ".dta.json")
+     * @return The serializer format, or invalid if not found
      */
+    static FSGSerializerFormat GetFormatForExtension(const FString& Extension);
+
+    UE_DEPRECATED(5.6, "Use GetFormatForExtension instead. Will be removed in UE 5.7")
     static uint32 GetTypeIdForExtension(const FString& Extension);
 
     /**
@@ -415,7 +426,7 @@ private:
     /** Registered serializers keyed by file extension (case-insensitive) */
     static TMap<FString, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS;
 
-    /** Registered serializers keyed by integer type ID  - used for binary file routing */
-    static TMap<uint32, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS_BY_ID;
+    /** Registered serializers keyed by format identifier - used for binary file routing */
+    static TMap<FSGSerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS_BY_FORMAT;
 };
 

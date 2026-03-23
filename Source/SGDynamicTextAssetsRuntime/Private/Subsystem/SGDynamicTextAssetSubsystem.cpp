@@ -11,6 +11,7 @@
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "UObject/Package.h"
+#include "Core/SGSerializerFormat.h"
 #include "Serialization/SGDynamicTextAssetSerializerBase.h"
 #include "Server/SGDynamicTextAssetServerNullInterface.h"
 #include "Templates/SubclassOf.h"
@@ -182,7 +183,7 @@ bool USGDynamicTextAssetSubsystem::AddToCache(const TScriptInterface<ISGDynamicT
 }
 
 void USGDynamicTextAssetSubsystem::Internal_LoadDynamicTextAssetFromFileAsync_GameThread(const FString& FilePath,
-    const UClass* ClassPtr, const FString& TextPayload, uint32 SerializerTypeId,
+    const UClass* ClassPtr, const FString& TextPayload, FSGSerializerFormat SerializerFormat,
     const bool& bReadSuccess, const FOnDynamicTextAssetLoaded& OnComplete)
 {
     // Decrement pending counter
@@ -200,9 +201,9 @@ void USGDynamicTextAssetSubsystem::Internal_LoadDynamicTextAssetFromFileAsync_Ga
         return;
     }
 
-    // For binary files SerializerTypeId is non-zero (read from header); for text files use extension lookup
-    TSharedPtr<ISGDynamicTextAssetSerializer> serializer = (SerializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
-        ? FSGDynamicTextAssetFileManager::FindSerializerForTypeId(SerializerTypeId)
+    // For binary files SerializerFormat is valid (read from header); for text files use extension lookup
+    TSharedPtr<ISGDynamicTextAssetSerializer> serializer = SerializerFormat.IsValid()
+        ? FSGDynamicTextAssetFileManager::FindSerializerForFormat(SerializerFormat)
         : FSGDynamicTextAssetFileManager::FindSerializerForFile(FilePath);
     if (!serializer.IsValid())
     {
@@ -347,11 +348,11 @@ TScriptInterface<ISGDynamicTextAssetProvider> USGDynamicTextAssetSubsystem::Load
     {
         // Try extracting file info first to resolve the class implicitly.
         FString jsonContents;
-        uint32 classResolveTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
-        if (FSGDynamicTextAssetFileManager::ReadRawFileContents(FilePath, jsonContents, &classResolveTypeId))
+        FSGSerializerFormat classResolveFormat;
+        if (FSGDynamicTextAssetFileManager::ReadRawFileContents(FilePath, jsonContents, &classResolveFormat))
         {
-            TSharedPtr<ISGDynamicTextAssetSerializer> serializer = (classResolveTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
-                ? FSGDynamicTextAssetFileManager::FindSerializerForTypeId(classResolveTypeId)
+            TSharedPtr<ISGDynamicTextAssetSerializer> serializer = classResolveFormat.IsValid()
+                ? FSGDynamicTextAssetFileManager::FindSerializerForFormat(classResolveFormat)
                 : FSGDynamicTextAssetFileManager::FindSerializerForFile(FilePath);
             if (serializer.IsValid())
             {
@@ -383,16 +384,16 @@ TScriptInterface<ISGDynamicTextAssetProvider> USGDynamicTextAssetSubsystem::Load
         return emptyProvider;
     }
 
-    // Read file contents for binary files, OutSerializerTypeId identifies the deserializer
+    // Read file contents for binary files, OutSerializerFormat identifies the deserializer
     FString jsonContents;
-    uint32 serializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
-    if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(FilePath, jsonContents, &serializerTypeId))
+    FSGSerializerFormat serializerFormat;
+    if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(FilePath, jsonContents, &serializerFormat))
     {
         return emptyProvider;
     }
 
-    TSharedPtr<ISGDynamicTextAssetSerializer> serializer = (serializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
-        ? FSGDynamicTextAssetFileManager::FindSerializerForTypeId(serializerTypeId)
+    TSharedPtr<ISGDynamicTextAssetSerializer> serializer = serializerFormat.IsValid()
+        ? FSGDynamicTextAssetFileManager::FindSerializerForFormat(serializerFormat)
         : FSGDynamicTextAssetFileManager::FindSerializerForFile(FilePath);
     if (!serializer.IsValid())
     {
@@ -545,14 +546,14 @@ int32 USGDynamicTextAssetSubsystem::LoadAllDynamicTextAssetsOfClass(UClass* Dyna
     {
         // Extract class name from JSON to determine actual class
         FString jsonContents;
-        uint32 fileSerializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
-        if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, jsonContents, &fileSerializerTypeId))
+        FSGSerializerFormat fileSerializerFormat;
+        if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, jsonContents, &fileSerializerFormat))
         {
             continue;
         }
 
-        TSharedPtr<ISGDynamicTextAssetSerializer> serializer = (fileSerializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
-            ? FSGDynamicTextAssetFileManager::FindSerializerForTypeId(fileSerializerTypeId)
+        TSharedPtr<ISGDynamicTextAssetSerializer> serializer = fileSerializerFormat.IsValid()
+            ? FSGDynamicTextAssetFileManager::FindSerializerForFormat(fileSerializerFormat)
             : FSGDynamicTextAssetFileManager::FindSerializerForFile(filePath);
         if (!serializer.IsValid())
         {
@@ -634,13 +635,13 @@ void USGDynamicTextAssetSubsystem::LoadDynamicTextAssetFromFileAsync(const FStri
     // Execute file I/O on background thread
     Async(EAsyncExecution::ThreadPool, [weakThis, FilePath, classPtr, OnComplete]()
     {
-        // Read file on background thread, binary files are decompressed and yield a non-zero TypeId
+        // Read file on background thread, binary files are decompressed and yield a valid SerializerFormat
         FString jsonContents;
-        uint32 serializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
-        bool readSuccess = FSGDynamicTextAssetFileManager::ReadRawFileContents(FilePath, jsonContents, &serializerTypeId);
+        FSGSerializerFormat serializerFormat;
+        bool readSuccess = FSGDynamicTextAssetFileManager::ReadRawFileContents(FilePath, jsonContents, &serializerFormat);
 
         // Return to game thread for object creation and callback
-        AsyncTask(ENamedThreads::GameThread, [weakThis, FilePath, classPtr, jsonContents, serializerTypeId, readSuccess, OnComplete]()
+        AsyncTask(ENamedThreads::GameThread, [weakThis, FilePath, classPtr, jsonContents, serializerFormat, readSuccess, OnComplete]()
         {
             USGDynamicTextAssetSubsystem* subsystem = weakThis.Get();
             if (!subsystem)
@@ -654,7 +655,7 @@ void USGDynamicTextAssetSubsystem::LoadDynamicTextAssetFromFileAsync(const FStri
                 return;
             }
 
-            subsystem->Internal_LoadDynamicTextAssetFromFileAsync_GameThread(FilePath, classPtr, jsonContents, serializerTypeId, readSuccess, OnComplete);
+            subsystem->Internal_LoadDynamicTextAssetFromFileAsync_GameThread(FilePath, classPtr, jsonContents, serializerFormat, readSuccess, OnComplete);
         });
     });
 }
@@ -718,13 +719,13 @@ void USGDynamicTextAssetSubsystem::LoadDynamicTextAssetAsync(const FSGDynamicTex
             return;
         }
 
-        // Found file, now proceed with standard load logic and binary files yield a non-zero TypeId
+        // Found file, now proceed with standard load logic and binary files yield a valid SerializerFormat
         FString textContents;
-        uint32 asyncSerializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
-        bool readSuccess = FSGDynamicTextAssetFileManager::ReadRawFileContents(foundPath, textContents, &asyncSerializerTypeId);
+        FSGSerializerFormat asyncSerializerFormat;
+        bool readSuccess = FSGDynamicTextAssetFileManager::ReadRawFileContents(foundPath, textContents, &asyncSerializerFormat);
 
         // Return to game thread
-        AsyncTask(ENamedThreads::GameThread, [weakThis, foundPath, safeClassHint, textContents, asyncSerializerTypeId, readSuccess, OnComplete]()
+        AsyncTask(ENamedThreads::GameThread, [weakThis, foundPath, safeClassHint, textContents, asyncSerializerFormat, readSuccess, OnComplete]()
         {
             USGDynamicTextAssetSubsystem* subsystem = weakThis.Get();
             if (!subsystem)
@@ -737,8 +738,8 @@ void USGDynamicTextAssetSubsystem::LoadDynamicTextAssetAsync(const FSGDynamicTex
 
             if (!classToUse && readSuccess)
             {
-                 TSharedPtr<ISGDynamicTextAssetSerializer> serializer = (asyncSerializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
-                     ? FSGDynamicTextAssetFileManager::FindSerializerForTypeId(asyncSerializerTypeId)
+                 TSharedPtr<ISGDynamicTextAssetSerializer> serializer = asyncSerializerFormat.IsValid()
+                     ? FSGDynamicTextAssetFileManager::FindSerializerForFormat(asyncSerializerFormat)
                      : FSGDynamicTextAssetFileManager::FindSerializerForFile(foundPath);
                  if (serializer.IsValid())
                  {
@@ -783,7 +784,7 @@ void USGDynamicTextAssetSubsystem::LoadDynamicTextAssetAsync(const FSGDynamicTex
                 return;
             }
 
-            subsystem->Internal_LoadDynamicTextAssetFromFileAsync_GameThread(foundPath, classToUse, textContents, asyncSerializerTypeId, readSuccess, OnComplete);
+            subsystem->Internal_LoadDynamicTextAssetFromFileAsync_GameThread(foundPath, classToUse, textContents, asyncSerializerFormat, readSuccess, OnComplete);
         });
     });
 }

@@ -169,7 +169,7 @@ void USGDynamicTextAssetFormatVersionCommandlet::ValidateAllFiles(TArray<FSGForm
 		result.FilePath = filePath;
 		result.FileVersion = fileVersion;
 		result.SerializerVersion = serializerVersion;
-		result.SerializerTypeId = serializer->GetSerializerTypeId();
+		result.SerializerFormat = serializer->GetSerializerFormat();
 
 		if (fileVersion.Major != serializerVersion.Major)
 		{

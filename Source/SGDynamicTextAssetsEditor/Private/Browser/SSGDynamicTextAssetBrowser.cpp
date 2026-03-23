@@ -513,7 +513,7 @@ void SSGDynamicTextAssetBrowser::RefreshTileViewForSelectedType()
                 filePath,
                 itemClass ? itemClass : SelectedTypeClass.Get(),
                 fileInfo.AssetTypeId,
-                fileInfo.SerializerTypeId
+                fileInfo.SerializerFormat
             );
             items.Add(item);
         }

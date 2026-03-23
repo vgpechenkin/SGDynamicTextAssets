@@ -1,6 +1,8 @@
 // Copyright Start Games, Inc. All Rights Reserved.
 
 #include "Misc/AutomationTest.h"
+
+#include "Core/SGSerializerFormat.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
@@ -21,7 +23,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	virtual FText GetFormatDescription() const override { return FText::GetEmpty(); }
 #endif
-	virtual uint32 GetSerializerTypeId() const override { return 99; }
+	virtual FSGSerializerFormat GetSerializerFormat() const override { return FSGSerializerFormat(99); }
 	virtual FSGDynamicTextAssetVersion GetFileFormatVersion() const override { return FSGDynamicTextAssetVersion(1, 0, 0); }
 
 	virtual bool SerializeProvider(const ISGDynamicTextAssetProvider* Provider,
@@ -77,7 +79,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	virtual FText GetFormatDescription() const override { return FText::GetEmpty(); }
 #endif
-	virtual uint32 GetSerializerTypeId() const override { return 98; }
+	virtual FSGSerializerFormat GetSerializerFormat() const override { return FSGSerializerFormat(98); }
 	virtual FSGDynamicTextAssetVersion GetFileFormatVersion() const override { return FSGDynamicTextAssetVersion(1, 0, 0); }
 
 	virtual bool SerializeProvider(const ISGDynamicTextAssetProvider* Provider,

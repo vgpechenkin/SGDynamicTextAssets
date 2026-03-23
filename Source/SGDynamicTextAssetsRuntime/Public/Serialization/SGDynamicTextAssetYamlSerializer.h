@@ -41,21 +41,18 @@ public:
     virtual const FSlateBrush* GetIconBrush() const override;
 #endif
 
-    /**
-     * Unique integer ID for the YAML serializer format.
-     * Stored in binary (.dta.bin) file headers so the loader can route the
-     * decompressed payload back to this serializer without a string lookup.
-     *
-     * Range 1-99 is reserved for built-in serializers.
-     * Third-party serializers should use IDs >= 100.
-     */
-    static constexpr uint32 TYPE_ID = 3;
+    /** FSGSerializerFormat for the YAML serializer. */
+    static const FSGSerializerFormat FORMAT;
+
+    /** @deprecated Use FORMAT instead. */
+    UE_DEPRECATED(5.6, "Use FORMAT instead. Will be removed in UE 5.7")
+    static constexpr uint32 TYPE_ID = SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID;
 
     // ISGDynamicTextAssetSerializer overrides
     virtual FString GetFileExtension() const override;
     virtual FText GetFormatName() const override;
     virtual FText GetFormatDescription() const override;
-    virtual uint32 GetSerializerTypeId() const override;
+    virtual FSGSerializerFormat GetSerializerFormat() const override;
     virtual FSGDynamicTextAssetVersion GetFileFormatVersion() const override;
     virtual bool SerializeProvider(const ISGDynamicTextAssetProvider* Provider, FString& OutString) const override;
     virtual bool DeserializeProvider(const FString& InString, ISGDynamicTextAssetProvider* OutProvider, bool& bOutMigrated) const override;

@@ -154,9 +154,9 @@ const FSGDynamicTextAssetProjectInfoCache& USGDynamicTextAssetScanSubsystem::Get
 	return ProjectInfoCache;
 }
 
-void USGDynamicTextAssetScanSubsystem::UpdateProjectInfoForFile(uint32 SerializerTypeId, const FSGDynamicTextAssetVersion& FileFormatVersion)
+void USGDynamicTextAssetScanSubsystem::UpdateProjectInfoForFile(const FSGSerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion)
 {
-	ProjectInfoCache.RecordFileVersion(SerializerTypeId, FileFormatVersion);
+	ProjectInfoCache.RecordFileVersion(SerializerFormat, FileFormatVersion);
 	ProjectInfoCache.SaveToFile(FSGDynamicTextAssetProjectInfoCache::GetDefaultCachePath());
 }
 
@@ -220,9 +220,9 @@ bool USGDynamicTextAssetScanSubsystem::ProcessOneProjectInfoItem()
 	const FString filePath = PendingProjectInfoFiles.Pop(EAllowShrinking::No);
 	const FSGDynamicTextAssetFileInfo fileInfo = FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(filePath);
 
-	if (fileInfo.bIsValid && fileInfo.SerializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
+	if (fileInfo.bIsValid && fileInfo.SerializerFormat.IsValid())
 	{
-		ProjectInfoCache.RecordFileVersion(fileInfo.SerializerTypeId, fileInfo.FileFormatVersion);
+		ProjectInfoCache.RecordFileVersion(fileInfo.SerializerFormat, fileInfo.FileFormatVersion);
 	}
 
 	return !PendingProjectInfoFiles.IsEmpty();

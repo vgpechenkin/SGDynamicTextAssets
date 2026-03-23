@@ -8,6 +8,7 @@
 #include "Core/SGDynamicTextAssetTypeId.h"
 #include "Core/SGDynamicTextAssetBundleData.h"
 #include "Core/SGDynamicTextAssetVersion.h"
+#include "Core/SGSerializerFormat.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 
 struct FSlateBrush;
@@ -55,26 +56,37 @@ public:
 	virtual FText GetFormatDescription() const = 0;
 
 	/**
-	 * Returns the unique integer ID for this serializer format.
-	 * This ID is stored in binary (.dta.bin) file headers to identify which
-	 * serializer to use when loading, without storing the full extension string.
+	 * Returns the FSGSerializerFormat identifying this serializer.
+	 * The format's underlying TypeId is stored in binary (.dta.bin) file headers
+	 * to identify which serializer to use when loading.
 	 *
-	 * IMPORTANT: IDs must be globally unique across all registered serializers.
+	 * IMPORTANT: Format IDs must be globally unique across all registered serializers.
 	 * Duplicate ID registration is a fatal error caught at startup via UE_LOG(Fatal).
 	 *
 	 * Reserved built-in ID range [1, 99]:
-	 * 0 = INVALID
+	 * 0 = INVALID (FSGSerializerFormat::INVALID)
 	 * 1 = JSON (.dta.json)
 	 * 2 = XML (.dta.xml)
 	 * 3 = YAML (.dta.yaml)
-	 * 98 = FSGTestAltSerializer for tests. (.dta.test.alt)
-	 * 99 = FSGTestSerializer for tests. (.dta.test)
+	 * 98 = FSGTestAltSerializer for tests (.dta.test.alt)
+	 * 99 = FSGTestSerializer for tests (.dta.test)
 	 *
 	 * Third-party plugin serializers should use IDs >= 100 to avoid conflicts.
-	 * Zero(INVALID_SERIALIZER_TYPE_ID) is invalid and will be rejected at registration time.
-	 * @see INVALID_SERIALIZER_TYPE_ID
+	 * A default-constructed FSGSerializerFormat (TypeId=0) is invalid and will
+	 * be rejected at registration time.
+	 * @see FSGSerializerFormat::INVALID
 	 */
-	virtual uint32 GetSerializerTypeId() const = 0;
+	virtual FSGSerializerFormat GetSerializerFormat() const = 0;
+
+	/**
+	 * @deprecated Use GetSerializerFormat() instead.
+	 * Returns the underlying uint32 type ID for backward compatibility.
+	 */
+	UE_DEPRECATED(5.6, "Use GetSerializerFormat() instead. Will be removed in UE 5.7")
+	virtual uint32 GetSerializerTypeId() const
+	{
+		return GetSerializerFormat().GetTypeId();
+	}
 
 	/**
 	 * Returns the current file format version for this serializer.
@@ -129,9 +141,9 @@ public:
 
 	/**
 	 * Extracts file information from a serialized string without full deserialization.
-	 * @deprecated Use the ISGDynamicTextAssetSerializer::ExtractFileInfo instead. Will be removed in 5.7
+	 * @deprecated Use the ISGDynamicTextAssetSerializer::ExtractFileInfo instead. Will be removed in UE 5.7
 	 */
-	UE_DEPRECATED(5.6, "Use the ISGDynamicTextAssetSerializer::ExtractFileInfo instead. Will be removed in 5.7")
+	UE_DEPRECATED(5.6, "Use the ISGDynamicTextAssetSerializer::ExtractFileInfo instead. Will be removed in UE 5.7")
 	virtual bool ExtractMetadata(const FString& InString,
 		FSGDynamicTextAssetId& OutId,
 		FString& OutClassName,
@@ -206,8 +218,9 @@ public:
 	virtual bool UpdateFileFormatVersion(FString& InOutFileContents,
 		const FSGDynamicTextAssetVersion& NewVersion) const;
 
-	/** The invalid serializer type ID to avoid confusion of what the value is. */
-	static constexpr uint32 INVALID_SERIALIZER_TYPE_ID = 0;
+	/** @deprecated Use FSGSerializerFormat::INVALID or SGDynamicTextAssetConstants::INVALID_SERIALIZER_TYPE_ID instead. */
+	UE_DEPRECATED(5.6, "Use FSGSerializerFormat::INVALID or SGDynamicTextAssetConstants::INVALID_SERIALIZER_TYPE_ID instead. Will be removed in UE 5.7")
+	static constexpr uint32 INVALID_SERIALIZER_TYPE_ID = SGDynamicTextAssetConstants::INVALID_SERIALIZER_TYPE_ID;
 
 	/**
 	 * Wrapper key for the file information block (format-agnostic logical name).

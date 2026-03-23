@@ -321,7 +321,7 @@ bool FSGDynamicTextAssetFileManager_ReadRawFileContents_BinaryRoundtrip::RunTest
 	// Step 1: Convert JSON to binary
 	FSGBinaryEncodeParams encodeParams;
 	encodeParams.Id = testId;
-	encodeParams.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	encodeParams.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 
 	TArray<uint8> binaryData;
 	bool convertSuccess = FSGDynamicTextAssetBinarySerializer::StringToBinary(originalJson, encodeParams, binaryData);

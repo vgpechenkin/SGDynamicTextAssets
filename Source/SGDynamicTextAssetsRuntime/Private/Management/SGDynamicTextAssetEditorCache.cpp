@@ -8,6 +8,7 @@
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "SGDynamicTextAssetLogs.h"
+#include "Core/SGSerializerFormat.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Editor.h"
 
@@ -154,8 +155,8 @@ TScriptInterface<ISGDynamicTextAssetProvider> FSGDynamicTextAssetEditorCache::In
 
 	// Step 2: Read raw file contents
 	FString textPayload;
-	uint32 serializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
-	if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, textPayload, &serializerTypeId))
+	FSGSerializerFormat serializerFormat;
+	if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, textPayload, &serializerFormat))
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
 			TEXT("FSGDynamicTextAssetEditorCache: Failed to read file FilePath(%s)"), *filePath);
@@ -164,8 +165,8 @@ TScriptInterface<ISGDynamicTextAssetProvider> FSGDynamicTextAssetEditorCache::In
 
 	// Step 3: Find the appropriate serializer
 	TSharedPtr<ISGDynamicTextAssetSerializer> serializer =
-		(serializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
-		? FSGDynamicTextAssetFileManager::FindSerializerForTypeId(serializerTypeId)
+		serializerFormat.IsValid()
+		? FSGDynamicTextAssetFileManager::FindSerializerForFormat(serializerFormat)
 		: FSGDynamicTextAssetFileManager::FindSerializerForFile(filePath);
 	if (!serializer.IsValid())
 	{

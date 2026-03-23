@@ -14,6 +14,8 @@
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"
 
+const FSGSerializerFormat FSGDynamicTextAssetYamlSerializer::FORMAT(SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID);
+
 THIRD_PARTY_INCLUDES_START
 #include <fkYAML/node.hpp>
 THIRD_PARTY_INCLUDES_END
@@ -559,9 +561,9 @@ data:
 #endif
 }
 
-uint32 FSGDynamicTextAssetYamlSerializer::GetSerializerTypeId() const
+FSGSerializerFormat FSGDynamicTextAssetYamlSerializer::GetSerializerFormat() const
 {
-    return TYPE_ID;
+    return FORMAT;
 }
 
 FSGDynamicTextAssetVersion FSGDynamicTextAssetYamlSerializer::GetFileFormatVersion() const
@@ -1240,7 +1242,7 @@ bool FSGDynamicTextAssetYamlSerializer::ValidateStructure(const FString& InStrin
 bool FSGDynamicTextAssetYamlSerializer::ExtractFileInfo(const FString& InString, FSGDynamicTextAssetFileInfo& OutFileInfo) const
 {
     OutFileInfo = FSGDynamicTextAssetFileInfo();
-    OutFileInfo.SerializerTypeId = TYPE_ID;
+    OutFileInfo.SerializerFormat = FORMAT;
 
     fkyaml::node rootNode;
     FString parseError;

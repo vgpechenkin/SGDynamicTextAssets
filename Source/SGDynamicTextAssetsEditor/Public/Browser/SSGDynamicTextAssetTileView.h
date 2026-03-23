@@ -14,6 +14,7 @@
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Browser/SGDynamicTextAssetBrowserCommands.h"
 
+#include "Core/SGSerializerFormat.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 
 /**
@@ -28,13 +29,13 @@ struct FSGDynamicTextAssetListItem
         const FString& InFilePath,
         UClass* InClass,
         const FSGDynamicTextAssetTypeId& InAssetTypeId,
-        const uint32& InSerializerTypeId)
+        const FSGSerializerFormat& InSerializerFormat)
         : Id(InId)
         , UserFacingId(InUserFacingId)
         , FilePath(InFilePath)
         , DynamicTextAssetClass(InClass)
         , AssetTypeId(InAssetTypeId)
-        , SerializerTypeId(InSerializerTypeId)
+        , SerializerFormat(InSerializerFormat)
     { }
 
     /** Display name (derived from UserFacingId) */
@@ -55,8 +56,8 @@ struct FSGDynamicTextAssetListItem
     /** The asset type ID for this item's class */
     FSGDynamicTextAssetTypeId AssetTypeId;
 
-    /** The serializer associated with this item. */
-    uint32 SerializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
+    /** The serializer format associated with this item. */
+    FSGSerializerFormat SerializerFormat;
 };
 
 DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetSelected, TSharedPtr<FSGDynamicTextAssetListItem> /*SelectedItem*/);

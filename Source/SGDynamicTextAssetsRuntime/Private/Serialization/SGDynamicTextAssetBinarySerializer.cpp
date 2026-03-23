@@ -27,9 +27,9 @@ bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetBinarySerializer: Inputted INVALID Id"));
 		return false;
 	}
-	if (Params.SerializerTypeId == 0)
+	if (!Params.SerializerFormat.IsValid())
 	{
-		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetBinarySerializer: Inputted INVALID SerializerTypeId (0 is reserved)"));
+		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetBinarySerializer: Inputted INVALID SerializerFormat"));
 		return false;
 	}
 
@@ -42,13 +42,13 @@ bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 		return false;
 	}
 
-	// Prepare header  - SerializerTypeId is stored here so the loader can route
+	// Prepare header  - SerializerFormat is stored here so the loader can route
 	// the decompressed payload to the correct deserializer without a string lookup.
 	// AssetTypeGuid enables class resolution directly from the header without decompression.
 	FSGBinaryDynamicTextAssetHeader header;
 	header.CompressionType = static_cast<uint32>(Params.CompressionMethod);
 	header.UncompressedSize = uncompressedSize;
-	header.SerializerTypeId = Params.SerializerTypeId;
+	header.SerializerTypeId = Params.SerializerFormat.GetTypeId();
 	header.Guid = Params.Id.GetGuid();
 	header.AssetTypeGuid = Params.AssetTypeId.GetGuid();
 
@@ -122,10 +122,10 @@ bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 	const TArray<uint8>& BinaryData,
 	FString& OutPayloadString,
-	uint32& OutSerializerTypeId)
+	FSGSerializerFormat& OutSerializerFormat)
 {
 	OutPayloadString.Empty();
-	OutSerializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
+	OutSerializerFormat = FSGSerializerFormat();
 
 	if (BinaryData.IsEmpty())
 	{
@@ -243,9 +243,9 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 	FUTF8ToTCHAR utf8Converter(reinterpret_cast<const ANSICHAR*>(uncompressedData.GetData()), uncompressedData.Num());
 	OutPayloadString = FString(utf8Converter.Length(), utf8Converter.Get());
 
-	// Return the serializer type ID from the header - caller passes this to
-	// FSGDynamicTextAssetFileManager::FindSerializerForTypeId() to get the right deserializer
-	OutSerializerTypeId = header.SerializerTypeId;
+	// Return the serializer format from the header - caller passes this to
+	// FSGDynamicTextAssetFileManager::FindSerializerForFormat() to get the right deserializer
+	OutSerializerFormat = FSGSerializerFormat(header.SerializerTypeId);
 
 	return true;
 }
@@ -320,27 +320,37 @@ bool FSGDynamicTextAssetBinarySerializer::WriteBinaryFile(
 	return true;
 }
 
-bool FSGDynamicTextAssetBinarySerializer::BinaryReadSerializerTypeId(
+bool FSGDynamicTextAssetBinarySerializer::BinaryReadSerializerFormat(
 	const TArray<uint8>& BinaryData,
-	uint32& OutSerializerTypeId)
+	FSGSerializerFormat& OutSerializerFormat)
 {
-	OutSerializerTypeId = 0;
+	OutSerializerFormat = FSGSerializerFormat();
 
 	// Read and validate the fixed 64-byte header at the start of the binary data.
-	// This gives us access to SerializerTypeId without touching the compressed payload at all.
+	// This gives us access to SerializerFormat without touching the compressed payload at all.
 	FSGBinaryDynamicTextAssetHeader header;
 	if (!ReadHeader(BinaryData, header))
 	{
 		return false;
 	}
 
-	// SerializerTypeId is a fixed uint32 inside the header  - no variable-length data to skip.
+	// SerializerFormat is a fixed uint32 inside the header - no variable-length data to skip.
 	// The compressed payload always starts at exactly HEADER_SIZE bytes into the file,
 	// regardless of which serializer produced it.
-	// Pass this ID to FSGDynamicTextAssetFileManager::FindSerializerForTypeId() to get the
+	// Pass this format to FSGDynamicTextAssetFileManager::FindSerializerForFormat() to get the
 	// serializer instance that knows how to deserialize the payload.
-	OutSerializerTypeId = header.SerializerTypeId;
+	OutSerializerFormat = FSGSerializerFormat(header.SerializerTypeId);
 	return true;
+}
+
+bool FSGDynamicTextAssetBinarySerializer::BinaryReadSerializerTypeId(
+	const TArray<uint8>& BinaryData,
+	uint32& OutSerializerTypeId)
+{
+	FSGSerializerFormat format;
+	bool bResult = BinaryReadSerializerFormat(BinaryData, format);
+	OutSerializerTypeId = format.GetTypeId();
+	return bResult;
 }
 
 bool FSGDynamicTextAssetBinarySerializer::ConvertJsonFileToBinary(
@@ -375,7 +385,7 @@ bool FSGDynamicTextAssetBinarySerializer::ConvertJsonFileToBinary(
 	// Convert to binary, storing the serializer's type ID and asset type ID for routing on load
 	FSGBinaryEncodeParams params;
 	params.Id = binMeta.Id;
-	params.SerializerTypeId = serializer->GetSerializerTypeId();
+	params.SerializerFormat = serializer->GetSerializerFormat();
 	params.AssetTypeId = binMeta.AssetTypeId;
 	params.CompressionMethod = CompressionMethod;
 

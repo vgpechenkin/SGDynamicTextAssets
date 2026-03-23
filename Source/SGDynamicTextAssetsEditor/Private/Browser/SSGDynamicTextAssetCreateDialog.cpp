@@ -209,7 +209,7 @@ void SSGDynamicTextAssetCreateDialog::BuildExtensionOptions()
     for (const TSharedPtr<ISGDynamicTextAssetSerializer>& serializer : serializers)
     {
         TSharedPtr<FSGDynamicTextAssetSerializerMetadata> metadata = MakeShared<FSGDynamicTextAssetSerializerMetadata>();
-        metadata->SerializerTypeId = serializer->GetSerializerTypeId();
+        metadata->SerializerFormat = serializer->GetSerializerFormat();
         metadata->FileExtension = serializer->GetFileExtension();
         metadata->FormatName = serializer->GetFormatName();
         ExtensionOptions.Add(metadata);

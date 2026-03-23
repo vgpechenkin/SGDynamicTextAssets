@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Core/SGDynamicTextAssetVersion.h"
+#include "Core/SGSerializerFormat.h"
 
 /**
  * Aggregated format version data for a single serializer type.
@@ -13,8 +14,8 @@
  */
 struct SGDYNAMICTEXTASSETSEDITOR_API FSGSerializerFormatVersionInfo
 {
-	/** The serializer's unique type ID (e.g., 1 for JSON, 2 for XML, 3 for YAML). */
-	uint32 SerializerTypeId = 0;
+	/** The serializer format (e.g., 1 for JSON, 2 for XML, 3 for YAML). */
+	FSGSerializerFormat SerializerFormat;
 
 	/** Human-readable serializer name (e.g., "JSON"). */
 	FString SerializerName;
@@ -76,10 +77,10 @@ public:
 	 * Record a file's format version contribution.
 	 * Called during the scan phase for each DTA file, and incrementally on file save.
 	 *
-	 * @param SerializerTypeId The serializer type that handles this file
+	 * @param SerializerFormat The serializer format that handles this file
 	 * @param FileFormatVersion The format version found in the file
 	 */
-	void RecordFileVersion(uint32 SerializerTypeId, const FSGDynamicTextAssetVersion& FileFormatVersion);
+	void RecordFileVersion(const FSGSerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion);
 
 	/**
 	 * Populate the CurrentSerializerVersion field for all tracked serializers
@@ -88,11 +89,11 @@ public:
 	 */
 	void PopulateCurrentSerializerVersions();
 
-	/** Get format info for a specific serializer type ID. Returns nullptr if not tracked. */
-	const FSGSerializerFormatVersionInfo* GetInfoForSerializer(uint32 SerializerTypeId) const;
+	/** Get format info for a specific serializer format. Returns nullptr if not tracked. */
+	const FSGSerializerFormatVersionInfo* GetInfoForSerializer(const FSGSerializerFormat& SerializerFormat) const;
 
 	/** Get all serializer format version infos. */
-	const TMap<uint32, FSGSerializerFormatVersionInfo>& GetAllFormatVersions() const;
+	const TMap<FSGSerializerFormat, FSGSerializerFormatVersionInfo>& GetAllFormatVersions() const;
 
 	/** Returns the default cache file path under the project's Saved directory. */
 	static FString GetDefaultCachePath();
@@ -105,8 +106,8 @@ private:
 	/** When the cache was last saved. */
 	FDateTime SavedAt;
 
-	/** Per-serializer format version tracking. Key = SerializerTypeId. */
-	TMap<uint32, FSGSerializerFormatVersionInfo> FormatVersionsBySerializerId;
+	/** Per-serializer format version tracking. Key = SerializerFormat. */
+	TMap<FSGSerializerFormat, FSGSerializerFormatVersionInfo> FormatVersionsBySerializerId;
 
 	/** True if the cache has been loaded or populated by a scan. */
 	uint8 bIsLoaded : 1 = false;

@@ -187,9 +187,9 @@ TSharedRef<ITableRow> SSGDynamicTextAssetTileView::GenerateRow(TSharedPtr<FSGDyn
     const FString className = Item->DynamicTextAssetClass.IsValid() ? Item->DynamicTextAssetClass->GetName() : TEXT("Unknown");
 
     TSharedPtr<ISGDynamicTextAssetSerializer> serializer = nullptr;
-    if (Item->SerializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
+    if (Item->SerializerFormat.IsValid())
     {
-        serializer = FSGDynamicTextAssetFileManager::FindSerializerForTypeId(Item->SerializerTypeId);
+        serializer = FSGDynamicTextAssetFileManager::FindSerializerForFormat(Item->SerializerFormat);
     }
     // Account for if we failed to get the serializer for it
     // We NEED this information for readability
@@ -598,7 +598,7 @@ TSharedPtr<SWidget> SSGDynamicTextAssetTileView::GenerateContextMenu()
                         createdFilePath,
                         itemClass ? itemClass : selectedItem->DynamicTextAssetClass.Get(),
                         fileInfo.AssetTypeId,
-                        fileInfo.SerializerTypeId
+                        fileInfo.SerializerFormat
                     );
                     AllItems.Add(newItem);
 

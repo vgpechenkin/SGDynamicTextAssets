@@ -641,7 +641,7 @@ bool FSGDynamicTextAssetEditorToolkit::SaveToFile()
         TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FSGDynamicTextAssetFileManager::FindSerializerForFile(FilePath);
         if (serializer.IsValid())
         {
-            scanSubsystem->UpdateProjectInfoForFile(serializer->GetSerializerTypeId(), serializer->GetFileFormatVersion());
+            scanSubsystem->UpdateProjectInfoForFile(serializer->GetSerializerFormat(), serializer->GetFileFormatVersion());
 
             // Update tracked version so subsequent saves don't re-log the upgrade
             LoadedFileFormatVersion = serializer->GetFileFormatVersion();

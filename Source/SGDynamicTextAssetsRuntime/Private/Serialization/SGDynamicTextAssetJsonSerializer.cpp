@@ -2,6 +2,7 @@
 
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
 
+#include "Core/SGSerializerFormat.h"
 #include "SGDynamicTextAssetLogs.h"
 #include "Core/SGDynamicTextAsset.h"
 #include "Core/SGDynamicTextAssetTypeId.h"
@@ -14,6 +15,8 @@
 #include "Internationalization/Regex.h"
 #include "Statics/SGDynamicTextAssetSlateStyles.h"
 #include "UObject/UnrealType.h"
+
+const FSGSerializerFormat FSGDynamicTextAssetJsonSerializer::FORMAT(SGDynamicTextAssetConstants::JSON_SERIALIZER_TYPE_ID);
 
 #if WITH_EDITOR
 const FSlateBrush* FSGDynamicTextAssetJsonSerializer::GetIconBrush() const
@@ -70,9 +73,9 @@ JSON format uses a file information block (sgFileInformation), for example:
 #endif
 }
 
-uint32 FSGDynamicTextAssetJsonSerializer::GetSerializerTypeId() const
+FSGSerializerFormat FSGDynamicTextAssetJsonSerializer::GetSerializerFormat() const
 {
-    return TYPE_ID;
+    return FORMAT;
 }
 
 FSGDynamicTextAssetVersion FSGDynamicTextAssetJsonSerializer::GetFileFormatVersion() const
@@ -677,7 +680,7 @@ bool FSGDynamicTextAssetJsonSerializer::ValidateStructure(const FString& InStrin
 bool FSGDynamicTextAssetJsonSerializer::ExtractFileInfo(const FString& InString, FSGDynamicTextAssetFileInfo& OutFileInfo) const
 {
     OutFileInfo = FSGDynamicTextAssetFileInfo();
-    OutFileInfo.SerializerTypeId = TYPE_ID;
+    OutFileInfo.SerializerFormat = FORMAT;
 
     TSharedPtr<FJsonObject> rootObject;
     TSharedRef<TJsonReader<>> reader = TJsonReaderFactory<>::Create(InString);

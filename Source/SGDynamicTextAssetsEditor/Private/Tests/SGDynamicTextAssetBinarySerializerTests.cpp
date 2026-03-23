@@ -4,6 +4,7 @@
 #include "Serialization/SGBinaryEncodeParams.h"
 #include "Serialization/SGDynamicTextAssetBinarySerializer.h"
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
+#include "Core/SGSerializerFormat.h"
 
 /**
  * Test: Default-constructed header has valid magic number and correct constants
@@ -46,7 +47,7 @@ bool FSGDynamicTextAssetBinarySerializer_RoundtripZlib_MatchesInput::RunTest(con
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
 
 	TArray<uint8> binaryData;
@@ -55,8 +56,8 @@ bool FSGDynamicTextAssetBinarySerializer_RoundtripZlib_MatchesInput::RunTest(con
 	TestTrue(TEXT("Binary data should not be empty"), binaryData.Num() > 0);
 
 	FString outputJson;
-	uint32 unusedSerializerTypeId = 0;
-	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerTypeId);
+	FSGSerializerFormat unusedSerializerFormat;
+	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerFormat);
 	TestTrue(TEXT("BinaryToString should succeed"), bExtracted);
 	TestEqual(TEXT("Roundtrip output should match input"), outputJson, inputJson);
 
@@ -81,7 +82,7 @@ bool FSGDynamicTextAssetBinarySerializer_RoundtripNone_MatchesInput::RunTest(con
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::None;
 
 	TArray<uint8> binaryData;
@@ -89,8 +90,8 @@ bool FSGDynamicTextAssetBinarySerializer_RoundtripNone_MatchesInput::RunTest(con
 	TestTrue(TEXT("StringToBinary with None should succeed"), bConverted);
 
 	FString outputJson;
-	uint32 unusedSerializerTypeId = 0;
-	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerTypeId);
+	FSGSerializerFormat unusedSerializerFormat;
+	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerFormat);
 	TestTrue(TEXT("BinaryToString should succeed"), bExtracted);
 	TestEqual(TEXT("Roundtrip output should match input"), outputJson, inputJson);
 
@@ -115,7 +116,7 @@ bool FSGDynamicTextAssetBinarySerializer_RoundtripLZ4_MatchesInput::RunTest(cons
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::LZ4;
 
 	TArray<uint8> binaryData;
@@ -123,8 +124,8 @@ bool FSGDynamicTextAssetBinarySerializer_RoundtripLZ4_MatchesInput::RunTest(cons
 	TestTrue(TEXT("StringToBinary with LZ4 should succeed"), bConverted);
 
 	FString outputJson;
-	uint32 unusedSerializerTypeId = 0;
-	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerTypeId);
+	FSGSerializerFormat unusedSerializerFormat;
+	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerFormat);
 	TestTrue(TEXT("BinaryToString should succeed"), bExtracted);
 	TestEqual(TEXT("Roundtrip output should match input"), outputJson, inputJson);
 
@@ -147,7 +148,7 @@ bool FSGDynamicTextAssetBinarySerializer_ReadHeader_ExtractsMetadata::RunTest(co
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
 
 	TArray<uint8> binaryData;
@@ -182,7 +183,7 @@ bool FSGDynamicTextAssetBinarySerializer_ReadHeader_NoneCompression::RunTest(con
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::None;
 
 	TArray<uint8> binaryData;
@@ -215,7 +216,7 @@ bool FSGDynamicTextAssetBinarySerializer_ExtractId_MatchesInput::RunTest(const F
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 
 	TArray<uint8> binaryData;
 	FSGDynamicTextAssetBinarySerializer::StringToBinary(inputJson, params, binaryData);
@@ -245,7 +246,7 @@ bool FSGDynamicTextAssetBinarySerializer_IsValidBinaryData_DetectsValidity::RunT
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 
 	TArray<uint8> validBinary;
 	FSGDynamicTextAssetBinarySerializer::StringToBinary(inputJson, params, validBinary);
@@ -288,7 +289,7 @@ bool FSGDynamicTextAssetBinarySerializer_JsonToBinary_EmptyStringFails::RunTest(
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 
 	TArray<uint8> binaryData;
 	AddExpectedError("Inputted EMPTY PayloadString");
@@ -313,7 +314,7 @@ bool FSGDynamicTextAssetBinarySerializer_JsonToBinary_InvalidIdFails::RunTest(co
 
 	FSGBinaryEncodeParams params;
 	params.Id = invalidId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 
 	TArray<uint8> binaryData;
 	AddExpectedError("Inputted INVALID Id");
@@ -336,8 +337,8 @@ bool FSGDynamicTextAssetBinarySerializer_BinaryToJson_EmptyArrayFails::RunTest(c
 	TArray<uint8> emptyData;
 	FString outputJson;
 	AddExpectedError("Inputted Empty BinaryData");
-	uint32 unusedSerializerTypeId = 0;
-	bool bResult = FSGDynamicTextAssetBinarySerializer::BinaryToString(emptyData, outputJson, unusedSerializerTypeId);
+	FSGSerializerFormat unusedSerializerFormat;
+	bool bResult = FSGDynamicTextAssetBinarySerializer::BinaryToString(emptyData, outputJson, unusedSerializerFormat);
 	TestFalse(TEXT("Empty array should fail"), bResult);
 	TestTrue(TEXT("Output string should be empty on failure"), outputJson.IsEmpty());
 
@@ -367,7 +368,7 @@ bool FSGDynamicTextAssetBinarySerializer_Zlib_CompressesData::RunTest(const FStr
 
 	FSGBinaryEncodeParams compressedParams;
 	compressedParams.Id = testId;
-	compressedParams.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	compressedParams.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	compressedParams.CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
 
 	TArray<uint8> compressedBinary;
@@ -375,7 +376,7 @@ bool FSGDynamicTextAssetBinarySerializer_Zlib_CompressesData::RunTest(const FStr
 
 	FSGBinaryEncodeParams uncompressedParams;
 	uncompressedParams.Id = testId;
-	uncompressedParams.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	uncompressedParams.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	uncompressedParams.CompressionMethod = ESGDynamicTextAssetCompressionMethod::None;
 
 	TArray<uint8> uncompressedBinary;
@@ -445,7 +446,7 @@ bool FSGDynamicTextAssetBinarySerializer_JsonToBinary_WritesContentHash::RunTest
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
 
 	TArray<uint8> binaryData;
@@ -479,7 +480,7 @@ bool FSGDynamicTextAssetBinarySerializer_ContentHash_DeterministicForSameInput::
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
 
 	TArray<uint8> binaryData1;
@@ -516,7 +517,7 @@ bool FSGDynamicTextAssetBinarySerializer_ContentHash_DiffersForDifferentInput::R
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
 
 	TArray<uint8> binaryData1;
@@ -556,7 +557,7 @@ bool FSGDynamicTextAssetBinarySerializer_BinaryToJson_DetectsTamperedPayload::Ru
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::None;
 
 	TArray<uint8> binaryData;
@@ -572,9 +573,9 @@ bool FSGDynamicTextAssetBinarySerializer_BinaryToJson_DetectsTamperedPayload::Ru
 	}
 
 	FString outputJson;
-	uint32 unusedSerializerTypeId = 0;
+	FSGSerializerFormat unusedSerializerFormat;
 	AddExpectedError("Content hash mismatch");
-	bool bResult = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerTypeId);
+	bool bResult = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerFormat);
 	TestFalse(TEXT("BinaryToString should fail for tampered data"), bResult);
 
 	return true;
@@ -598,15 +599,15 @@ bool FSGDynamicTextAssetBinarySerializer_BinaryToJson_PassesValidContentHash::Ru
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
 
 	TArray<uint8> binaryData;
 	FSGDynamicTextAssetBinarySerializer::StringToBinary(inputJson, params, binaryData);
 
 	FString outputJson;
-	uint32 unusedSerializerTypeId = 0;
-	bool bResult = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerTypeId);
+	FSGSerializerFormat unusedSerializerFormat;
+	bool bResult = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerFormat);
 	TestTrue(TEXT("BinaryToString should succeed with valid content hash"), bResult);
 	TestEqual(TEXT("Output should match input"), outputJson, inputJson);
 
@@ -629,7 +630,7 @@ bool FSGDynamicTextAssetBinarySerializer_ContentHash_WorksWithNoneCompression::R
 
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::None;
 
 	TArray<uint8> binaryData;
@@ -642,8 +643,8 @@ bool FSGDynamicTextAssetBinarySerializer_ContentHash_WorksWithNoneCompression::R
 
 	// Roundtrip should work
 	FString outputJson;
-	uint32 unusedSerializerTypeId = 0;
-	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerTypeId);
+	FSGSerializerFormat unusedSerializerFormat;
+	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerFormat);
 	TestTrue(TEXT("BinaryToString should succeed"), bExtracted);
 	TestEqual(TEXT("Roundtrip should match"), outputJson, inputJson);
 
@@ -675,7 +676,7 @@ bool FSGDynamicTextAssetBinarySerializer_Roundtrip_PreservesUserFacingId::RunTes
 	// JSON -> Binary
 	FSGBinaryEncodeParams params;
 	params.Id = testId;
-	params.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+	params.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	params.CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
 
 	TArray<uint8> binaryData;
@@ -684,8 +685,8 @@ bool FSGDynamicTextAssetBinarySerializer_Roundtrip_PreservesUserFacingId::RunTes
 
 	// Binary -> JSON
 	FString outputJson;
-	uint32 unusedSerializerTypeId = 0;
-	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerTypeId);
+	FSGSerializerFormat unusedSerializerFormat;
+	bool bExtracted = FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, outputJson, unusedSerializerFormat);
 	TestTrue(TEXT("BinaryToString should succeed"), bExtracted);
 
 	// Verify the $userfacingid survived the roundtrip
