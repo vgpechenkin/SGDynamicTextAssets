@@ -79,6 +79,7 @@ public:
     virtual const FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData() const override;
     virtual FSGDynamicTextAssetBundleData& GetMutableSGDTAssetBundleData() override;
     virtual bool HasSGDTAssetBundles() const override;
+    virtual TSoftClassPtr<USGDTAAssetBundleExtender> GetAssetBundleExtenderOverride() const override;
     // ~ISGDynamicTextAssetProvider interface
 
     /** Returns the version as a formatted string */
@@ -86,18 +87,26 @@ public:
     FString GetVersionString() const;
 
     /**
-     * Returns the FNames of the base metadata UPROPERTY fields: DynamicTextAssetId, UserFacingId, Version.
-     * Used by serializers to exclude these fields from the data block during property iteration.
+     * Returns the FNames of the base metadata UPROPERTY that will have custom editor tooling.
      *
      * Implemented via GET_MEMBER_NAME_CHECKED in SGDynamicTextAsset.cpp so that renaming any
      * of these properties becomes a compile error rather than a silent runtime mismatch.
      */
+    static TSet<FName> GetFileInformationPropertyNames();
+
+    /**
+     * Returns the FNames of the base metadata UPROPERTY that will have custom editor tooling.
+     *
+     * Implemented via GET_MEMBER_NAME_CHECKED in SGDynamicTextAsset.cpp so that renaming any
+     * of these properties becomes a compile error rather than a silent runtime mismatch.
+     */
+    UE_DEPRECATED(5.6, "Use GetFileInformationPropertyNames instead. Will be removed in UE 5.7")
     static TSet<FName> GetMetadataPropertyNames();
 
 protected:
 
     /**
-     * Called after this dynamic text asset's properties have been populated from JSON.
+     * Called after this dynamic text asset's properties have been populated from the serializer.
      * Override to perform custom initialization or caching.
      */
     UFUNCTION(BlueprintNativeEvent, Category = "Dynamic Text Asset", meta = (DisplayName = "Post Dynamic Text Asset Loaded"))
@@ -114,6 +123,14 @@ protected:
     UFUNCTION(BlueprintNativeEvent, Category = "Dynamic Text Asset")
     bool ValidateDynamicTextAsset(FSGDynamicTextAssetValidationResult& OutResult) const;
     virtual bool ValidateDynamicTextAsset_Implementation(FSGDynamicTextAssetValidationResult& OutResult) const { return true; }
+
+    /**
+     * Optional per-DTA override for the asset bundle extender.
+     * When set, this extender is used instead of the settings-level mapping.
+     * When null, the system falls back to settings configuration.
+     */
+    UPROPERTY(EditAnywhere, Category = "Dynamic Text Asset|File Information")
+    TSoftClassPtr<USGDTAAssetBundleExtender> AssetBundleExtenderOverride = nullptr;
 
 private:
 

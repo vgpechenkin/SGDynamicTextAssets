@@ -2,6 +2,7 @@
 
 #include "Core/ISGDynamicTextAssetProvider.h"
 
+#include "Serialization/SGDTAAssetBundleExtender.h"
 #include "Statics/SGDynamicTextAssetStatics.h"
 
 bool ISGDynamicTextAssetProvider::Native_ValidateDynamicTextAsset(FSGDynamicTextAssetValidationResult& OutResult) const
@@ -46,6 +47,11 @@ bool ISGDynamicTextAssetProvider::Native_ValidateDynamicTextAsset(FSGDynamicText
 bool ISGDynamicTextAssetProvider::HasSGDTAssetBundles() const
 {
 	return GetSGDTAssetBundleData().HasBundles();
+}
+
+TSoftClassPtr<USGDTAAssetBundleExtender> ISGDynamicTextAssetProvider::GetAssetBundleExtenderOverride() const
+{
+	return nullptr;
 }
 
 #if WITH_EDITOR

@@ -3,7 +3,102 @@
 #include "Settings/SGDynamicTextAssetSettings.h"
 
 #include "Engine/AssetManager.h"
+#include "Management/SGDynamicTextAssetFileManager.h"
+#include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "SGDynamicTextAssetLogs.h"
+
+#if WITH_EDITOR
+#include "Misc/DataValidation.h"
+#endif
+
+USGDynamicTextAssetSettingsAsset::USGDynamicTextAssetSettingsAsset()
+{
+	// TODO Fill in with the default asset bundle extender when its made
+	{
+		// Iterate over all serializers to setup default configurations for all serializers
+		//TArray<TSharedPtr<ISGDynamicTextAssetSerializer>> serializers =
+			//FSGDynamicTextAssetFileManager::GetAllRegisteredSerializers();
+	}
+}
+
+#if WITH_EDITOR
+EDataValidationResult USGDynamicTextAssetSettingsAsset::IsDataValid(FDataValidationContext& Context) const
+{
+	EDataValidationResult result = Super::IsDataValid(Context);
+
+	// Validate that every registered serializer format has an asset bundle extender
+	TArray<TSharedPtr<ISGDynamicTextAssetSerializer>> serializers =
+		FSGDynamicTextAssetFileManager::GetAllRegisteredSerializers();
+
+	// Track which formats are covered and check for overlaps
+	TMap<uint32, uint32> formatCoverageCount;
+
+	for (const FSGAssetBundleExtenderMapping& mapping : AssetBundleExtenderMappings)
+	{
+		// Validate the extender class is set
+		if (mapping.ExtenderClass.IsNull())
+		{
+			Context.AddError(INVTEXT("Asset bundle extender mapping has a null ExtenderClass. Each mapping must specify an extender."));
+			result = EDataValidationResult::Invalid;
+		}
+
+		// Check which formats this mapping covers
+		const uint32 bitmask = mapping.AppliesTo.GetTypeId();
+		for (const TSharedPtr<ISGDynamicTextAssetSerializer>& serializer : serializers)
+		{
+			if (!serializer.IsValid())
+			{
+				continue;
+			}
+
+			const uint32 formatBit = 1u << serializer->GetSerializerFormat().GetTypeId();
+			if ((bitmask & formatBit) != 0)
+			{
+				formatCoverageCount.FindOrAdd(serializer->GetSerializerFormat().GetTypeId())++;
+			}
+		}
+	}
+
+	// Check for formats with no coverage
+	for (const TSharedPtr<ISGDynamicTextAssetSerializer>& serializer : serializers)
+	{
+		if (!serializer.IsValid())
+		{
+			continue;
+		}
+
+		const uint32 typeId = serializer->GetSerializerFormat().GetTypeId();
+		const uint32* countPtr = formatCoverageCount.Find(typeId);
+
+		if (!countPtr)
+		{
+			Context.AddError(FText::Format(
+				INVTEXT("Serializer format `{0}` could not be found due to unknown error."),
+				serializer->GetFormatName()));
+			result = EDataValidationResult::Invalid;
+			continue;
+		}
+		const uint32& count = *countPtr;
+
+		if (count == 0)
+		{
+			Context.AddError(FText::Format(
+				INVTEXT("Serializer format '{0}' has no asset bundle extender assigned. Add a mapping that covers this format."),
+				serializer->GetFormatName()));
+			result = EDataValidationResult::Invalid;
+		}
+		else if (count > 1)
+		{
+			Context.AddError(FText::Format(
+				INVTEXT("Serializer format '{0}' is assigned to multiple asset bundle extenders. Only one extender per format is allowed."),
+				serializer->GetFormatName()));
+			result = EDataValidationResult::Invalid;
+		}
+	}
+
+	return result;
+}
+#endif
 
 FName USGDynamicTextAssetSettingsAsset::GetCustomCompressionName() const
 {

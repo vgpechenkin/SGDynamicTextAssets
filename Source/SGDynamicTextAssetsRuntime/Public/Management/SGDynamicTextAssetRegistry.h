@@ -13,6 +13,8 @@
 class FJsonObject;
 class FSGDynamicTextAssetTypeManifest;
 
+class USGDTAAssetBundleExtender;
+
 /** Delegate broadcast when the registry changes (class registered/unregistered). */
 DECLARE_MULTICAST_DELEGATE(FOnDynamicTextAssetRegistryChanged);
 
@@ -212,6 +214,17 @@ public:
     /** Delegate broadcast when type manifests are synced or updated. */
     FOnTypeManifestUpdated OnTypeManifestUpdated;
 
+    /**
+     * Gets or creates a cached instance of the given asset bundle extender class.
+     * Loads the class from the soft pointer if needed, then caches the instance.
+     * Instances are owned by the registry and persist for its lifetime.
+     *
+     * @param ExtenderClass Soft class pointer to the extender class
+     * @return The cached instance, or nullptr if the class is null or fails to load
+     */
+    USGDTAAssetBundleExtender* GetOrCreateAssetBundleExtender(
+        const TSoftClassPtr<USGDTAAssetBundleExtender>& ExtenderClass);
+
 private:
 
     /** Rebuilds the cached class list from registered bases + reflection */
@@ -244,4 +257,8 @@ private:
 
     /** UClass -> TypeId reverse lookup, built during SyncManifests. */
     TMap<TWeakObjectPtr<const UClass>, FSGDynamicTextAssetTypeId> ClassToTypeIdMap;
+
+    /** Cached asset bundle extender instances, keyed by loaded class. One instance per class. */
+    UPROPERTY(Transient)
+    TMap<TSoftClassPtr<USGDTAAssetBundleExtender>, TObjectPtr<USGDTAAssetBundleExtender>> CachedAssetBundleExtenders;
 };

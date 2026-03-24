@@ -33,9 +33,9 @@ bool FSGDynamicTextAssetSerializerBase::DeserializeValueToProperty(
 bool FSGDynamicTextAssetSerializerBase::ShouldSerializeProperty(const FProperty* Property) const
 {
     // Exclude base metadata fields handled separately as wrapper level fields, not in data block.
-    // USGDynamicTextAsset::GetMetadataPropertyNames() uses GET_MEMBER_NAME_CHECKED internally so renaming
+    // USGDynamicTextAsset::GetFileInformationPropertyNames() uses GET_MEMBER_NAME_CHECKED internally so renaming
     // those properties becomes a compile error rather than a silent runtime mismatch.
-    static const TSet<FName> metadataPropertyNames = USGDynamicTextAsset::GetMetadataPropertyNames();
+    static const TSet<FName> metadataPropertyNames = USGDynamicTextAsset::GetFileInformationPropertyNames();
 
     if (metadataPropertyNames.Contains(Property->GetFName()))
     {

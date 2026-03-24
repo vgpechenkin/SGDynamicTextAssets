@@ -16,6 +16,7 @@
 #include "Management/SGDynamicTextAssetTypeManifest.h"
 #include "Misc/Paths.h"
 #include "SGDynamicTextAssetLogs.h"
+#include "Serialization/SGDTAAssetBundleExtender.h"
 #include "UObject/UObjectIterator.h"
 
 USGDynamicTextAssetRegistry* USGDynamicTextAssetRegistry::Get()
@@ -769,4 +770,41 @@ void USGDynamicTextAssetRegistry::RebuildTypeIdMaps()
             }
         }
     }
+}
+
+USGDTAAssetBundleExtender* USGDynamicTextAssetRegistry::GetOrCreateAssetBundleExtender(
+    const TSoftClassPtr<USGDTAAssetBundleExtender>& ExtenderClass)
+{
+    if (ExtenderClass.IsNull())
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
+            TEXT("USGDynamicTextAssetRegistry::GetOrCreateAssetBundleExtender: Inputted NULL ExtenderClass"));
+        return nullptr;
+    }
+
+    UClass* loadedClass = UAssetManager::Get().GetStreamableManager().LoadSynchronous(ExtenderClass);
+    if (!loadedClass)
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
+            TEXT("USGDynamicTextAssetRegistry::GetOrCreateAssetBundleExtender: Failed to load extender class '%s'"),
+            *ExtenderClass.ToString());
+        return nullptr;
+    }
+
+    if (TObjectPtr<USGDTAAssetBundleExtender>* existing = CachedAssetBundleExtenders.Find(ExtenderClass))
+    {
+        if (existing->Get())
+        {
+            return existing->Get();
+        }
+    }
+
+    USGDTAAssetBundleExtender* newInstance = NewObject<USGDTAAssetBundleExtender>(this, loadedClass);
+    CachedAssetBundleExtenders.Add(ExtenderClass, newInstance);
+
+    UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
+        TEXT("USGDynamicTextAssetRegistry: Created asset bundle extender instance for class '%s'"),
+        *loadedClass->GetName());
+
+    return newInstance;
 }

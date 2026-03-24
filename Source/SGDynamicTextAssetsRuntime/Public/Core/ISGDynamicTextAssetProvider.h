@@ -16,6 +16,8 @@
 
 class FJsonObject;
 
+class USGDTAAssetBundleExtender;
+
 /**
  * UInterface boilerplate for the dynamic text asset provider interface.
  *
@@ -147,6 +149,13 @@ public:
 
 	/** Returns true if this provider has any asset bundles. */
 	virtual bool HasSGDTAssetBundles() const;
+
+	/**
+	 * Returns the per-DTA asset bundle extender override class.
+	 * When non-null, this extender takes priority over the settings mapping.
+	 * Default: returns a null soft class pointer (no override).
+	 */
+	virtual TSoftClassPtr<USGDTAAssetBundleExtender> GetAssetBundleExtenderOverride() const;
 
 #if WITH_EDITOR
 	/** Notifies listeners that this dynamic text asset has changed */

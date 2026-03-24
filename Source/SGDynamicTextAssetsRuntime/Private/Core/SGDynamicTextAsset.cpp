@@ -2,11 +2,13 @@
 
 #include "Core/SGDynamicTextAsset.h"
 
+#include "Serialization/SGDTAAssetBundleExtender.h"
+
 USGDynamicTextAsset::USGDynamicTextAsset()
 {
     // DynamicTextAssetId will be set by the subsystem when loading
-    // UserFacingId will be populated from JSON
-    // Version will be populated from JSON
+    // UserFacingId will be populated from the serializer
+    // Version will be populated from the serializer
 }
 
 const FSGDynamicTextAssetId& USGDynamicTextAsset::GetDynamicTextAssetId() const
@@ -81,6 +83,11 @@ bool USGDynamicTextAsset::HasSGDTAssetBundles() const
     return SGDTAssetBundleData.HasBundles();
 }
 
+TSoftClassPtr<USGDTAAssetBundleExtender> USGDynamicTextAsset::GetAssetBundleExtenderOverride() const
+{
+    return AssetBundleExtenderOverride;
+}
+
 bool USGDynamicTextAsset::Native_ValidateDynamicTextAsset(FSGDynamicTextAssetValidationResult& OutResult) const
 {
     if (!ISGDynamicTextAssetProvider::Native_ValidateDynamicTextAsset(OutResult))
@@ -108,14 +115,20 @@ FString USGDynamicTextAsset::GetVersionString() const
     return Version.ToString();
 }
 
-TSet<FName> USGDynamicTextAsset::GetMetadataPropertyNames()
+TSet<FName> USGDynamicTextAsset::GetFileInformationPropertyNames()
 {
     // GET_MEMBER_NAME_CHECKED is called here (inside a member function body) so that it has
-    // access to the private members DynamicTextAssetId, UserFacingId, and Version.
+    // access to the private members and other types.
     // If any of these properties are renamed, this function will produce a compile error.
     return {
         GET_MEMBER_NAME_CHECKED(USGDynamicTextAsset, DynamicTextAssetId),
         GET_MEMBER_NAME_CHECKED(USGDynamicTextAsset, UserFacingId),
-        GET_MEMBER_NAME_CHECKED(USGDynamicTextAsset, Version)
+        GET_MEMBER_NAME_CHECKED(USGDynamicTextAsset, Version),
+        GET_MEMBER_NAME_CHECKED(USGDynamicTextAsset, AssetBundleExtenderOverride)
     };
+}
+
+TSet<FName> USGDynamicTextAsset::GetMetadataPropertyNames()
+{
+    return GetFileInformationPropertyNames();
 }

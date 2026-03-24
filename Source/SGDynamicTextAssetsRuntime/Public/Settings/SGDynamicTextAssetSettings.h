@@ -4,10 +4,13 @@
 
 #include "CoreMinimal.h"
 
+#include "Core/SGDTASerializerFormat.h"
 #include "Engine/DataAsset.h"
 #include "Engine/DeveloperSettings.h"
 
 #include "SGDynamicTextAssetSettings.generated.h"
+
+class USGDTAAssetBundleExtender;
 
 /**
  * Compression methods available for cooked dynamic text asset files.
@@ -32,6 +35,40 @@ enum class ESGDynamicTextAssetCompressionMethod : uint8
 };
 
 /**
+ * Maps one or more serializer formats (as a bitmask) to an asset bundle extender class.
+ * Used in USGDynamicTextAssetSettingsAsset to configure which extender handles
+ * each serializer format's asset bundle processing.
+ */
+USTRUCT(BlueprintType)
+struct SGDYNAMICTEXTASSETSRUNTIME_API FSGAssetBundleExtenderMapping
+{
+	GENERATED_BODY()
+
+	/** Bitmask of serializer formats this extender handles. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (SGDTABitmask))
+	FSGDTASerializerFormat AppliesTo;
+
+	/** The extender class to use for the matched formats. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSoftClassPtr<USGDTAAssetBundleExtender> ExtenderClass = nullptr;
+
+	bool operator==(const FSGAssetBundleExtenderMapping& Other) const
+	{
+		return AppliesTo == Other.AppliesTo && ExtenderClass == Other.ExtenderClass;
+	}
+
+	bool operator!=(const FSGAssetBundleExtenderMapping& Other) const
+	{
+		return !(*this == Other);
+	}
+
+	friend uint32 GetTypeHash(const FSGAssetBundleExtenderMapping& Mapping)
+	{
+		return HashCombine(GetTypeHash(Mapping.AppliesTo), GetTypeHash(Mapping.ExtenderClass));
+	}
+};
+
+/**
  * Data Asset containing SGDynamicTextAssets plugin configuration.
  *
  * Using a Data Asset instead of INI files prevents players from
@@ -45,6 +82,14 @@ class SGDYNAMICTEXTASSETSRUNTIME_API USGDynamicTextAssetSettingsAsset : public U
 {
 	GENERATED_BODY()
 public:
+
+	USGDynamicTextAssetSettingsAsset();
+
+#if WITH_EDITOR
+	// UObject overrides
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+	// ~UObject overrides
+#endif
 
 	/**
 	 * Returns the FName of the custom compression format to use.
@@ -131,6 +176,14 @@ public:
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cooking")
 	uint8 bDeleteCookedAssetsAfterPackaging : 1 = 1;
+
+	/**
+	 * Asset bundle extender mappings.
+	 * Each entry maps one or more serializer formats (as a bitmask) to an extender class.
+	 * Every registered serializer format must be covered by exactly one mapping.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset Bundles")
+	TSet<FSGAssetBundleExtenderMapping> AssetBundleExtenderMappings;
 };
 
 /**
