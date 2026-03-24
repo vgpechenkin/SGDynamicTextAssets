@@ -12,11 +12,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FInstancedValidation_OwnerDTA_NoViolations::RunTest(const FString& Parameters)
 {
-	// USGTestInstancedOwnerDTA has Instanced single + array properties pointing to
+	// USGDTATestInstancedOwnerDTA has Instanced single + array properties pointing to
 	// EditInlineNew classes with no nested hard refs. Should pass validation.
 	TArray<FString> violations;
 	bool bHasViolations = FSGDynamicTextAssetValidationUtils::DetectHardReferenceProperties(
-		USGTestInstancedOwnerDTA::StaticClass(), violations);
+		USGDTATestInstancedOwnerDTA::StaticClass(), violations);
 
 	TestFalse(TEXT("Instanced owner DTA with EditInlineNew sub-objects should have no violations"), bHasViolations);
 	TestTrue(TEXT("Violations array should be empty"), violations.IsEmpty());
@@ -31,12 +31,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FInstancedValidation_HardRefOwnerDTA_DetectsNestedHardRef::RunTest(const FString& Parameters)
 {
-	// USGTestInstancedHardRefOwnerDTA has an instanced object whose class
-	// (USGTestInstancedWithHardRef) contains a TObjectPtr<UObject> hard reference.
+	// USGDTATestInstancedHardRefOwnerDTA has an instanced object whose class
+	// (USGDTATestInstancedWithHardRef) contains a TObjectPtr<UObject> hard reference.
 	// Recursive validation should catch this.
 	TArray<FString> violations;
 	bool bHasViolations = FSGDynamicTextAssetValidationUtils::DetectHardReferenceProperties(
-		USGTestInstancedHardRefOwnerDTA::StaticClass(), violations);
+		USGDTATestInstancedHardRefOwnerDTA::StaticClass(), violations);
 
 	TestTrue(TEXT("Instanced object with nested hard ref should have violations"), bHasViolations);
 	TestTrue(TEXT("Should have at least one violation"), !violations.IsEmpty());
@@ -63,10 +63,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FInstancedValidation_InstancedArray_NoViolations::RunTest(const FString& Parameters)
 {
-	// Verify that the instanced TArray<TObjectPtr<USGTestInstancedBase>> property
-	// on USGTestInstancedOwnerDTA is specifically detected as an instanced property
+	// Verify that the instanced TArray<TObjectPtr<USGDTATestInstancedBase>> property
+	// on USGDTATestInstancedOwnerDTA is specifically detected as an instanced property
 	// and does not trigger violations.
-	const UClass* testClass = USGTestInstancedOwnerDTA::StaticClass();
+	const UClass* testClass = USGDTATestInstancedOwnerDTA::StaticClass();
 
 	// Find the InstancedArray property and verify its inner element has the instanced flag.
 	// CPF_InstancedReference is set on the array's inner FObjectProperty, not the outer FArrayProperty.
@@ -98,7 +98,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FInstancedValidation_IsInstancedObjectProperty_CorrectResults::RunTest(const FString& Parameters)
 {
-	const UClass* ownerClass = USGTestInstancedOwnerDTA::StaticClass();
+	const UClass* ownerClass = USGDTATestInstancedOwnerDTA::StaticClass();
 
 	// Instanced single property should return true
 	const FProperty* instancedProp = ownerClass->FindPropertyByName(TEXT("SingleInstanced"));
@@ -169,7 +169,7 @@ bool FInstancedValidation_InstancedStructDTA_NoViolations::RunTest(const FString
 	// Validation should not flag it.
 	TArray<FString> violations;
 	bool bHasViolations = FSGDynamicTextAssetValidationUtils::DetectHardReferenceProperties(
-		USGTestInstancedStructDTA::StaticClass(), violations);
+		USGDTATestInstancedStructDTA::StaticClass(), violations);
 
 	TestFalse(TEXT("DTA with FInstancedStruct properties should have no violations"), bHasViolations);
 	TestTrue(TEXT("Violations array should be empty"), violations.IsEmpty());

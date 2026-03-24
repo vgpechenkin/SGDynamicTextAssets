@@ -14,7 +14,7 @@
 #include "UObject/TextProperty.h"
 #include "UObject/UnrealType.h"
 
-const FSGSerializerFormat FSGDynamicTextAssetYamlSerializer::FORMAT(SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID);
+const FSGDTASerializerFormat FSGDynamicTextAssetYamlSerializer::FORMAT(SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID);
 
 THIRD_PARTY_INCLUDES_START
 #include <fkYAML/node.hpp>
@@ -561,7 +561,7 @@ data:
 #endif
 }
 
-FSGSerializerFormat FSGDynamicTextAssetYamlSerializer::GetSerializerFormat() const
+FSGDTASerializerFormat FSGDynamicTextAssetYamlSerializer::GetSerializerFormat() const
 {
     return FORMAT;
 }

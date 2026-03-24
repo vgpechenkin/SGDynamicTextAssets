@@ -11,7 +11,7 @@
  * Test struct containing a bundled soft reference inside a struct.
  */
 USTRUCT()
-struct FSGBundleTestStruct
+struct FSGDTABundleTestStruct
 {
 	GENERATED_BODY()
 public:
@@ -30,7 +30,7 @@ public:
  * Contains a soft reference tagged with a bundle.
  */
 UCLASS(EditInlineNew, NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden)
-class USGBundleTestInstancedObject : public UObject
+class USGDTABundleTestInstancedObject : public UObject
 {
 	GENERATED_BODY()
 public:
@@ -44,7 +44,7 @@ public:
  * Dynamic text asset with various bundled soft reference patterns for testing.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, ClassGroup = "Start Games")
-class USGBundleTestDynamicTextAsset : public USGDynamicTextAsset
+class USGDTABundleTestDynamicTextAsset : public USGDynamicTextAsset
 {
 	GENERATED_BODY()
 public:
@@ -83,11 +83,11 @@ public:
 
 	/** Struct containing a bundled soft reference. */
 	UPROPERTY()
-	FSGBundleTestStruct StructWithBundle;
+	FSGDTABundleTestStruct StructWithBundle;
 
 	/** Instanced sub-object containing a bundled soft reference. */
 	UPROPERTY(Instanced)
-	TObjectPtr<USGBundleTestInstancedObject> InstancedObj = nullptr;
+	TObjectPtr<USGDTABundleTestInstancedObject> InstancedObj = nullptr;
 
 	/** Plain primitive (no bundle relevance). */
 	UPROPERTY()

@@ -2,7 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
@@ -11,11 +11,11 @@
  * Minimal test serializer for testing the registry.
  * Implements ISGDynamicTextAssetSerializer with no-op methods.
  */
-class FSGTestSerializer : public ISGDynamicTextAssetSerializer
+class FSGDTATestSerializer : public ISGDynamicTextAssetSerializer
 {
 public:
 
-	FSGTestSerializer() = default;
+	FSGDTATestSerializer() = default;
 
 	// ISGDynamicTextAssetSerializer overrides
 	virtual FString GetFileExtension() const override { return TEXT(".dta.test"); }
@@ -23,7 +23,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	virtual FText GetFormatDescription() const override { return FText::GetEmpty(); }
 #endif
-	virtual FSGSerializerFormat GetSerializerFormat() const override { return FSGSerializerFormat(99); }
+	virtual FSGDTASerializerFormat GetSerializerFormat() const override { return FSGDTASerializerFormat(99); }
 	virtual FSGDynamicTextAssetVersion GetFileFormatVersion() const override { return FSGDynamicTextAssetVersion(1, 0, 0); }
 
 	virtual bool SerializeProvider(const ISGDynamicTextAssetProvider* Provider,
@@ -67,11 +67,11 @@ public:
 /**
  * Second test serializer with a different extension for multi-registration tests.
  */
-class FSGTestAltSerializer : public ISGDynamicTextAssetSerializer
+class FSGDTATestAltSerializer : public ISGDynamicTextAssetSerializer
 {
 public:
 
-	FSGTestAltSerializer() = default;
+	FSGDTATestAltSerializer() = default;
 
 	// ISGDynamicTextAssetSerializer overrides
 	virtual FString GetFileExtension() const override { return TEXT(".dta.test.alt"); }
@@ -79,7 +79,7 @@ public:
 #if !UE_BUILD_SHIPPING
 	virtual FText GetFormatDescription() const override { return FText::GetEmpty(); }
 #endif
-	virtual FSGSerializerFormat GetSerializerFormat() const override { return FSGSerializerFormat(98); }
+	virtual FSGDTASerializerFormat GetSerializerFormat() const override { return FSGDTASerializerFormat(98); }
 	virtual FSGDynamicTextAssetVersion GetFileFormatVersion() const override { return FSGDynamicTextAssetVersion(1, 0, 0); }
 
 	virtual bool SerializeProvider(const ISGDynamicTextAssetProvider* Provider,
@@ -149,7 +149,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSerializerRegistry_RegisterAndFindCustomSerializer::RunTest(const FString& Parameters)
 {
 	// Register the test serializer
-	FSGDynamicTextAssetFileManager::RegisterSerializer<FSGTestSerializer>();
+	FSGDynamicTextAssetFileManager::RegisterSerializer<FSGDTATestSerializer>();
 
 	TSharedPtr<ISGDynamicTextAssetSerializer> found = FSGDynamicTextAssetFileManager::FindSerializerForExtension(TEXT(".dta.test"));
 	TestTrue(TEXT("Test serializer should be found after registration"), found.IsValid());
@@ -161,7 +161,7 @@ bool FSerializerRegistry_RegisterAndFindCustomSerializer::RunTest(const FString&
 	}
 
 	// Cleanup
-	FSGDynamicTextAssetFileManager::UnregisterSerializer<FSGTestSerializer>();
+	FSGDynamicTextAssetFileManager::UnregisterSerializer<FSGDTATestSerializer>();
 
 	TSharedPtr<ISGDynamicTextAssetSerializer> afterUnregister = FSGDynamicTextAssetFileManager::FindSerializerForExtension(TEXT(".dta.test"));
 	TestFalse(TEXT("Test serializer should not be found after unregistration"), afterUnregister.IsValid());
@@ -248,8 +248,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSerializerRegistry_MultipleSerializers_IndependentLookup::RunTest(const FString& Parameters)
 {
 	// Register two custom test serializers
-	FSGDynamicTextAssetFileManager::RegisterSerializer<FSGTestSerializer>();
-	FSGDynamicTextAssetFileManager::RegisterSerializer<FSGTestAltSerializer>();
+	FSGDynamicTextAssetFileManager::RegisterSerializer<FSGDTATestSerializer>();
+	FSGDynamicTextAssetFileManager::RegisterSerializer<FSGDTATestAltSerializer>();
 
 	TSharedPtr<ISGDynamicTextAssetSerializer> test = FSGDynamicTextAssetFileManager::FindSerializerForExtension(TEXT(".dta.test"));
 	TSharedPtr<ISGDynamicTextAssetSerializer> alt = FSGDynamicTextAssetFileManager::FindSerializerForExtension(TEXT(".dta.test.alt"));
@@ -266,8 +266,8 @@ bool FSerializerRegistry_MultipleSerializers_IndependentLookup::RunTest(const FS
 	}
 
 	// Cleanup
-	FSGDynamicTextAssetFileManager::UnregisterSerializer<FSGTestSerializer>();
-	FSGDynamicTextAssetFileManager::UnregisterSerializer<FSGTestAltSerializer>();
+	FSGDynamicTextAssetFileManager::UnregisterSerializer<FSGDTATestSerializer>();
+	FSGDynamicTextAssetFileManager::UnregisterSerializer<FSGDTATestAltSerializer>();
 
 	return true;
 }

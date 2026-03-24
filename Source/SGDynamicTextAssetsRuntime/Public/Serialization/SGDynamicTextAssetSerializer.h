@@ -8,7 +8,7 @@
 #include "Core/SGDynamicTextAssetTypeId.h"
 #include "Core/SGDynamicTextAssetBundleData.h"
 #include "Core/SGDynamicTextAssetVersion.h"
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 
 struct FSlateBrush;
@@ -56,7 +56,7 @@ public:
 	virtual FText GetFormatDescription() const = 0;
 
 	/**
-	 * Returns the FSGSerializerFormat identifying this serializer.
+	 * Returns the FSGDTASerializerFormat identifying this serializer.
 	 * The format's underlying TypeId is stored in binary (.dta.bin) file headers
 	 * to identify which serializer to use when loading.
 	 *
@@ -64,19 +64,19 @@ public:
 	 * Duplicate ID registration is a fatal error caught at startup via UE_LOG(Fatal).
 	 *
 	 * Reserved built-in ID range [1, 99]:
-	 * 0 = INVALID (FSGSerializerFormat::INVALID)
+	 * 0 = INVALID (FSGDTASerializerFormat::INVALID)
 	 * 1 = JSON (.dta.json)
 	 * 2 = XML (.dta.xml)
 	 * 3 = YAML (.dta.yaml)
-	 * 98 = FSGTestAltSerializer for tests (.dta.test.alt)
-	 * 99 = FSGTestSerializer for tests (.dta.test)
+	 * 98 = FSGDTATestAltSerializer for tests (.dta.test.alt)
+	 * 99 = FSGDTATestSerializer for tests (.dta.test)
 	 *
 	 * Third-party plugin serializers should use IDs >= 100 to avoid conflicts.
-	 * A default-constructed FSGSerializerFormat (TypeId=0) is invalid and will
+	 * A default-constructed FSGDTASerializerFormat (TypeId=0) is invalid and will
 	 * be rejected at registration time.
-	 * @see FSGSerializerFormat::INVALID
+	 * @see FSGDTASerializerFormat::INVALID
 	 */
-	virtual FSGSerializerFormat GetSerializerFormat() const = 0;
+	virtual FSGDTASerializerFormat GetSerializerFormat() const = 0;
 
 	/**
 	 * @deprecated Use GetSerializerFormat() instead.
@@ -218,8 +218,8 @@ public:
 	virtual bool UpdateFileFormatVersion(FString& InOutFileContents,
 		const FSGDynamicTextAssetVersion& NewVersion) const;
 
-	/** @deprecated Use FSGSerializerFormat::INVALID or SGDynamicTextAssetConstants::INVALID_SERIALIZER_TYPE_ID instead. */
-	UE_DEPRECATED(5.6, "Use FSGSerializerFormat::INVALID or SGDynamicTextAssetConstants::INVALID_SERIALIZER_TYPE_ID instead. Will be removed in UE 5.7")
+	/** @deprecated Use FSGDTASerializerFormat::INVALID or SGDynamicTextAssetConstants::INVALID_SERIALIZER_TYPE_ID instead. */
+	UE_DEPRECATED(5.6, "Use FSGDTASerializerFormat::INVALID or SGDynamicTextAssetConstants::INVALID_SERIALIZER_TYPE_ID instead. Will be removed in UE 5.7")
 	static constexpr uint32 INVALID_SERIALIZER_TYPE_ID = SGDynamicTextAssetConstants::INVALID_SERIALIZER_TYPE_ID;
 
 	/**

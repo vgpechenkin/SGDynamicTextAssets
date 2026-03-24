@@ -53,7 +53,7 @@ public:
 
     SLATE_END_ARGS()
 
-    enum class ERawTextFormat
+    enum class ESGDTARawTextFormat
     {
         // Custom or raw text
         Raw,
@@ -73,7 +73,7 @@ public:
     void SetIdentityProperties(const FText& InDynamicTextAssetId, const FText& InUserFacingId, const FText& InVersion);
 
     /** Retrieves the text format type that this raw view uses. */
-    ERawTextFormat GetTextFormat() const { return TextFormat; }
+    ESGDTARawTextFormat GetTextFormat() const { return TextFormat; }
 
 private:
 
@@ -87,7 +87,7 @@ private:
     FReply OnRefreshButtonClicked();
 
     /** The text format type that this raw view uses. */
-    ERawTextFormat TextFormat = ERawTextFormat::Raw;
+    ESGDTARawTextFormat TextFormat = ESGDTARawTextFormat::Raw;
 
     /** Current full text, stored to allow copying. */
     FText CurrentText;

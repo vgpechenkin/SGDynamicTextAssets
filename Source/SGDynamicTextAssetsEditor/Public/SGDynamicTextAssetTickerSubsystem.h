@@ -15,7 +15,7 @@
  * Each work item represents a batch of similar operations (e.g., scanning files,
  * processing assets) that should be spread across multiple frames.
  */
-struct SGDYNAMICTEXTASSETSEDITOR_API FSGTickerWorkItem
+struct SGDYNAMICTEXTASSETSEDITOR_API FSGDTATickerWorkItem
 {
 	/** Unique identifier for this work item. Used for dequeue and completion callbacks. */
 	FName WorkId;
@@ -51,7 +51,7 @@ struct SGDYNAMICTEXTASSETSEDITOR_API FSGTickerWorkItem
  * Editor subsystem that handles time-sliced work processing.
  *
  * Generic infrastructure with no knowledge of DTA scanning, files, or caches.
- * External systems queue FSGTickerWorkItem objects, then call StartProcessing()
+ * External systems queue FSGDTATickerWorkItem objects, then call StartProcessing()
  * to begin frame-budgeted execution.
  *
  * The ticker is only active while work is being processed. When all work
@@ -74,7 +74,7 @@ public:
 	 * Does not start processing until StartProcessing() is called.
 	 * If a work item with the same WorkId is already queued, it is replaced.
 	 */
-	void QueueWork(const FSGTickerWorkItem& WorkItem);
+	void QueueWork(const FSGDTATickerWorkItem& WorkItem);
 
 	/**
 	 * Remove a queued work item by ID.
@@ -122,10 +122,10 @@ private:
 	void FinishAllWork(uint8 bSuccess);
 
 	/** Work items waiting to be started (not yet sorted or processing). */
-	TArray<FSGTickerWorkItem> QueuedWork;
+	TArray<FSGDTATickerWorkItem> QueuedWork;
 
 	/** Work items sorted by priority, actively being processed. */
-	TArray<FSGTickerWorkItem> ActiveWork;
+	TArray<FSGDTATickerWorkItem> ActiveWork;
 
 	/** Index into ActiveWork for the currently processing item. */
 	int32 CurrentWorkIndex = 0;

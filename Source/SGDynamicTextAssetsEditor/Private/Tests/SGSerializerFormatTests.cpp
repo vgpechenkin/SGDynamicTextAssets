@@ -2,7 +2,7 @@
 
 #include "Misc/AutomationTest.h"
 
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
 #include "Serialization/SGDynamicTextAssetXmlSerializer.h"
 #include "Serialization/SGDynamicTextAssetYamlSerializer.h"
@@ -16,7 +16,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_DefaultState_IsInvalid::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat defaultFormat;
+	FSGDTASerializerFormat defaultFormat;
 
 	TestEqual(TEXT("Default-constructed TypeId should be 0"), defaultFormat.GetTypeId(), 0u);
 	TestFalse(TEXT("Default-constructed format should be invalid"), defaultFormat.IsValid());
@@ -31,8 +31,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_InvalidConstant_IsInvalid::RunTest(const FString& Parameters)
 {
-	TestEqual(TEXT("INVALID TypeId should be 0"), FSGSerializerFormat::INVALID.GetTypeId(), 0u);
-	TestFalse(TEXT("INVALID should not be valid"), FSGSerializerFormat::INVALID.IsValid());
+	TestEqual(TEXT("INVALID TypeId should be 0"), FSGDTASerializerFormat::INVALID.GetTypeId(), 0u);
+	TestFalse(TEXT("INVALID should not be valid"), FSGDTASerializerFormat::INVALID.IsValid());
 
 	return true;
 }
@@ -45,7 +45,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSerializerFormat_JsonFormat_IsValid::RunTest(const FString& Parameters)
 {
 	// Use the serializer's FORMAT constant directly
-	FSGSerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 
 	TestTrue(TEXT("JSON format should be valid"), jsonFormat.IsValid());
 	TestEqual(TEXT("JSON format TypeId should match JSON FORMAT"),
@@ -62,7 +62,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSerializerFormat_XmlFormat_IsValid::RunTest(const FString& Parameters)
 {
 	// Use the serializer's FORMAT constant directly
-	FSGSerializerFormat xmlFormat = FSGDynamicTextAssetXmlSerializer::FORMAT;
+	FSGDTASerializerFormat xmlFormat = FSGDynamicTextAssetXmlSerializer::FORMAT;
 
 	TestTrue(TEXT("XML format should be valid"), xmlFormat.IsValid());
 	TestEqual(TEXT("XML format TypeId should match XML FORMAT"),
@@ -79,7 +79,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSerializerFormat_YamlFormat_IsValid::RunTest(const FString& Parameters)
 {
 	// Use the serializer's FORMAT constant directly
-	FSGSerializerFormat yamlFormat = FSGDynamicTextAssetYamlSerializer::FORMAT;
+	FSGDTASerializerFormat yamlFormat = FSGDynamicTextAssetYamlSerializer::FORMAT;
 
 	TestTrue(TEXT("YAML format should be valid"), yamlFormat.IsValid());
 	TestEqual(TEXT("YAML format TypeId should match YAML FORMAT"),
@@ -95,9 +95,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_Equality_MatchesCorrectly::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat jsonA = FSGDynamicTextAssetJsonSerializer::FORMAT;
-	FSGSerializerFormat jsonB = FSGDynamicTextAssetJsonSerializer::FORMAT;
-	FSGSerializerFormat xmlFormat = FSGDynamicTextAssetXmlSerializer::FORMAT;
+	FSGDTASerializerFormat jsonA = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat jsonB = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat xmlFormat = FSGDynamicTextAssetXmlSerializer::FORMAT;
 
 	TestTrue(TEXT("Same format should be equal"), jsonA == jsonB);
 	TestFalse(TEXT("Different formats should not be equal"), jsonA == xmlFormat);
@@ -114,8 +114,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_Inequality_MatchesCorrectly::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
-	FSGSerializerFormat xmlFormat = FSGDynamicTextAssetXmlSerializer::FORMAT;
+	FSGDTASerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat xmlFormat = FSGDynamicTextAssetXmlSerializer::FORMAT;
 
 	TestTrue(TEXT("Different formats should be not-equal"), jsonFormat != xmlFormat);
 	TestFalse(TEXT("Same format should not be not-equal"),
@@ -131,9 +131,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_GetTypeHash_ConsistentResults::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat jsonA = FSGDynamicTextAssetJsonSerializer::FORMAT;
-	FSGSerializerFormat jsonB = FSGDynamicTextAssetJsonSerializer::FORMAT;
-	FSGSerializerFormat xmlFormat = FSGDynamicTextAssetXmlSerializer::FORMAT;
+	FSGDTASerializerFormat jsonA = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat jsonB = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat xmlFormat = FSGDynamicTextAssetXmlSerializer::FORMAT;
 
 	TestEqual(TEXT("Same TypeId should produce same hash"),
 		GetTypeHash(jsonA), GetTypeHash(jsonB));
@@ -150,7 +150,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_FromTypeId_CorrectTypeId::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat format = FSGSerializerFormat::FromTypeId(5);
+	FSGDTASerializerFormat format = FSGDTASerializerFormat::FromTypeId(5);
 
 	TestEqual(TEXT("FromTypeId should preserve the TypeId"), format.GetTypeId(), 5u);
 	TestTrue(TEXT("FromTypeId with non-zero value should be valid"), format.IsValid());
@@ -165,17 +165,17 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_TextExportImport_RoundTrip::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat original = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat original = FSGDynamicTextAssetJsonSerializer::FORMAT;
 
 	// Export
 	FString exported;
-	FSGSerializerFormat defaultValue;
+	FSGDTASerializerFormat defaultValue;
 	original.ExportTextItem(exported, defaultValue, nullptr, 0, nullptr);
 
 	TestFalse(TEXT("Exported string should not be empty"), exported.IsEmpty());
 
 	// Import
-	FSGSerializerFormat imported;
+	FSGDTASerializerFormat imported;
 	const TCHAR* buffer = *exported;
 	imported.ImportTextItem(buffer, 0, nullptr, nullptr);
 
@@ -193,7 +193,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_BinarySerialize_RoundTrip::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat original = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat original = FSGDynamicTextAssetJsonSerializer::FORMAT;
 
 	// Write
 	TArray<uint8> data;
@@ -203,7 +203,7 @@ bool FSerializerFormat_BinarySerialize_RoundTrip::RunTest(const FString& Paramet
 	TestTrue(TEXT("Serialized data should not be empty"), data.Num() > 0);
 
 	// Read
-	FSGSerializerFormat loaded;
+	FSGDTASerializerFormat loaded;
 	FMemoryReader reader(data);
 	loaded.Serialize(reader);
 
@@ -221,7 +221,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_FromExtension_ResolvesJson::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat format = FSGSerializerFormat::FromExtension(TEXT(".dta.json"));
+	FSGDTASerializerFormat format = FSGDTASerializerFormat::FromExtension(TEXT(".dta.json"));
 
 	TestTrue(TEXT("Format from .dta.json extension should be valid"), format.IsValid());
 	TestEqual(TEXT("Format from .dta.json should have JSON TypeId"),
@@ -237,12 +237,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_GetFormatName_ReturnsCorrectName::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	FText jsonName = jsonFormat.GetFormatName();
 
 	TestEqual(TEXT("JSON format name should be 'JSON'"), jsonName.ToString(), TEXT("JSON"));
 
-	FSGSerializerFormat invalidFormat;
+	FSGDTASerializerFormat invalidFormat;
 	FText invalidName = invalidFormat.GetFormatName();
 
 	TestEqual(TEXT("Invalid format name should be 'Invalid'"), invalidName.ToString(), TEXT("Invalid"));
@@ -257,12 +257,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_GetSerializer_ValidAndInvalid::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	TSharedPtr<ISGDynamicTextAssetSerializer> jsonSerializer = jsonFormat.GetSerializer();
 
 	TestTrue(TEXT("JSON format should return a non-null serializer"), jsonSerializer.IsValid());
 
-	FSGSerializerFormat invalidFormat;
+	FSGDTASerializerFormat invalidFormat;
 	TSharedPtr<ISGDynamicTextAssetSerializer> nullSerializer = invalidFormat.GetSerializer();
 
 	TestFalse(TEXT("Invalid format should return a null serializer"), nullSerializer.IsValid());
@@ -277,13 +277,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSerializerFormat_ToString_CorrectStringRepresentation::RunTest(const FString& Parameters)
 {
-	FSGSerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
+	FSGDTASerializerFormat jsonFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 	FString jsonString = jsonFormat.ToString();
 
 	TestEqual(TEXT("JSON format ToString should return its TypeId as string"),
 		jsonString, FString::FromInt(static_cast<int32>(FSGDynamicTextAssetJsonSerializer::FORMAT.GetTypeId())));
 
-	FSGSerializerFormat invalidFormat;
+	FSGDTASerializerFormat invalidFormat;
 	FString invalidString = invalidFormat.ToString();
 
 	TestEqual(TEXT("Invalid format ToString should return '0'"), invalidString, TEXT("0"));

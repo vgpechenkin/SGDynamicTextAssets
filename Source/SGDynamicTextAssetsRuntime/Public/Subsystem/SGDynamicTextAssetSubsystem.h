@@ -6,7 +6,7 @@
 
 #include "Core/ISGDynamicTextAssetProvider.h"
 #include "Core/SGDynamicTextAssetId.h"
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Engine/StreamableManager.h"
 #include "Server/ISGDynamicTextAssetServerInterface.h"
 #include "UObject/ScriptInterface.h"
@@ -27,7 +27,7 @@ struct FSGDynamicTextAssetBundleData;
  * (e.g., TMap<Id, TSet<UClass*>>).
  */
 USTRUCT()
-struct FSGTrackedInstancedClasses
+struct FSGDTATrackedInstancedClasses
 {
     GENERATED_BODY()
 public:
@@ -43,7 +43,7 @@ public:
  * trigger GC, log diagnostics, or pre-load replacements.
  */
 USTRUCT(BlueprintType)
-struct FSGInstancedClassReleaseContext
+struct FSGDTAInstancedClassReleaseContext
 {
     GENERATED_BODY()
 public:
@@ -68,7 +68,7 @@ public:
  */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
     FOnInstancedClassesReleased,
-    const FSGInstancedClassReleaseContext&, Context);
+    const FSGDTAInstancedClassReleaseContext&, Context);
 
 /**
  * Game Instance Subsystem for loading and caching dynamic text assets at runtime.
@@ -419,7 +419,7 @@ private:
      * Populated after deserialization, cleaned up on cache removal.
      */
     UPROPERTY(Transient)
-    TMap<FSGDynamicTextAssetId, FSGTrackedInstancedClasses> TrackedInstancedClasses;
+    TMap<FSGDynamicTextAssetId, FSGDTATrackedInstancedClasses> TrackedInstancedClasses;
 
     /**
      * Reference count per instanced object UClass across all cached DTAs.
@@ -452,7 +452,7 @@ private:
     void Internal_LoadDynamicTextAssetFromFileAsync_GameThread(const FString& FilePath,
         const UClass* ClassPtr,
         const FString& TextPayload,
-        FSGSerializerFormat SerializerFormat,
+        FSGDTASerializerFormat SerializerFormat,
         const bool& bReadSuccess,
         const FOnDynamicTextAssetLoaded& OnComplete);
 };

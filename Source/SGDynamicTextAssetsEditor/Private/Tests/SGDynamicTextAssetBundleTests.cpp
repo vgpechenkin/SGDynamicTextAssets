@@ -15,7 +15,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_ExtractFromObject_FindsSoftObjectAndClassRefs::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->VisualRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/TestVisual.TestVisual")));
 	asset->AudioRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/TestAudio.TestAudio")));
 	asset->ClassRef = TSoftClassPtr<UObject>(FSoftObjectPath(TEXT("/Game/TestClass.TestClass_C")));
@@ -53,7 +53,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_ExtractFromObject_CommaSeparatedBundleNames::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->SharedRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Shared.Shared")));
 
 	FSGDynamicTextAssetBundleData bundleData;
@@ -103,7 +103,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_ExtractFromObject_UnbundledRefExcluded::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->UnbundledRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Unbundled.Unbundled")));
 
 	FSGDynamicTextAssetBundleData bundleData;
@@ -122,7 +122,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_ExtractFromObject_StructNestedSoftRef::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->StructWithBundle.StructSoftRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/StructAsset.StructAsset")));
 
 	FSGDynamicTextAssetBundleData bundleData;
@@ -146,7 +146,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_ExtractFromObject_ArraySoftRefs::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->ArrayRefs.Add(TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Arr0.Arr0"))));
 	asset->ArrayRefs.Add(TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Arr1.Arr1"))));
 
@@ -170,7 +170,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_ExtractFromObject_MapSoftRefs::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->MapRefs.Add(FName(TEXT("Key1")), TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Map1.Map1"))));
 	asset->MapRefs.Add(FName(TEXT("Key2")), TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Map2.Map2"))));
 
@@ -194,7 +194,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_ExtractFromObject_SetSoftRefs::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->SetRefs.Add(TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Set0.Set0"))));
 	asset->SetRefs.Add(TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Set1.Set1"))));
 
@@ -218,8 +218,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_ExtractFromObject_InstancedSubObject::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
-	asset->InstancedObj = NewObject<USGBundleTestInstancedObject>(asset);
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
+	asset->InstancedObj = NewObject<USGDTABundleTestInstancedObject>(asset);
 	asset->InstancedObj->InstancedSoftRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/InstancedAsset.InstancedAsset")));
 
 	FSGDynamicTextAssetBundleData bundleData;
@@ -246,7 +246,7 @@ bool FBundle_JsonRoundTrip_PreservesBundleMetadata::RunTest(const FString& Param
 {
 	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Setup: create a DTA with bundled soft references
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->SetDynamicTextAssetId(FSGDynamicTextAssetId(FGuid::NewGuid()));
 	asset->SetUserFacingId(TEXT("BundleTestAsset"));
 	asset->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
@@ -291,7 +291,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_FindBundle_ReturnsNullForNonExistent::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->VisualRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Test.Test")));
 
 	FSGDynamicTextAssetBundleData bundleData;
@@ -310,7 +310,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_GetBundleNames_ReturnsAllNames::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->VisualRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/V.V")));
 	asset->AudioRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/A.A")));
 	asset->ClassRef = TSoftClassPtr<UObject>(FSoftObjectPath(TEXT("/Game/C.C_C")));
@@ -335,7 +335,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_GetPathsForBundle_CollectsPaths::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->VisualRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Visual.Visual")));
 	asset->SharedRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Shared.Shared")));
 
@@ -362,7 +362,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FBundle_Reset_ClearsAllData::RunTest(const FString& Parameters)
 {
-	USGBundleTestDynamicTextAsset* asset = NewObject<USGBundleTestDynamicTextAsset>();
+	USGDTABundleTestDynamicTextAsset* asset = NewObject<USGDTABundleTestDynamicTextAsset>();
 	asset->VisualRef = TSoftObjectPtr<UObject>(FSoftObjectPath(TEXT("/Game/Test.Test")));
 
 	FSGDynamicTextAssetBundleData bundleData;

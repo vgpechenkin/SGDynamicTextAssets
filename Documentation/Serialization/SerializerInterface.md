@@ -18,8 +18,8 @@ The SGDynamicTextAssets plugin uses a polymorphic serialization architecture tha
 ```
 ISGDynamicTextAssetSerializer              (Pure C++ interface, not a UInterface)
     │
-    ├── FSGTestSerializer                      (TypeId=99, .dta.test, tests only)
-    ├── FSGTestAltSerializer                   (TypeId=98, .dta.test.alt, tests only)
+    ├── FSGDTATestSerializer                      (TypeId=99, .dta.test, tests only)
+    ├── FSGDTATestAltSerializer                   (TypeId=98, .dta.test.alt, tests only)
     │
     └── FSGDynamicTextAssetSerializerBase       (Abstract base with JSON-intermediate helpers)
             │
@@ -67,8 +67,8 @@ Each serializer has a unique integer ID stored in binary (`.dta.bin`) file heade
 | 1 | JSON | `FSGDynamicTextAssetJsonSerializer` |
 | 2 | XML | `FSGDynamicTextAssetXmlSerializer` |
 | 3 | YAML | `FSGDynamicTextAssetYamlSerializer` |
-| 98 | Test Alt | `FSGTestAltSerializer` (tests only) |
-| 99 | Test | `FSGTestSerializer` (tests only) |
+| 98 | Test Alt | `FSGDTATestAltSerializer` (tests only) |
+| 99 | Test | `FSGDTATestSerializer` (tests only) |
 | 100+ | Reserved | Third-party plugin serializers |
 
 Duplicate ID registration is a fatal error caught at startup.

@@ -51,7 +51,7 @@ public:
 private:
 
 	/** Entry in the picker dropdown */
-	struct FPickerEntry
+	struct FSGDTAPickerEntry
 	{
 		FSGDynamicTextAssetId Id;
 		FString UserFacingId;
@@ -75,16 +75,16 @@ private:
 	FText GetCurrentTooltipText() const;
 
 	/** Called when the user selects an entry from the list */
-	void OnEntrySelected(TSharedPtr<FPickerEntry> NewEntry);
+	void OnEntrySelected(TSharedPtr<FSGDTAPickerEntry> NewEntry);
 
 	/** Called when list view selection changes */
-	void OnListSelectionChanged(TSharedPtr<FPickerEntry> NewEntry, ESelectInfo::Type SelectInfo);
+	void OnListSelectionChanged(TSharedPtr<FSGDTAPickerEntry> NewEntry, ESelectInfo::Type SelectInfo);
 
 	/** Generates the picker menu content (search box, filter, list) */
 	TSharedRef<SWidget> GeneratePickerMenu();
 
 	/** Generates a row widget for the list view */
-	TSharedRef<ITableRow> GenerateListRow(TSharedPtr<FPickerEntry> Entry, const TSharedRef<STableViewBase>& OwnerTable);
+	TSharedRef<ITableRow> GenerateListRow(TSharedPtr<FSGDTAPickerEntry> Entry, const TSharedRef<STableViewBase>& OwnerTable);
 
 	/** Called when search text changes */
 	void OnSearchTextChanged(const FText& NewText);
@@ -116,8 +116,8 @@ private:
 	/** Returns the TypeFilter class from the meta tag on the UPROPERTY */
 	UClass* GetTypeFilterClass() const;
 
-	/** Finds the FPickerEntry matching the current ID */
-	TSharedPtr<FPickerEntry> FindCurrentEntry() const;
+	/** Finds the FSGDTAPickerEntry matching the current ID */
+	TSharedPtr<FSGDTAPickerEntry> FindCurrentEntry() const;
 
 	/** The property handle for the FSGDynamicTextAssetRef struct */
 	TSharedPtr<IPropertyHandle> StructPropertyHandle = nullptr;
@@ -132,10 +132,10 @@ private:
 	FString CurrentUserFacingId;
 
 	/** All available entries (unfiltered) */
-	TArray<TSharedPtr<FPickerEntry>> AllEntries;
+	TArray<TSharedPtr<FSGDTAPickerEntry>> AllEntries;
 
 	/** Filtered entries currently shown in the list */
-	TArray<TSharedPtr<FPickerEntry>> FilteredEntries;
+	TArray<TSharedPtr<FSGDTAPickerEntry>> FilteredEntries;
 
 	/** Current search text */
 	FString SearchText;
@@ -147,7 +147,7 @@ private:
 	TArray<TSharedPtr<FString>> AvailableClassNames;
 
 	/** The list view widget inside the combo button */
-	TSharedPtr<SListView<TSharedPtr<FPickerEntry>>> PickerListView = nullptr;
+	TSharedPtr<SListView<TSharedPtr<FSGDTAPickerEntry>>> PickerListView = nullptr;
 
 	/** The combo button wrapping the searchable list */
 	TSharedPtr<SComboButton> ComboButton = nullptr;

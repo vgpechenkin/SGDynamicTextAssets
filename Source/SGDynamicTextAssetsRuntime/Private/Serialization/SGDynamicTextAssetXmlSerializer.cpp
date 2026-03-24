@@ -16,7 +16,7 @@
 #include "XmlFile.h"
 #include "XmlNode.h"
 
-const FSGSerializerFormat FSGDynamicTextAssetXmlSerializer::FORMAT(SGDynamicTextAssetConstants::XML_SERIALIZER_TYPE_ID);
+const FSGDTASerializerFormat FSGDynamicTextAssetXmlSerializer::FORMAT(SGDynamicTextAssetConstants::XML_SERIALIZER_TYPE_ID);
 
 namespace FSGDynamicTextAssetXmlSerializerInternals
 {
@@ -393,7 +393,7 @@ XML format uses a file information block (sgFileInformation), for example:
 #endif
 }
 
-FSGSerializerFormat FSGDynamicTextAssetXmlSerializer::GetSerializerFormat() const
+FSGDTASerializerFormat FSGDynamicTextAssetXmlSerializer::GetSerializerFormat() const
 {
     return FORMAT;
 }

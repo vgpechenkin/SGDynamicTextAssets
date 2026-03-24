@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/SGDynamicTextAssetId.h"
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 
 class USGDynamicTextAsset;
 class FSGDynamicTextAssetCookManifest;
@@ -152,9 +152,9 @@ public:
      * @return True if file was read successfully
      */
     static bool ReadRawFileContents(const FString& FilePath, FString& OutContents,
-        FSGSerializerFormat* OutSerializerFormat = nullptr);
+        FSGDTASerializerFormat* OutSerializerFormat = nullptr);
 
-    UE_DEPRECATED(5.6, "Use ReadRawFileContents with FSGSerializerFormat* instead. Will be removed in UE 5.7")
+    UE_DEPRECATED(5.6, "Use ReadRawFileContents with FSGDTASerializerFormat* instead. Will be removed in UE 5.7")
     static bool ReadRawFileContents(const FString& FilePath, FString& OutContents,
         uint32* OutSerializerTypeId);
 
@@ -326,7 +326,7 @@ public:
      * @param Format The serializer format to look up
      * @return The serializer, or nullptr if not found
      */
-    static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForFormat(FSGSerializerFormat Format);
+    static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForFormat(FSGDTASerializerFormat Format);
 
     UE_DEPRECATED(5.6, "Use FindSerializerForFormat instead. Will be removed in UE 5.7")
     static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForTypeId(uint32 TypeId);
@@ -338,7 +338,7 @@ public:
      * @param Extension File extension (e.g., ".dta.json")
      * @return The serializer format, or invalid if not found
      */
-    static FSGSerializerFormat GetFormatForExtension(const FString& Extension);
+    static FSGDTASerializerFormat GetFormatForExtension(const FString& Extension);
 
     UE_DEPRECATED(5.6, "Use GetFormatForExtension instead. Will be removed in UE 5.7")
     static uint32 GetTypeIdForExtension(const FString& Extension);
@@ -427,6 +427,6 @@ private:
     static TMap<FString, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS;
 
     /** Registered serializers keyed by format identifier - used for binary file routing */
-    static TMap<FSGSerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS_BY_FORMAT;
+    static TMap<FSGDTASerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS_BY_FORMAT;
 };
 

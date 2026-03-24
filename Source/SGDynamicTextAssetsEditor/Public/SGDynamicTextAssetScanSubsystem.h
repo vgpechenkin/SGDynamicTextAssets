@@ -9,7 +9,7 @@
 
 #include "SGDynamicTextAssetScanSubsystem.generated.h"
 
-struct FSGTickerWorkItem;
+struct FSGDTATickerWorkItem;
 class USGDynamicTextAssetTickerSubsystem;
 
 /**
@@ -100,7 +100,7 @@ public:
 	 * Incrementally update the project info cache for a single file.
 	 * Called after a DTA file is saved to keep the cache current without a full rescan.
 	 */
-	void UpdateProjectInfoForFile(const FSGSerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion);
+	void UpdateProjectInfoForFile(const FSGDTASerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion);
 
 	/**
 	 * Get the list of DTA files discovered during the current scan.
@@ -120,7 +120,7 @@ public:
 private:
 
 	/** Convert a scan phase to a ticker work item. */
-	FSGTickerWorkItem ConvertPhaseToWorkItem(const FSGDynamicTextAssetScanPhase& Phase) const;
+	FSGDTATickerWorkItem ConvertPhaseToWorkItem(const FSGDynamicTextAssetScanPhase& Phase) const;
 
 	/** Called when the ticker subsystem finishes all queued work. */
 	void OnTickerAllWorkComplete();

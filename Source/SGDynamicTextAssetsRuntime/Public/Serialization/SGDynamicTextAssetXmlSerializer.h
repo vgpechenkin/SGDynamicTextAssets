@@ -48,8 +48,8 @@ public:
     virtual const FSlateBrush* GetIconBrush() const override;
 #endif
 
-    /** FSGSerializerFormat for the XML serializer. */
-    static const FSGSerializerFormat FORMAT;
+    /** FSGDTASerializerFormat for the XML serializer. */
+    static const FSGDTASerializerFormat FORMAT;
 
     /** @deprecated Use FORMAT instead. */
     UE_DEPRECATED(5.6, "Use FORMAT instead. Will be removed in UE 5.7")
@@ -59,7 +59,7 @@ public:
     virtual FString GetFileExtension() const override;
     virtual FText GetFormatName() const override;
     virtual FText GetFormatDescription() const override;
-    virtual FSGSerializerFormat GetSerializerFormat() const override;
+    virtual FSGDTASerializerFormat GetSerializerFormat() const override;
     virtual FSGDynamicTextAssetVersion GetFileFormatVersion() const override;
     virtual bool SerializeProvider(const ISGDynamicTextAssetProvider* Provider, FString& OutString) const override;
     virtual bool DeserializeProvider(const FString& InString, ISGDynamicTextAssetProvider* OutProvider, bool& bOutMigrated) const override;

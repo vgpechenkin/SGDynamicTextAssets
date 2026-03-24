@@ -9,12 +9,12 @@
 #include "Misc/Compression.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
-#include "Serialization/SGBinaryEncodeParams.h"
+#include "Serialization/SGDTABinaryEncodeParams.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 
 bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 	const FString& PayloadString,
-	const FSGBinaryEncodeParams& Params,
+	const FSGDTABinaryEncodeParams& Params,
 	TArray<uint8>& OutBinaryData)
 {
 	if (PayloadString.IsEmpty())
@@ -45,7 +45,7 @@ bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 	// Prepare header  - SerializerFormat is stored here so the loader can route
 	// the decompressed payload to the correct deserializer without a string lookup.
 	// AssetTypeGuid enables class resolution directly from the header without decompression.
-	FSGBinaryDynamicTextAssetHeader header;
+	FSGDTABinaryHeader header;
 	header.CompressionType = static_cast<uint32>(Params.CompressionMethod);
 	header.UncompressedSize = uncompressedSize;
 	header.SerializerTypeId = Params.SerializerFormat.GetTypeId();
@@ -104,14 +104,14 @@ bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 
 	// Write header then compressed payload directly  - no variable-length block
 	OutBinaryData.Empty();
-	OutBinaryData.Reserve(FSGBinaryDynamicTextAssetHeader::HEADER_SIZE + compressedData.Num());
+	OutBinaryData.Reserve(FSGDTABinaryHeader::HEADER_SIZE + compressedData.Num());
 
 	// Serialize the fixed 64-byte header to memory
 	FMemoryWriter headerWriter(OutBinaryData);
 	header.Serialize(headerWriter);
 
 	// Verify header serialized to exactly HEADER_SIZE bytes
-	check(OutBinaryData.Num() == FSGBinaryDynamicTextAssetHeader::HEADER_SIZE);
+	check(OutBinaryData.Num() == FSGDTABinaryHeader::HEADER_SIZE);
 
 	// Append compressed payload  - always starts at byte offset HEADER_SIZE
 	OutBinaryData.Append(compressedData);
@@ -122,10 +122,10 @@ bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 	const TArray<uint8>& BinaryData,
 	FString& OutPayloadString,
-	FSGSerializerFormat& OutSerializerFormat)
+	FSGDTASerializerFormat& OutSerializerFormat)
 {
 	OutPayloadString.Empty();
-	OutSerializerFormat = FSGSerializerFormat();
+	OutSerializerFormat = FSGDTASerializerFormat();
 
 	if (BinaryData.IsEmpty())
 	{
@@ -134,7 +134,7 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 	}
 
 	// Read and validate the fixed 64-byte header
-	FSGBinaryDynamicTextAssetHeader header;
+	FSGDTABinaryHeader header;
 	if (!ReadHeader(BinaryData, header))
 	{
 		return false;
@@ -150,7 +150,7 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 
 	// Validate the compressed payload fits within the remaining data.
 	// BinaryData.Num() - HEADER_SIZE is the count of bytes available after the header (a size, not a location).
-	const int32 totalDataAfterHeader = BinaryData.Num() - FSGBinaryDynamicTextAssetHeader::HEADER_SIZE;
+	const int32 totalDataAfterHeader = BinaryData.Num() - FSGDTABinaryHeader::HEADER_SIZE;
 	if (header.CompressedSize > static_cast<uint32>(totalDataAfterHeader))
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetBinarySerializer: CompressedSize(%u) exceeds available data(%d) for ID(%s)"),
@@ -159,7 +159,7 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 	}
 
 	// Validate total expected size
-	const int32 expectedTotalSize = FSGBinaryDynamicTextAssetHeader::HEADER_SIZE + header.CompressedSize;
+	const int32 expectedTotalSize = FSGDTABinaryHeader::HEADER_SIZE + header.CompressedSize;
 	if (BinaryData.Num() < expectedTotalSize)
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetBinarySerializer: Binary data too small. expectedTotalSize(%d), BinaryData size(%d)"),
@@ -175,7 +175,7 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 	// reinterpret_cast is needed because FUTF8ToTCHAR expects ANSICHAR* but GetData()
 	// returns uint8*. Both are 1-byte types, so no data is actually reinterpreted  - this
 	// is purely a type-system cast to satisfy the API signature.
-	const uint8* compressedDataPtr = BinaryData.GetData() + FSGBinaryDynamicTextAssetHeader::HEADER_SIZE;
+	const uint8* compressedDataPtr = BinaryData.GetData() + FSGDTABinaryHeader::HEADER_SIZE;
 
 	// Verify content hash
 	if (!header.HasContentHash())
@@ -184,13 +184,13 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 			*header.Guid.ToString());
 		return false;
 	}
-	uint8 computedHash[FSGBinaryDynamicTextAssetHeader::CONTENT_HASH_SIZE];
+	uint8 computedHash[FSGDTABinaryHeader::CONTENT_HASH_SIZE];
 	FSHA1 sha1;
 	sha1.Update(compressedDataPtr, header.CompressedSize);
 	sha1.Final();
 	sha1.GetHash(computedHash);
 
-	if (FMemory::Memcmp(computedHash, header.ContentHash, FSGBinaryDynamicTextAssetHeader::CONTENT_HASH_SIZE) != 0)
+	if (FMemory::Memcmp(computedHash, header.ContentHash, FSGDTABinaryHeader::CONTENT_HASH_SIZE) != 0)
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetBinarySerializer: Content hash mismatch for ID(%s) - file may be corrupted or tampered with"),
 			*header.Guid.ToString());
@@ -245,16 +245,16 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryToString(
 
 	// Return the serializer format from the header - caller passes this to
 	// FSGDynamicTextAssetFileManager::FindSerializerForFormat() to get the right deserializer
-	OutSerializerFormat = FSGSerializerFormat(header.SerializerTypeId);
+	OutSerializerFormat = FSGDTASerializerFormat(header.SerializerTypeId);
 
 	return true;
 }
 
 bool FSGDynamicTextAssetBinarySerializer::ReadHeader(
 	const TArray<uint8>& BinaryData,
-	FSGBinaryDynamicTextAssetHeader& OutHeader)
+	FSGDTABinaryHeader& OutHeader)
 {
-	if (BinaryData.Num() < FSGBinaryDynamicTextAssetHeader::HEADER_SIZE)
+	if (BinaryData.Num() < FSGDTABinaryHeader::HEADER_SIZE)
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetBinarySerializer: Binary data too small for header"));
 		return false;
@@ -268,15 +268,15 @@ bool FSGDynamicTextAssetBinarySerializer::ReadHeader(
 	if (!OutHeader.IsValid())
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetBinarySerializer: Invalid magic number(%s) (expected %s)"),
-			*OutHeader.GetMagicNumberString(), *FSGBinaryDynamicTextAssetHeader::GetExpectedMagicNumberString());
+			*OutHeader.GetMagicNumberString(), *FSGDTABinaryHeader::GetExpectedMagicNumberString());
 		return false;
 	}
 
 	// Check schema version compatibility
-	if (OutHeader.PluginSchemaVersion > FSGBinaryDynamicTextAssetHeader::CURRENT_SCHEMA_VERSION)
+	if (OutHeader.PluginSchemaVersion > FSGDTABinaryHeader::CURRENT_SCHEMA_VERSION)
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetBinarySerializer: Unsupported PluginSchemaVersion(%d) (max supported: %d)"),
-			OutHeader.PluginSchemaVersion, FSGBinaryDynamicTextAssetHeader::CURRENT_SCHEMA_VERSION);
+			OutHeader.PluginSchemaVersion, FSGDTABinaryHeader::CURRENT_SCHEMA_VERSION);
 		return false;
 	}
 
@@ -322,13 +322,13 @@ bool FSGDynamicTextAssetBinarySerializer::WriteBinaryFile(
 
 bool FSGDynamicTextAssetBinarySerializer::BinaryReadSerializerFormat(
 	const TArray<uint8>& BinaryData,
-	FSGSerializerFormat& OutSerializerFormat)
+	FSGDTASerializerFormat& OutSerializerFormat)
 {
-	OutSerializerFormat = FSGSerializerFormat();
+	OutSerializerFormat = FSGDTASerializerFormat();
 
 	// Read and validate the fixed 64-byte header at the start of the binary data.
 	// This gives us access to SerializerFormat without touching the compressed payload at all.
-	FSGBinaryDynamicTextAssetHeader header;
+	FSGDTABinaryHeader header;
 	if (!ReadHeader(BinaryData, header))
 	{
 		return false;
@@ -339,7 +339,7 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryReadSerializerFormat(
 	// regardless of which serializer produced it.
 	// Pass this format to FSGDynamicTextAssetFileManager::FindSerializerForFormat() to get the
 	// serializer instance that knows how to deserialize the payload.
-	OutSerializerFormat = FSGSerializerFormat(header.SerializerTypeId);
+	OutSerializerFormat = FSGDTASerializerFormat(header.SerializerTypeId);
 	return true;
 }
 
@@ -347,7 +347,7 @@ bool FSGDynamicTextAssetBinarySerializer::BinaryReadSerializerTypeId(
 	const TArray<uint8>& BinaryData,
 	uint32& OutSerializerTypeId)
 {
-	FSGSerializerFormat format;
+	FSGDTASerializerFormat format;
 	bool bResult = BinaryReadSerializerFormat(BinaryData, format);
 	OutSerializerTypeId = format.GetTypeId();
 	return bResult;
@@ -383,7 +383,7 @@ bool FSGDynamicTextAssetBinarySerializer::ConvertJsonFileToBinary(
 	}
 
 	// Convert to binary, storing the serializer's type ID and asset type ID for routing on load
-	FSGBinaryEncodeParams params;
+	FSGDTABinaryEncodeParams params;
 	params.Id = binMeta.Id;
 	params.SerializerFormat = serializer->GetSerializerFormat();
 	params.AssetTypeId = binMeta.AssetTypeId;
@@ -409,7 +409,7 @@ bool FSGDynamicTextAssetBinarySerializer::ExtractId(
 	const TArray<uint8>& BinaryData,
 	FSGDynamicTextAssetId& OutId)
 {
-	FSGBinaryDynamicTextAssetHeader header;
+	FSGDTABinaryHeader header;
 	if (!ReadHeader(BinaryData, header))
 	{
 		return false;
@@ -420,7 +420,7 @@ bool FSGDynamicTextAssetBinarySerializer::ExtractId(
 
 bool FSGDynamicTextAssetBinarySerializer::IsValidBinaryData(const TArray<uint8>& BinaryData)
 {
-	FSGBinaryDynamicTextAssetHeader header;
+	FSGDTABinaryHeader header;
 	return ReadHeader(BinaryData, header);
 }
 

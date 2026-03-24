@@ -11,7 +11,7 @@
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "UObject/Package.h"
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Serialization/SGDynamicTextAssetSerializerBase.h"
 #include "Server/SGDynamicTextAssetServerNullInterface.h"
 #include "Templates/SubclassOf.h"
@@ -91,7 +91,7 @@ bool USGDynamicTextAssetSubsystem::RemoveFromCache(const FSGDynamicTextAssetId& 
     {
         // Decrement ref counts and collect classes that drop to zero
         TArray<UClass*> releasedClasses;
-        if (const FSGTrackedInstancedClasses* trackedEntry = TrackedInstancedClasses.Find(Id))
+        if (const FSGDTATrackedInstancedClasses* trackedEntry = TrackedInstancedClasses.Find(Id))
         {
             for (const TObjectPtr<UClass>& trackedClass : trackedEntry->Classes)
             {
@@ -117,7 +117,7 @@ bool USGDynamicTextAssetSubsystem::RemoveFromCache(const FSGDynamicTextAssetId& 
         // Broadcast if any classes were fully released
         if (!releasedClasses.IsEmpty())
         {
-            FSGInstancedClassReleaseContext context;
+            FSGDTAInstancedClassReleaseContext context;
             context.RemovedAssetId = Id;
             context.ReleasedClasses = MoveTemp(releasedClasses);
             context.RemainingTrackedClassCount = InstancedClassRefCounts.Num();
@@ -183,7 +183,7 @@ bool USGDynamicTextAssetSubsystem::AddToCache(const TScriptInterface<ISGDynamicT
 }
 
 void USGDynamicTextAssetSubsystem::Internal_LoadDynamicTextAssetFromFileAsync_GameThread(const FString& FilePath,
-    const UClass* ClassPtr, const FString& TextPayload, FSGSerializerFormat SerializerFormat,
+    const UClass* ClassPtr, const FString& TextPayload, FSGDTASerializerFormat SerializerFormat,
     const bool& bReadSuccess, const FOnDynamicTextAssetLoaded& OnComplete)
 {
     // Decrement pending counter
@@ -348,7 +348,7 @@ TScriptInterface<ISGDynamicTextAssetProvider> USGDynamicTextAssetSubsystem::Load
     {
         // Try extracting file info first to resolve the class implicitly.
         FString jsonContents;
-        FSGSerializerFormat classResolveFormat;
+        FSGDTASerializerFormat classResolveFormat;
         if (FSGDynamicTextAssetFileManager::ReadRawFileContents(FilePath, jsonContents, &classResolveFormat))
         {
             TSharedPtr<ISGDynamicTextAssetSerializer> serializer = classResolveFormat.IsValid()
@@ -386,7 +386,7 @@ TScriptInterface<ISGDynamicTextAssetProvider> USGDynamicTextAssetSubsystem::Load
 
     // Read file contents for binary files, OutSerializerFormat identifies the deserializer
     FString jsonContents;
-    FSGSerializerFormat serializerFormat;
+    FSGDTASerializerFormat serializerFormat;
     if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(FilePath, jsonContents, &serializerFormat))
     {
         return emptyProvider;
@@ -546,7 +546,7 @@ int32 USGDynamicTextAssetSubsystem::LoadAllDynamicTextAssetsOfClass(UClass* Dyna
     {
         // Extract class name from JSON to determine actual class
         FString jsonContents;
-        FSGSerializerFormat fileSerializerFormat;
+        FSGDTASerializerFormat fileSerializerFormat;
         if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, jsonContents, &fileSerializerFormat))
         {
             continue;
@@ -637,7 +637,7 @@ void USGDynamicTextAssetSubsystem::LoadDynamicTextAssetFromFileAsync(const FStri
     {
         // Read file on background thread, binary files are decompressed and yield a valid SerializerFormat
         FString jsonContents;
-        FSGSerializerFormat serializerFormat;
+        FSGDTASerializerFormat serializerFormat;
         bool readSuccess = FSGDynamicTextAssetFileManager::ReadRawFileContents(FilePath, jsonContents, &serializerFormat);
 
         // Return to game thread for object creation and callback
@@ -721,7 +721,7 @@ void USGDynamicTextAssetSubsystem::LoadDynamicTextAssetAsync(const FSGDynamicTex
 
         // Found file, now proceed with standard load logic and binary files yield a valid SerializerFormat
         FString textContents;
-        FSGSerializerFormat asyncSerializerFormat;
+        FSGDTASerializerFormat asyncSerializerFormat;
         bool readSuccess = FSGDynamicTextAssetFileManager::ReadRawFileContents(foundPath, textContents, &asyncSerializerFormat);
 
         // Return to game thread
@@ -1005,7 +1005,7 @@ void USGDynamicTextAssetSubsystem::TrackInstancedClassesForProvider(
         return;
     }
 
-    FSGTrackedInstancedClasses& entry = TrackedInstancedClasses.FindOrAdd(Id);
+    FSGDTATrackedInstancedClasses& entry = TrackedInstancedClasses.FindOrAdd(Id);
     FSGDynamicTextAssetSerializerBase::CollectInstancedObjectClasses(ProviderObject, entry.Classes);
 
     // Increment ref counts for each tracked class
@@ -1029,7 +1029,7 @@ void USGDynamicTextAssetSubsystem::TrackInstancedClassesForProvider(
 int32 USGDynamicTextAssetSubsystem::GetTrackedInstancedClassCount() const
 {
     int32 total = 0;
-    for (const TPair<FSGDynamicTextAssetId, FSGTrackedInstancedClasses>& pair : TrackedInstancedClasses)
+    for (const TPair<FSGDynamicTextAssetId, FSGDTATrackedInstancedClasses>& pair : TrackedInstancedClasses)
     {
         total += pair.Value.Classes.Num();
     }
@@ -1039,7 +1039,7 @@ int32 USGDynamicTextAssetSubsystem::GetTrackedInstancedClassCount() const
 TSet<UClass*> USGDynamicTextAssetSubsystem::GetAllTrackedInstancedClasses() const
 {
     TSet<UClass*> result;
-    for (const TPair<FSGDynamicTextAssetId, FSGTrackedInstancedClasses>& pair : TrackedInstancedClasses)
+    for (const TPair<FSGDynamicTextAssetId, FSGDTATrackedInstancedClasses>& pair : TrackedInstancedClasses)
     {
         result.Reserve(result.Num() + pair.Value.Classes.Num());
         for (UClass* classPtr : pair.Value.Classes)
@@ -1056,7 +1056,7 @@ TSet<UClass*> USGDynamicTextAssetSubsystem::GetAllTrackedInstancedClasses() cons
 TArray<UClass*> USGDynamicTextAssetSubsystem::GetTrackedInstancedClassesForId(const FSGDynamicTextAssetId& Id) const
 {
     TArray<UClass*> result;
-    if (const FSGTrackedInstancedClasses* entry = TrackedInstancedClasses.Find(Id))
+    if (const FSGDTATrackedInstancedClasses* entry = TrackedInstancedClasses.Find(Id))
     {
         result.Reserve(result.Num() + entry->Classes.Num());
         for (UClass* classPtr : entry->Classes)

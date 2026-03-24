@@ -7,7 +7,7 @@
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Serialization/SGDynamicTextAssetBinarySerializer.h"
 #include "Core/SGDynamicTextAsset.h"
-#include "Serialization/SGBinaryEncodeParams.h"
+#include "Serialization/SGDTABinaryEncodeParams.h"
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -319,7 +319,7 @@ bool FSGDynamicTextAssetFileManager_ReadRawFileContents_BinaryRoundtrip::RunTest
 	platformFile.CreateDirectoryTree(*testDir);
 
 	// Step 1: Convert JSON to binary
-	FSGBinaryEncodeParams encodeParams;
+	FSGDTABinaryEncodeParams encodeParams;
 	encodeParams.Id = testId;
 	encodeParams.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 

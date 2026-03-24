@@ -18,7 +18,7 @@ public:
 	SLATE_BEGIN_ARGS(SSGDynamicTextAssetIcon)
 		: _Serializer(nullptr)
 		, _FontStyle(FCoreStyle::GetDefaultFontStyle("Italic", 8))
-		, _ReferenceType(ESGReferenceType::DynamicTextAsset)
+		, _ReferenceType(ESGDTAReferenceType::DynamicTextAsset)
 		, _Label(FText::GetEmpty())
 	{}
 
@@ -29,7 +29,7 @@ public:
 		SLATE_ARGUMENT(FSlateFontInfo, FontStyle)
 
 		/** The object type that this icon will use. */
-		SLATE_ARGUMENT(ESGReferenceType, ReferenceType)
+		SLATE_ARGUMENT(ESGDTAReferenceType, ReferenceType)
 
 		/** Label override of the icon for non-Dynamic Text Asset types. */
 		SLATE_ARGUMENT(FText, Label)

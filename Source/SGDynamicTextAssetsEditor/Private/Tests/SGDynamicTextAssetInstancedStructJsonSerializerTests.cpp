@@ -8,7 +8,7 @@
 
 /**
  * Test: Single FInstancedStruct with base type round-trips through JSON serialization.
- * Creates a USGTestInstancedStructDTA with a populated SingleStruct,
+ * Creates a USGDTATestInstancedStructDTA with a populated SingleStruct,
  * serializes to JSON, deserializes to a new instance, and verifies properties match.
  */
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -20,7 +20,7 @@ bool FInstancedStructJsonRoundtrip_SingleBase::RunTest(const FString& Parameters
 {
 	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Arrange
-	USGTestInstancedStructDTA* source = NewObject<USGTestInstancedStructDTA>();
+	USGDTATestInstancedStructDTA* source = NewObject<USGDTATestInstancedStructDTA>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 
 	FTestInstancedStructBase baseStruct;
@@ -34,7 +34,7 @@ bool FInstancedStructJsonRoundtrip_SingleBase::RunTest(const FString& Parameters
 	bool bSerialized = serializer.SerializeProvider(source, jsonString);
 	TestTrue(TEXT("Serialization should succeed"), bSerialized);
 
-	USGTestInstancedStructDTA* target = NewObject<USGTestInstancedStructDTA>();
+	USGDTATestInstancedStructDTA* target = NewObject<USGDTATestInstancedStructDTA>();
 	bool bMigrated = false;
 	bool bDeserialized = serializer.DeserializeProvider(jsonString, target, bMigrated);
 	TestTrue(TEXT("Deserialization should succeed"), bDeserialized);
@@ -69,7 +69,7 @@ bool FInstancedStructJsonRoundtrip_ArrayMixed::RunTest(const FString& Parameters
 {
 	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Arrange
-	USGTestInstancedStructDTA* source = NewObject<USGTestInstancedStructDTA>();
+	USGDTATestInstancedStructDTA* source = NewObject<USGDTATestInstancedStructDTA>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 
 	FTestInstancedStructBase baseEntry;
@@ -90,7 +90,7 @@ bool FInstancedStructJsonRoundtrip_ArrayMixed::RunTest(const FString& Parameters
 	bool bSerialized = serializer.SerializeProvider(source, jsonString);
 	TestTrue(TEXT("Serialization should succeed"), bSerialized);
 
-	USGTestInstancedStructDTA* target = NewObject<USGTestInstancedStructDTA>();
+	USGDTATestInstancedStructDTA* target = NewObject<USGDTATestInstancedStructDTA>();
 	bool bMigrated = false;
 	bool bDeserialized = serializer.DeserializeProvider(jsonString, target, bMigrated);
 	TestTrue(TEXT("Deserialization should succeed"), bDeserialized);
@@ -143,7 +143,7 @@ bool FInstancedStructJsonRoundtrip_EmptyGraceful::RunTest(const FString& Paramet
 {
 	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Arrange
-	USGTestInstancedStructDTA* source = NewObject<USGTestInstancedStructDTA>();
+	USGDTATestInstancedStructDTA* source = NewObject<USGDTATestInstancedStructDTA>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 	// SingleStruct is left uninitialized (default-constructed, invalid)
 
@@ -153,7 +153,7 @@ bool FInstancedStructJsonRoundtrip_EmptyGraceful::RunTest(const FString& Paramet
 	bool bSerialized = serializer.SerializeProvider(source, jsonString);
 	TestTrue(TEXT("Serialization should succeed with empty FInstancedStruct"), bSerialized);
 
-	USGTestInstancedStructDTA* target = NewObject<USGTestInstancedStructDTA>();
+	USGDTATestInstancedStructDTA* target = NewObject<USGDTATestInstancedStructDTA>();
 	bool bMigrated = false;
 	bool bDeserialized = serializer.DeserializeProvider(jsonString, target, bMigrated);
 	TestTrue(TEXT("Deserialization should succeed with empty FInstancedStruct"), bDeserialized);

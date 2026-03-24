@@ -16,7 +16,7 @@ class SSGDynamicTextAssetTileView;
 class STextBlock;
 
 class FMenuBuilder;
-struct FSGDynamicTextAssetListItem;
+struct FSGDTAAssetListItem;
 struct FSGDynamicTextAssetId;
 
 /**
@@ -82,13 +82,13 @@ private:
     void OnTypeSelected(UClass* SelectedClass);
 
     /** Called when an item is selected in the tile view */
-    void OnItemSelected(TSharedPtr<FSGDynamicTextAssetListItem> Item);
+    void OnItemSelected(TSharedPtr<FSGDTAAssetListItem> Item);
 
     /** Called when an item is double-clicked in the tile view */
-    void OnItemDoubleClicked(TSharedPtr<FSGDynamicTextAssetListItem> Item);
+    void OnItemDoubleClicked(TSharedPtr<FSGDTAAssetListItem> Item);
 
     /** Called when the tile view selection changes - updates the status bar */
-    void OnTileViewSelectionChanged(const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& SelectedItems);
+    void OnTileViewSelectionChanged(const TArray<TSharedPtr<FSGDTAAssetListItem>>& SelectedItems);
 
     /** Pushes the current selection/count text to the status bar */
     void RefreshStatusBar();
@@ -160,7 +160,7 @@ private:
     bool HasExactlyOneItemSelected() const;
 
     /** Called by the tile view to allow the browser to add additional context menu entries */
-    void OnBuildContextMenuExtension(FMenuBuilder& MenuBuilder, const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& SelectedItems);
+    void OnBuildContextMenuExtension(FMenuBuilder& MenuBuilder, const TArray<TSharedPtr<FSGDTAAssetListItem>>& SelectedItems);
 
     /**
      * Converts the given items to the target file format.
@@ -169,7 +169,7 @@ private:
      * @param Items The items to convert
      * @param TargetExtension The target file extension (e.g., ".dta.xml")
      */
-    void ConvertSelectedItems(const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& Items, const FString& TargetExtension);
+    void ConvertSelectedItems(const TArray<TSharedPtr<FSGDTAAssetListItem>>& Items, const FString& TargetExtension);
 
     /** Binds keyboard shortcuts to the command list */
     void BindCommands();

@@ -215,7 +215,7 @@ TSharedRef<SWidget> FSGDynamicTextAssetRefCustomization::GeneratePickerMenu()
 			+ SVerticalBox::Slot()
 			.FillHeight(1.0f)
 			[
-				SAssignNew(PickerListView, SListView<TSharedPtr<FPickerEntry>>)
+				SAssignNew(PickerListView, SListView<TSharedPtr<FSGDTAPickerEntry>>)
 				.ListItemsSource(&FilteredEntries)
 				.OnGenerateRow(this, &FSGDynamicTextAssetRefCustomization::GenerateListRow)
 				.OnSelectionChanged(this, &FSGDynamicTextAssetRefCustomization::OnListSelectionChanged)
@@ -224,7 +224,7 @@ TSharedRef<SWidget> FSGDynamicTextAssetRefCustomization::GeneratePickerMenu()
 		];
 }
 
-FText FSGDynamicTextAssetRefCustomization::FPickerEntry::GetDisplayText() const
+FText FSGDynamicTextAssetRefCustomization::FSGDTAPickerEntry::GetDisplayText() const
 {
 	if (UserFacingId.IsEmpty())
 	{
@@ -282,7 +282,7 @@ void FSGDynamicTextAssetRefCustomization::RebuildPickerEntries()
 			}
 		}
 
-		TSharedPtr<FPickerEntry> entry = MakeShared<FPickerEntry>();
+		TSharedPtr<FSGDTAPickerEntry> entry = MakeShared<FSGDTAPickerEntry>();
 		entry->Id = fileInfo.Id;
 		entry->UserFacingId = fileInfo.UserFacingId;
 		entry->ClassName = fileInfo.ClassName;
@@ -291,7 +291,7 @@ void FSGDynamicTextAssetRefCustomization::RebuildPickerEntries()
 	}
 
 	// Sort by UserFacingId
-	AllEntries.Sort([](const TSharedPtr<FPickerEntry>& A, const TSharedPtr<FPickerEntry>& B)
+	AllEntries.Sort([](const TSharedPtr<FSGDTAPickerEntry>& A, const TSharedPtr<FSGDTAPickerEntry>& B)
 	{
 		return A->UserFacingId < B->UserFacingId;
 	});
@@ -307,7 +307,7 @@ void FSGDynamicTextAssetRefCustomization::ApplyFilter()
 {
 	FilteredEntries.Reset();
 
-	for (const TSharedPtr<FPickerEntry>& entry : AllEntries)
+	for (const TSharedPtr<FSGDTAPickerEntry>& entry : AllEntries)
 	{
 		// Apply editor-local class filter
 		if (!EditorFilterClassName.IsEmpty() && EditorFilterClassName != TEXT("All Types"))
@@ -367,7 +367,7 @@ FText FSGDynamicTextAssetRefCustomization::GetCurrentTooltipText() const
 		FText::FromString(CurrentUserFacingId), FText::FromString(CurrentId.ToString()));
 }
 
-void FSGDynamicTextAssetRefCustomization::OnEntrySelected(TSharedPtr<FPickerEntry> NewEntry)
+void FSGDynamicTextAssetRefCustomization::OnEntrySelected(TSharedPtr<FSGDTAPickerEntry> NewEntry)
 {
 	if (!NewEntry.IsValid())
 	{
@@ -386,7 +386,7 @@ void FSGDynamicTextAssetRefCustomization::OnEntrySelected(TSharedPtr<FPickerEntr
 		*NewEntry->UserFacingId, *NewEntry->Id.ToString());
 }
 
-void FSGDynamicTextAssetRefCustomization::OnListSelectionChanged(TSharedPtr<FPickerEntry> NewEntry, ESelectInfo::Type SelectInfo)
+void FSGDynamicTextAssetRefCustomization::OnListSelectionChanged(TSharedPtr<FSGDTAPickerEntry> NewEntry, ESelectInfo::Type SelectInfo)
 {
 	if (SelectInfo != ESelectInfo::Direct)
 	{
@@ -394,10 +394,10 @@ void FSGDynamicTextAssetRefCustomization::OnListSelectionChanged(TSharedPtr<FPic
 	}
 }
 
-TSharedRef<ITableRow> FSGDynamicTextAssetRefCustomization::GenerateListRow(TSharedPtr<FPickerEntry> Entry, 
+TSharedRef<ITableRow> FSGDynamicTextAssetRefCustomization::GenerateListRow(TSharedPtr<FSGDTAPickerEntry> Entry, 
 	const TSharedRef<STableViewBase>& OwnerTable)
 {
-	return SNew(STableRow<TSharedPtr<FPickerEntry>>, OwnerTable)
+	return SNew(STableRow<TSharedPtr<FSGDTAPickerEntry>>, OwnerTable)
 		[
 			SNew(SBox)
 			.Padding(FMargin(4.0f, 2.0f))
@@ -516,7 +516,7 @@ FReply FSGDynamicTextAssetRefCustomization::OnPasteClicked()
 	{
 		// Look up UserFacingId from entries if a matching GUID exists
 		FString resolvedUserFacingId;
-		for (const TSharedPtr<FPickerEntry>& entry : AllEntries)
+		for (const TSharedPtr<FSGDTAPickerEntry>& entry : AllEntries)
 		{
 			if (entry->Id == parsedId)
 			{
@@ -532,7 +532,7 @@ FReply FSGDynamicTextAssetRefCustomization::OnPasteClicked()
 	}
 
 	// Not a valid GUID - try to match as a UserFacingId
-	for (const TSharedPtr<FPickerEntry>& entry : AllEntries)
+	for (const TSharedPtr<FSGDTAPickerEntry>& entry : AllEntries)
 	{
 		if (entry->UserFacingId == clipboardText)
 		{
@@ -558,7 +558,7 @@ FReply FSGDynamicTextAssetRefCustomization::OnOpenEditorClicked()
 	}
 
 	// Find the entry to get the file path and class
-	TSharedPtr<FPickerEntry> currentEntry = FindCurrentEntry();
+	TSharedPtr<FSGDTAPickerEntry> currentEntry = FindCurrentEntry();
 	if (currentEntry.IsValid())
 	{
 		// Look up the class and type ID from the registry
@@ -610,7 +610,7 @@ void FSGDynamicTextAssetRefCustomization::ReadCurrentValues()
 	}
 
 	// Resolve display name from the pre-scanned file info (no world context needed)
-	for (const TSharedPtr<FPickerEntry>& entry : AllEntries)
+	for (const TSharedPtr<FSGDTAPickerEntry>& entry : AllEntries)
 	{
 		if (entry->Id == CurrentId)
 		{
@@ -712,14 +712,14 @@ UClass* FSGDynamicTextAssetRefCustomization::GetTypeFilterClass() const
 	return nullptr;
 }
 
-TSharedPtr<FSGDynamicTextAssetRefCustomization::FPickerEntry> FSGDynamicTextAssetRefCustomization::FindCurrentEntry() const
+TSharedPtr<FSGDynamicTextAssetRefCustomization::FSGDTAPickerEntry> FSGDynamicTextAssetRefCustomization::FindCurrentEntry() const
 {
 	if (!CurrentId.IsValid())
 	{
 		return nullptr;
 	}
 
-	for (const TSharedPtr<FPickerEntry>& entry : AllEntries)
+	for (const TSharedPtr<FSGDTAPickerEntry>& entry : AllEntries)
 	{
 		if (entry->Id == CurrentId)
 		{

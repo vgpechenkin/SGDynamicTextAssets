@@ -18,7 +18,7 @@
  * This separation prevents accidental misuse between asset IDs and type IDs.
  *
  * Each registered UClass derived from USGDynamicTextAsset is assigned a
- * stable FSGAssetTypeId that persists across class renames, enabling
+ * stable FSGDTAAssetTypeId that persists across class renames, enabling
  * file identity to be decoupled from C++ class names.
  *
  * Supports binary serialization, network serialization, and text
@@ -74,7 +74,7 @@ public:
 	 * Returns an invalid ID if parsing fails.
 	 *
 	 * @param InString The string to parse (hyphenated GUID format)
-	 * @return The parsed FSGAssetTypeId, or an invalid ID on failure
+	 * @return The parsed FSGDTAAssetTypeId, or an invalid ID on failure
 	 */
 	static FSGDynamicTextAssetTypeId FromString(const FString& InString);
 
@@ -134,13 +134,13 @@ public:
 
 #if WITH_EDITOR
 
-	DECLARE_MULTICAST_DELEGATE_TwoParams(FSGAssetTypeIdGuidChangeSignature, FGuid/*Previous*/, FGuid/*New*/);
+	DECLARE_MULTICAST_DELEGATE_TwoParams(FSGDTAAssetTypeIdGuidChangeSignature, FGuid/*Previous*/, FGuid/*New*/);
 	/**
 	 * For editor tooling, broadcasts when this type ID's GUID is changed.
 	 * Param 1 = Previous GUID
 	 * Param 2 = New/Current GUID
 	 */
-	FSGAssetTypeIdGuidChangeSignature OnGuidChanged_Editor;
+	FSGDTAAssetTypeIdGuidChangeSignature OnGuidChanged_Editor;
 
 #endif
 

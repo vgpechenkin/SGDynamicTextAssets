@@ -27,7 +27,7 @@ DECLARE_DELEGATE_OneParam(FOnDTAClassSelected, UClass* /*SelectedClass*/);
  * - Optional "None" entry for clearing the selection
  * - Programmatic selection via SetSelectedClass()
  *
- * Used by FSGAssetTypeIdCustomization and SSGDynamicTextAssetCreateDialog.
+ * Used by FSGDTAAssetTypeIdCustomization and SSGDynamicTextAssetCreateDialog.
  */
 class SGDYNAMICTEXTASSETSEDITOR_API SSGDynamicTextAssetClassPicker : public SCompoundWidget
 {

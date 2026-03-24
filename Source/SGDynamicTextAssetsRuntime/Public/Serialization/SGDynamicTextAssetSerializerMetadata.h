@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 
 /**
  * Quick-reference snapshot of a registered serializer's identity.
@@ -23,7 +23,7 @@ public:
 	 * The serializer format for this metadata entry.
 	 * Built-in range [1, 99] (1=JSON, 2=XML, 3=YAML). Third-party serializers use 100+.
 	 */
-	FSGSerializerFormat SerializerFormat;
+	FSGDTASerializerFormat SerializerFormat;
 
 	/** Full file extension handled by this serializer (e.g., ".dta.json", ".dta.xml"). */
 	FString FileExtension;

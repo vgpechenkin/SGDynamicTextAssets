@@ -328,13 +328,13 @@ void USGDynamicTextAssetReferenceSubsystem::SetupBlueprintScanPhase()
 		for (const FAssetData& assetData : allBlueprints)
 		{
 			FString packagePath = assetData.PackageName.ToString();
-			ESGReferenceCacheContentType contentType = GetContentTypeForPath(packagePath);
+			ESGDTAReferenceCacheContentType contentType = GetContentTypeForPath(packagePath);
 
-			if (contentType == ESGReferenceCacheContentType::EngineContent && !bScanEngine)
+			if (contentType == ESGDTAReferenceCacheContentType::EngineContent && !bScanEngine)
 			{
 				continue;
 			}
-			if (contentType == ESGReferenceCacheContentType::PluginContent && !bScanPlugins)
+			if (contentType == ESGDTAReferenceCacheContentType::PluginContent && !bScanPlugins)
 			{
 				continue;
 			}
@@ -390,13 +390,13 @@ void USGDynamicTextAssetReferenceSubsystem::SetupLevelScanPhase()
 		for (const FAssetData& assetData : allLevels)
 		{
 			FString packagePath = assetData.PackageName.ToString();
-			ESGReferenceCacheContentType contentType = GetContentTypeForPath(packagePath);
+			ESGDTAReferenceCacheContentType contentType = GetContentTypeForPath(packagePath);
 
-			if (contentType == ESGReferenceCacheContentType::EngineContent && !bScanEngine)
+			if (contentType == ESGDTAReferenceCacheContentType::EngineContent && !bScanEngine)
 			{
 				continue;
 			}
-			if (contentType == ESGReferenceCacheContentType::PluginContent && !bScanPlugins)
+			if (contentType == ESGDTAReferenceCacheContentType::PluginContent && !bScanPlugins)
 			{
 				continue;
 			}
@@ -517,7 +517,7 @@ void USGDynamicTextAssetReferenceSubsystem::ProcessBlueprintAsset(const FAssetDa
 	FSGReferenceCacheEntry& cacheEntry = PersistentAssetCache.FindOrAdd(packagePath);
 	cacheEntry.AssetPath = packagePath;
 	cacheEntry.SourceDisplayName = displayName;
-	cacheEntry.ReferenceType = ESGReferenceType::Blueprint;
+	cacheEntry.ReferenceType = ESGDTAReferenceType::Blueprint;
 	cacheEntry.ContentType = GetContentTypeForPath(packagePath);
 	cacheEntry.FoundReferences.Empty();
 
@@ -534,7 +534,7 @@ void USGDynamicTextAssetReferenceSubsystem::ProcessBlueprintAsset(const FAssetDa
 
 	// Collect all references into a local array
 	TArray<FSGDynamicTextAssetReferenceEntry> localEntries;
-	ExtractRefsFromObject(generatedClass, cdo, sourcePath, displayName, ESGReferenceType::Blueprint, localEntries);
+	ExtractRefsFromObject(generatedClass, cdo, sourcePath, displayName, ESGDTAReferenceType::Blueprint, localEntries);
 
 	// Scan default subobjects (components) for Actor Blueprints only.
 	// Non-Actor Blueprints skip the component scan but still contribute their CDO entries above.
@@ -552,7 +552,7 @@ void USGDynamicTextAssetReferenceSubsystem::ProcessBlueprintAsset(const FAssetDa
 
 			// Build context: "BP_Name > ComponentName"
 			FString componentDisplayName = FString::Printf(TEXT("%s > %s"), *displayName, *strippedComponentName);
-			ExtractRefsFromObject(component->GetClass(), component, sourcePath, componentDisplayName, ESGReferenceType::Blueprint, localEntries);
+			ExtractRefsFromObject(component->GetClass(), component, sourcePath, componentDisplayName, ESGDTAReferenceType::Blueprint, localEntries);
 			return true;
 		});
 	}
@@ -581,7 +581,7 @@ void USGDynamicTextAssetReferenceSubsystem::ProcessLevelAsset(const FAssetData& 
 	FSGReferenceCacheEntry& cacheEntry = PersistentAssetCache.FindOrAdd(packagePath);
 	cacheEntry.AssetPath = packagePath;
 	cacheEntry.SourceDisplayName = displayName;
-	cacheEntry.ReferenceType = ESGReferenceType::Level;
+	cacheEntry.ReferenceType = ESGDTAReferenceType::Level;
 	cacheEntry.ContentType = GetContentTypeForPath(packagePath);
 	cacheEntry.FoundReferences.Empty();
 
@@ -611,7 +611,7 @@ void USGDynamicTextAssetReferenceSubsystem::ProcessLevelAsset(const FAssetData& 
 			FString actorDisplayName = FString::Printf(TEXT("%s > %s"), *displayName, *actor->GetActorNameOrLabel());
 
 			// Scan the actor itself
-			ExtractRefsFromObject(actor->GetClass(), actor, sourcePath, actorDisplayName, ESGReferenceType::Level, localEntries);
+			ExtractRefsFromObject(actor->GetClass(), actor, sourcePath, actorDisplayName, ESGDTAReferenceType::Level, localEntries);
 
 			// Scan all components on the actor
 			TArray<UActorComponent*> components;
@@ -622,7 +622,7 @@ void USGDynamicTextAssetReferenceSubsystem::ProcessLevelAsset(const FAssetData& 
 				{
 					// Build context: "LevelName > ActorLabel > ComponentName"
 					FString componentDisplayName = FString::Printf(TEXT("%s > %s"), *actorDisplayName, *component->GetName());
-					ExtractRefsFromObject(component->GetClass(), component, sourcePath, componentDisplayName, ESGReferenceType::Level, localEntries);
+					ExtractRefsFromObject(component->GetClass(), component, sourcePath, componentDisplayName, ESGDTAReferenceType::Level, localEntries);
 				}
 			}
 		}
@@ -706,14 +706,14 @@ void USGDynamicTextAssetReferenceSubsystem::ProcessDynamicTextAssetFile(const FS
 	FSGReferenceCacheEntry& cacheEntry = PersistentAssetCache.FindOrAdd(FilePath);
 	cacheEntry.AssetPath = FilePath;
 	cacheEntry.SourceDisplayName = displayName;
-	cacheEntry.ReferenceType = ESGReferenceType::DynamicTextAsset;
-	cacheEntry.ContentType = ESGReferenceCacheContentType::DynamicTextAssets;
+	cacheEntry.ReferenceType = ESGDTAReferenceType::DynamicTextAsset;
+	cacheEntry.ContentType = ESGDTAReferenceCacheContentType::DynamicTextAssets;
 	cacheEntry.FoundReferences.Empty();
 	cacheEntry.LastModifiedTime = IFileManager::Get().GetTimeStamp(*FilePath);
 
 	// Collect all references into a local array
 	TArray<FSGDynamicTextAssetReferenceEntry> localEntries;
-	ExtractRefsFromObject(dataObjectClass, tempObject, sourcePath, displayName, ESGReferenceType::DynamicTextAsset, localEntries);
+	ExtractRefsFromObject(dataObjectClass, tempObject, sourcePath, displayName, ESGDTAReferenceType::DynamicTextAsset, localEntries);
 
 	// Encode all collected entries directly into the persistent cache entry
 	for (const FSGDynamicTextAssetReferenceEntry& entry : localEntries)
@@ -775,7 +775,7 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractRefsFromObject(
 	const UObject* ObjectInstance,
 	const FSoftObjectPath& SourceAsset,
 	const FString& SourceDisplayName,
-	ESGReferenceType ReferenceType,
+	ESGDTAReferenceType ReferenceType,
 	TArray<FSGDynamicTextAssetReferenceEntry>& OutEntries)
 {
 	if (!ObjectClass || !ObjectInstance)
@@ -796,7 +796,7 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractRefsFromProperty(
 	const FString& PropertyPath,
 	const FSoftObjectPath& SourceAsset,
 	const FString& SourceDisplayName,
-	ESGReferenceType ReferenceType,
+	ESGDTAReferenceType ReferenceType,
 	TArray<FSGDynamicTextAssetReferenceEntry>& OutEntries)
 {
 	if (!Property || !ContainerPtr)
@@ -819,7 +819,7 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractRefsFromProperty(
 					PropertyPath,
 					ReferenceType);
 				entry.SourceDisplayName = SourceDisplayName;
-				if (ReferenceType == ESGReferenceType::DynamicTextAsset)
+				if (ReferenceType == ESGDTAReferenceType::DynamicTextAsset)
 				{
 					entry.SourceFilePath = SourceAsset.ToString();
 				}
@@ -864,7 +864,7 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractRefsFromProperty(
 							elementPath,
 							ReferenceType);
 						entry.SourceDisplayName = SourceDisplayName;
-						if (ReferenceType == ESGReferenceType::DynamicTextAsset)
+						if (ReferenceType == ESGDTAReferenceType::DynamicTextAsset)
 						{
 							entry.SourceFilePath = SourceAsset.ToString();
 						}
@@ -912,7 +912,7 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractRefsFromProperty(
 							valuePath,
 							ReferenceType);
 						entry.SourceDisplayName = SourceDisplayName;
-						if (ReferenceType == ESGReferenceType::DynamicTextAsset)
+						if (ReferenceType == ESGDTAReferenceType::DynamicTextAsset)
 						{
 							entry.SourceFilePath = SourceAsset.ToString();
 						}
@@ -970,8 +970,8 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractDepsFromProperty(
 		const FSoftObjectPtr* softPtr = static_cast<const FSoftObjectPtr*>(valuePtr);
 		if (softPtr && !softPtr->IsNull())
 		{
-			const ESGReferenceType refType = (softObjProp->PropertyClass && softObjProp->PropertyClass->IsChildOf(UWorld::StaticClass()))
-				? ESGReferenceType::Level : ESGReferenceType::Blueprint;
+			const ESGDTAReferenceType refType = (softObjProp->PropertyClass && softObjProp->PropertyClass->IsChildOf(UWorld::StaticClass()))
+				? ESGDTAReferenceType::Level : ESGDTAReferenceType::Blueprint;
 			OutDependencies.Emplace(softPtr->ToSoftObjectPath(), PropertyPath,
 				softObjProp->PropertyClass ? softObjProp->PropertyClass->GetFName() : NAME_None, refType);
 		}
@@ -985,8 +985,8 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractDepsFromProperty(
 		const FSoftObjectPtr* softPtr = static_cast<const FSoftObjectPtr*>(valuePtr);
 		if (softPtr && !softPtr->IsNull())
 		{
-			const ESGReferenceType refType = (softClassProp->MetaClass && softClassProp->MetaClass->IsChildOf(UWorld::StaticClass()))
-				? ESGReferenceType::Level : ESGReferenceType::Blueprint;
+			const ESGDTAReferenceType refType = (softClassProp->MetaClass && softClassProp->MetaClass->IsChildOf(UWorld::StaticClass()))
+				? ESGDTAReferenceType::Level : ESGDTAReferenceType::Blueprint;
 			OutDependencies.Emplace(softPtr->ToSoftObjectPath(), PropertyPath,
 				softClassProp->MetaClass ? softClassProp->MetaClass->GetFName() : NAME_None, refType);
 		}
@@ -1054,8 +1054,8 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractDepsFromProperty(
 				const FSoftObjectPtr* softPtr = static_cast<const FSoftObjectPtr*>(elementPtr);
 				if (softPtr && !softPtr->IsNull())
 				{
-					const ESGReferenceType refType = (innerSoftObj->PropertyClass && innerSoftObj->PropertyClass->IsChildOf(UWorld::StaticClass()))
-						? ESGReferenceType::Level : ESGReferenceType::Blueprint;
+					const ESGDTAReferenceType refType = (innerSoftObj->PropertyClass && innerSoftObj->PropertyClass->IsChildOf(UWorld::StaticClass()))
+						? ESGDTAReferenceType::Level : ESGDTAReferenceType::Blueprint;
 					OutDependencies.Emplace(softPtr->ToSoftObjectPath(), elementPath,
 						innerSoftObj->PropertyClass ? innerSoftObj->PropertyClass->GetFName() : NAME_None, refType);
 				}
@@ -1065,8 +1065,8 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractDepsFromProperty(
 				const FSoftObjectPtr* softPtr = static_cast<const FSoftObjectPtr*>(elementPtr);
 				if (softPtr && !softPtr->IsNull())
 				{
-					const ESGReferenceType refType = (innerSoftClass->MetaClass && innerSoftClass->MetaClass->IsChildOf(UWorld::StaticClass()))
-						? ESGReferenceType::Level : ESGReferenceType::Blueprint;
+					const ESGDTAReferenceType refType = (innerSoftClass->MetaClass && innerSoftClass->MetaClass->IsChildOf(UWorld::StaticClass()))
+						? ESGDTAReferenceType::Level : ESGDTAReferenceType::Blueprint;
 					OutDependencies.Emplace(softPtr->ToSoftObjectPath(), elementPath,
 						innerSoftClass->MetaClass ? innerSoftClass->MetaClass->GetFName() : NAME_None, refType);
 				}
@@ -1111,8 +1111,8 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractDepsFromProperty(
 				const FSoftObjectPtr* softPtr = static_cast<const FSoftObjectPtr*>(valuePtr);
 				if (softPtr && !softPtr->IsNull())
 				{
-					const ESGReferenceType refType = (innerSoftObj->PropertyClass && innerSoftObj->PropertyClass->IsChildOf(UWorld::StaticClass()))
-						? ESGReferenceType::Level : ESGReferenceType::Blueprint;
+					const ESGDTAReferenceType refType = (innerSoftObj->PropertyClass && innerSoftObj->PropertyClass->IsChildOf(UWorld::StaticClass()))
+						? ESGDTAReferenceType::Level : ESGDTAReferenceType::Blueprint;
 					OutDependencies.Emplace(softPtr->ToSoftObjectPath(), valuePath,
 						innerSoftObj->PropertyClass ? innerSoftObj->PropertyClass->GetFName() : NAME_None, refType);
 				}
@@ -1122,8 +1122,8 @@ void USGDynamicTextAssetReferenceSubsystem::ExtractDepsFromProperty(
 				const FSoftObjectPtr* softPtr = static_cast<const FSoftObjectPtr*>(valuePtr);
 				if (softPtr && !softPtr->IsNull())
 				{
-					const ESGReferenceType refType = (innerSoftClass->MetaClass && innerSoftClass->MetaClass->IsChildOf(UWorld::StaticClass()))
-						? ESGReferenceType::Level : ESGReferenceType::Blueprint;
+					const ESGDTAReferenceType refType = (innerSoftClass->MetaClass && innerSoftClass->MetaClass->IsChildOf(UWorld::StaticClass()))
+						? ESGDTAReferenceType::Level : ESGDTAReferenceType::Blueprint;
 					OutDependencies.Emplace(softPtr->ToSoftObjectPath(), valuePath,
 						innerSoftClass->MetaClass ? innerSoftClass->MetaClass->GetFName() : NAME_None, refType);
 				}
@@ -1156,7 +1156,7 @@ void USGDynamicTextAssetReferenceSubsystem::ClearCacheAndRescan()
 void USGDynamicTextAssetReferenceSubsystem::SaveCacheToDisk()
 {
 	// Organize cache entries by content type
-	TMap<ESGReferenceCacheContentType, TArray<const FSGReferenceCacheEntry*>> entriesByType;
+	TMap<ESGDTAReferenceCacheContentType, TArray<const FSGReferenceCacheEntry*>> entriesByType;
 	for (const TPair<FString, FSGReferenceCacheEntry>& pair : PersistentAssetCache)
 	{
 		entriesByType.FindOrAdd(pair.Value.ContentType).Add(&pair.Value);
@@ -1167,7 +1167,7 @@ void USGDynamicTextAssetReferenceSubsystem::SaveCacheToDisk()
 	IFileManager::Get().MakeDirectory(*cacheFolderPath, true);
 
 	// Save each content type to its own file
-	for (const TPair<ESGReferenceCacheContentType, TArray<const FSGReferenceCacheEntry*>>& typeEntries : entriesByType)
+	for (const TPair<ESGDTAReferenceCacheContentType, TArray<const FSGReferenceCacheEntry*>>& typeEntries : entriesByType)
 	{
 		TSharedRef<FJsonObject> rootObject = MakeShared<FJsonObject>();
 		rootObject->SetNumberField(TEXT("version"), 1);
@@ -1217,14 +1217,14 @@ void USGDynamicTextAssetReferenceSubsystem::LoadCacheFromDisk()
 	PersistentAssetCache.Empty();
 
 	// Load each content type file
-	TArray<ESGReferenceCacheContentType> contentTypes = {
-		ESGReferenceCacheContentType::GameContent,
-		ESGReferenceCacheContentType::PluginContent,
-		ESGReferenceCacheContentType::EngineContent,
-		ESGReferenceCacheContentType::DynamicTextAssets
+	TArray<ESGDTAReferenceCacheContentType> contentTypes = {
+		ESGDTAReferenceCacheContentType::GameContent,
+		ESGDTAReferenceCacheContentType::PluginContent,
+		ESGDTAReferenceCacheContentType::EngineContent,
+		ESGDTAReferenceCacheContentType::DynamicTextAssets
 	};
 
-	for (ESGReferenceCacheContentType contentType : contentTypes)
+	for (ESGDTAReferenceCacheContentType contentType : contentTypes)
 	{
 		FString filePath = GetCacheFilePath(contentType);
 		FString jsonString;
@@ -1276,7 +1276,7 @@ void USGDynamicTextAssetReferenceSubsystem::LoadCacheFromDisk()
 			int32 refTypeInt;
 			if ((*entryObject)->TryGetNumberField(TEXT("referenceType"), refTypeInt))
 			{
-				entry.ReferenceType = static_cast<ESGReferenceType>(refTypeInt);
+				entry.ReferenceType = static_cast<ESGDTAReferenceType>(refTypeInt);
 			}
 
 			// Load references
@@ -1322,13 +1322,13 @@ void USGDynamicTextAssetReferenceSubsystem::LoadCacheFromDisk()
 	}
 }
 
-ESGReferenceCacheContentType USGDynamicTextAssetReferenceSubsystem::GetContentTypeForPath(const FString& AssetPath) const
+ESGDTAReferenceCacheContentType USGDynamicTextAssetReferenceSubsystem::GetContentTypeForPath(const FString& AssetPath) const
 {
 	// Check if it's a dynamic text asset file (file system path)
 	if (AssetPath.Contains(FSGDynamicTextAssetFileManager::GetDynamicTextAssetsRelativeRootPath())
 		|| !FSGDynamicTextAssetFileManager::GetSupportedExtensionForFile(AssetPath).IsEmpty())
 	{
-		return ESGReferenceCacheContentType::DynamicTextAssets;
+		return ESGDTAReferenceCacheContentType::DynamicTextAssets;
 	}
 
 	// For package paths (start with /), use mount point logic
@@ -1337,7 +1337,7 @@ ESGReferenceCacheContentType USGDynamicTextAssetReferenceSubsystem::GetContentTy
 		// Game content always starts with /Game/
 		if (AssetPath.StartsWith(TEXT("/Game/")) || AssetPath.StartsWith(TEXT("/Game")))
 		{
-			return ESGReferenceCacheContentType::GameContent;
+			return ESGDTAReferenceCacheContentType::GameContent;
 		}
 
 		// Check if this is from a project plugin by looking at known project plugin mount points
@@ -1354,13 +1354,13 @@ ESGReferenceCacheContentType USGDynamicTextAssetReferenceSubsystem::GetContentTy
 			FString projectPluginContentPath = FPaths::ProjectPluginsDir() / mountPoint / TEXT("Content");
 			if (FPaths::DirectoryExists(projectPluginContentPath))
 			{
-				return ESGReferenceCacheContentType::PluginContent;
+				return ESGDTAReferenceCacheContentType::PluginContent;
 			}
 		}
 
 		// Everything else (Engine content, Engine plugins like ControlRig, Niagara, etc.)
 		// These are mounted at root level but come from Engine or Engine plugins
-		return ESGReferenceCacheContentType::EngineContent;
+		return ESGDTAReferenceCacheContentType::EngineContent;
 	}
 
 	// File system paths - check if they're in the project's Plugins folder
@@ -1370,19 +1370,19 @@ ESGReferenceCacheContentType USGDynamicTextAssetReferenceSubsystem::GetContentTy
 		FString projectDir = FPaths::ProjectDir();
 		if (AssetPath.Contains(projectDir))
 		{
-			return ESGReferenceCacheContentType::PluginContent;
+			return ESGDTAReferenceCacheContentType::PluginContent;
 		}
-		return ESGReferenceCacheContentType::EngineContent;
+		return ESGDTAReferenceCacheContentType::EngineContent;
 	}
 
 	// Check for Engine paths in file system
 	if (AssetPath.Contains(TEXT("/Engine/")) || AssetPath.Contains(TEXT("\\Engine\\")))
 	{
-		return ESGReferenceCacheContentType::EngineContent;
+		return ESGDTAReferenceCacheContentType::EngineContent;
 	}
 
 	// Default to game content for anything else
-	return ESGReferenceCacheContentType::GameContent;
+	return ESGDTAReferenceCacheContentType::GameContent;
 }
 
 FString USGDynamicTextAssetReferenceSubsystem::GetCacheFolderPath() const
@@ -1391,27 +1391,27 @@ FString USGDynamicTextAssetReferenceSubsystem::GetCacheFolderPath() const
 	return settings->GetCacheRootFolder() / settings->ReferenceCacheFolderPath;
 }
 
-FString USGDynamicTextAssetReferenceSubsystem::GetCacheFilePath(ESGReferenceCacheContentType ContentType) const
+FString USGDynamicTextAssetReferenceSubsystem::GetCacheFilePath(ESGDTAReferenceCacheContentType ContentType) const
 {
 	FString fileName;
 	switch (ContentType)
 	{
-		case ESGReferenceCacheContentType::GameContent:
+		case ESGDTAReferenceCacheContentType::GameContent:
 		{
 			fileName = TEXT("GameContent.json");
 			break;
 		}
-		case ESGReferenceCacheContentType::PluginContent:
+		case ESGDTAReferenceCacheContentType::PluginContent:
 		{
 			fileName = TEXT("PluginContent.json");
 			break;
 		}
-		case ESGReferenceCacheContentType::EngineContent:
+		case ESGDTAReferenceCacheContentType::EngineContent:
 		{
 			fileName = TEXT("EngineContent.json");
 			break;
 		}
-		case ESGReferenceCacheContentType::DynamicTextAssets:
+		case ESGDTAReferenceCacheContentType::DynamicTextAssets:
 		{
 			fileName = TEXT("DynamicTextAssets.json");
 			break;
@@ -1467,7 +1467,7 @@ void USGDynamicTextAssetReferenceSubsystem::RebuildReferencerCacheFromPersistent
 				}
 				refEntry.SourceAsset = reconstructedPath;
 				refEntry.ReferenceType = entry.ReferenceType;
-				if (entry.ReferenceType == ESGReferenceType::DynamicTextAsset)
+				if (entry.ReferenceType == ESGDTAReferenceType::DynamicTextAsset)
 				{
 					refEntry.SourceFilePath = entry.AssetPath;
 				}

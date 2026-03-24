@@ -2,27 +2,27 @@
 
 #include "Misc/AutomationTest.h"
 
-#include "Core/SGSerializerFormat.h"
-#include "Customization/SGSerializerFormatCustomization.h"
+#include "Core/SGDTASerializerFormat.h"
+#include "Customization/SGDTASerializerFormatCustomization.h"
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
-#include "SGSerializerFormatCustomizationTestTypes.h"
+#include "SGDTASerializerFormatCustomizationTestTypes.h"
 #include "UObject/UnrealType.h"
 
 // -- MakeInstance returns a valid non-null instance --
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FSGSerializerFormatCustomization_MakeInstance_ReturnsValid,
+	FSGDTASerializerFormatCustomization_MakeInstance_ReturnsValid,
 	"SGDynamicTextAssets.Editor.Customization.SerializerFormat.MakeInstance_ReturnsValid",
 	EAutomationTestFlags::EditorContext |
 	EAutomationTestFlags::ProductFilter |
 	EAutomationTestFlags::MediumPriority)
 
-bool FSGSerializerFormatCustomization_MakeInstance_ReturnsValid::RunTest(const FString& Parameters)
+bool FSGDTASerializerFormatCustomization_MakeInstance_ReturnsValid::RunTest(const FString& Parameters)
 {
 	// MakeInstance should return a valid customization instance
 	// TSharedRef is always valid by construction, so just verify it doesn't crash
-	TSharedRef<IPropertyTypeCustomization> instance = FSGSerializerFormatCustomization::MakeInstance();
+	TSharedRef<IPropertyTypeCustomization> instance = FSGDTASerializerFormatCustomization::MakeInstance();
 	TestTrue(TEXT("MakeInstance should return a non-null instance"), &instance.Get() != nullptr);
 	return true;
 }
@@ -30,21 +30,21 @@ bool FSGSerializerFormatCustomization_MakeInstance_ReturnsValid::RunTest(const F
 // -- Registration check --
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FSGSerializerFormatCustomization_IsRegistered,
+	FSGDTASerializerFormatCustomization_IsRegistered,
 	"SGDynamicTextAssets.Editor.Customization.SerializerFormat.IsRegistered",
 	EAutomationTestFlags::EditorContext |
 	EAutomationTestFlags::ProductFilter |
 	EAutomationTestFlags::MediumPriority)
 
-bool FSGSerializerFormatCustomization_IsRegistered::RunTest(const FString& Parameters)
+bool FSGDTASerializerFormatCustomization_IsRegistered::RunTest(const FString& Parameters)
 {
 	// Verify the PropertyEditor module is loaded (it registers our customization on startup)
 	TestTrue(TEXT("PropertyEditor module should be loaded"),
 		FModuleManager::Get().IsModuleLoaded("PropertyEditor"));
 
 	// Verify a second MakeInstance call also succeeds (sanity check for registration stability)
-	TSharedRef<IPropertyTypeCustomization> instance1 = FSGSerializerFormatCustomization::MakeInstance();
-	TSharedRef<IPropertyTypeCustomization> instance2 = FSGSerializerFormatCustomization::MakeInstance();
+	TSharedRef<IPropertyTypeCustomization> instance1 = FSGDTASerializerFormatCustomization::MakeInstance();
+	TSharedRef<IPropertyTypeCustomization> instance2 = FSGDTASerializerFormatCustomization::MakeInstance();
 	TestTrue(TEXT("Multiple MakeInstance calls should produce distinct instances"),
 		&instance1.Get() != &instance2.Get());
 
@@ -54,17 +54,17 @@ bool FSGSerializerFormatCustomization_IsRegistered::RunTest(const FString& Param
 // -- Test UObject with UPROPERTY reflection --
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FSGSerializerFormatCustomization_TestObject_PropertiesAccessible,
+	FSGDTASerializerFormatCustomization_TestObject_PropertiesAccessible,
 	"SGDynamicTextAssets.Editor.Customization.SerializerFormat.TestObject_PropertiesAccessible",
 	EAutomationTestFlags::EditorContext |
 	EAutomationTestFlags::ProductFilter |
 	EAutomationTestFlags::MediumPriority)
 
-bool FSGSerializerFormatCustomization_TestObject_PropertiesAccessible::RunTest(const FString& Parameters)
+bool FSGDTASerializerFormatCustomization_TestObject_PropertiesAccessible::RunTest(const FString& Parameters)
 {
 	// Create test object
-	USGSerializerFormatCustomizationTestObject* testObj =
-		NewObject<USGSerializerFormatCustomizationTestObject>();
+	USGDTASerializerFormatCustomizationTestObject* testObj =
+		NewObject<USGDTASerializerFormatCustomizationTestObject>();
 	TestNotNull(TEXT("Test object should be created"), testObj);
 
 	// Verify SingleFormat property exists via reflection

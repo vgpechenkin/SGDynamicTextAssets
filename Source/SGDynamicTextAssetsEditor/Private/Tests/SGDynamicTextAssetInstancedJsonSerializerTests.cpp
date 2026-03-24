@@ -8,7 +8,7 @@
 
 /**
  * Test: Single non-null instanced object round-trips through JSON serialization.
- * Creates a USGTestInstancedOwnerDTA with a populated SingleInstanced sub-object,
+ * Creates a USGDTATestInstancedOwnerDTA with a populated SingleInstanced sub-object,
  * serializes to JSON, deserializes to a new instance, and verifies properties match.
  */
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -20,11 +20,11 @@ bool FInstancedJsonRoundtrip_SingleNonNull::RunTest(const FString& Parameters)
 {
 	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Arrange
-	USGTestInstancedOwnerDTA* source = NewObject<USGTestInstancedOwnerDTA>();
+	USGDTATestInstancedOwnerDTA* source = NewObject<USGDTATestInstancedOwnerDTA>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 	source->PlainString = TEXT("hello");
 
-	USGTestInstancedBase* subObj = NewObject<USGTestInstancedBase>(source);
+	USGDTATestInstancedBase* subObj = NewObject<USGDTATestInstancedBase>(source);
 	subObj->Name = TEXT("Test");
 	subObj->Value = 42.0f;
 	source->SingleInstanced = subObj;
@@ -35,7 +35,7 @@ bool FInstancedJsonRoundtrip_SingleNonNull::RunTest(const FString& Parameters)
 	bool bSerialized = serializer.SerializeProvider(source, jsonString);
 	TestTrue(TEXT("Serialization should succeed"), bSerialized);
 
-	USGTestInstancedOwnerDTA* target = NewObject<USGTestInstancedOwnerDTA>();
+	USGDTATestInstancedOwnerDTA* target = NewObject<USGDTATestInstancedOwnerDTA>();
 	bool bMigrated = false;
 	bool bDeserialized = serializer.DeserializeProvider(jsonString, target, bMigrated);
 	TestTrue(TEXT("Deserialization should succeed"), bDeserialized);
@@ -65,7 +65,7 @@ bool FInstancedJsonRoundtrip_NullPreserved::RunTest(const FString& Parameters)
 {
 	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Arrange
-	USGTestInstancedOwnerDTA* source = NewObject<USGTestInstancedOwnerDTA>();
+	USGDTATestInstancedOwnerDTA* source = NewObject<USGDTATestInstancedOwnerDTA>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 	// SingleInstanced is nullptr by default
 
@@ -78,7 +78,7 @@ bool FInstancedJsonRoundtrip_NullPreserved::RunTest(const FString& Parameters)
 	// Verify JSON contains null for the instanced property
 	TestTrue(TEXT("JSON should contain null for SingleInstanced"), jsonString.Contains(TEXT("null")));
 
-	USGTestInstancedOwnerDTA* target = NewObject<USGTestInstancedOwnerDTA>();
+	USGDTATestInstancedOwnerDTA* target = NewObject<USGDTATestInstancedOwnerDTA>();
 	bool bMigrated = false;
 	bool bDeserialized = serializer.DeserializeProvider(jsonString, target, bMigrated);
 	TestTrue(TEXT("Deserialization should succeed"), bDeserialized);
@@ -91,7 +91,7 @@ bool FInstancedJsonRoundtrip_NullPreserved::RunTest(const FString& Parameters)
 
 /**
  * Test: Polymorphic instanced object round-trips through JSON serialization.
- * Sets SingleInstanced to a USGTestInstancedDerived and verifies the derived
+ * Sets SingleInstanced to a USGDTATestInstancedDerived and verifies the derived
  * type's ExtraData property survives the round-trip.
  */
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -103,10 +103,10 @@ bool FInstancedJsonRoundtrip_Polymorphic::RunTest(const FString& Parameters)
 {
 	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Arrange
-	USGTestInstancedOwnerDTA* source = NewObject<USGTestInstancedOwnerDTA>();
+	USGDTATestInstancedOwnerDTA* source = NewObject<USGDTATestInstancedOwnerDTA>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 
-	USGTestInstancedDerived* derived = NewObject<USGTestInstancedDerived>(source);
+	USGDTATestInstancedDerived* derived = NewObject<USGDTATestInstancedDerived>(source);
 	derived->Name = TEXT("Derived");
 	derived->Value = 10.0f;
 	derived->ExtraData = 99;
@@ -120,17 +120,17 @@ bool FInstancedJsonRoundtrip_Polymorphic::RunTest(const FString& Parameters)
 
 	// Verify JSON contains the class key with the derived type name
 	TestTrue(TEXT("JSON should contain SG_INST_OBJ_CLASS"), jsonString.Contains(FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY));
-	TestTrue(TEXT("JSON should contain SGTestInstancedDerived"), jsonString.Contains(TEXT("SGTestInstancedDerived")));
+	TestTrue(TEXT("JSON should contain SGDTATestInstancedDerived"), jsonString.Contains(TEXT("SGDTATestInstancedDerived")));
 
-	USGTestInstancedOwnerDTA* target = NewObject<USGTestInstancedOwnerDTA>();
+	USGDTATestInstancedOwnerDTA* target = NewObject<USGDTATestInstancedOwnerDTA>();
 	bool bMigrated = false;
 	bool bDeserialized = serializer.DeserializeProvider(jsonString, target, bMigrated);
 	TestTrue(TEXT("Deserialization should succeed"), bDeserialized);
 
 	// Assert: verify the deserialized object is the derived type
 	TestNotNull(TEXT("SingleInstanced should not be null"), target->SingleInstanced.Get());
-	USGTestInstancedDerived* targetDerived = Cast<USGTestInstancedDerived>(target->SingleInstanced.Get());
-	TestNotNull(TEXT("SingleInstanced should be USGTestInstancedDerived"), targetDerived);
+	USGDTATestInstancedDerived* targetDerived = Cast<USGDTATestInstancedDerived>(target->SingleInstanced.Get());
+	TestNotNull(TEXT("SingleInstanced should be USGDTATestInstancedDerived"), targetDerived);
 	if (targetDerived)
 	{
 		TestEqual(TEXT("Name should match"), targetDerived->Name, TEXT("Derived"));
@@ -155,16 +155,16 @@ bool FInstancedJsonRoundtrip_ArrayMixedTypes::RunTest(const FString& Parameters)
 {
 	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Arrange
-	USGTestInstancedOwnerDTA* source = NewObject<USGTestInstancedOwnerDTA>();
+	USGDTATestInstancedOwnerDTA* source = NewObject<USGDTATestInstancedOwnerDTA>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 
 	// Entry 0: base type
-	USGTestInstancedBase* baseObj = NewObject<USGTestInstancedBase>(source);
+	USGDTATestInstancedBase* baseObj = NewObject<USGDTATestInstancedBase>(source);
 	baseObj->Name = TEXT("Base");
 	baseObj->Value = 1.0f;
 
 	// Entry 1: derived type
-	USGTestInstancedDerived* derivedObj = NewObject<USGTestInstancedDerived>(source);
+	USGDTATestInstancedDerived* derivedObj = NewObject<USGDTATestInstancedDerived>(source);
 	derivedObj->Name = TEXT("Derived");
 	derivedObj->Value = 2.0f;
 	derivedObj->ExtraData = 77;
@@ -180,7 +180,7 @@ bool FInstancedJsonRoundtrip_ArrayMixedTypes::RunTest(const FString& Parameters)
 	bool bSerialized = serializer.SerializeProvider(source, jsonString);
 	TestTrue(TEXT("Serialization should succeed"), bSerialized);
 
-	USGTestInstancedOwnerDTA* target = NewObject<USGTestInstancedOwnerDTA>();
+	USGDTATestInstancedOwnerDTA* target = NewObject<USGDTATestInstancedOwnerDTA>();
 	bool bMigrated = false;
 	bool bDeserialized = serializer.DeserializeProvider(jsonString, target, bMigrated);
 	TestTrue(TEXT("Deserialization should succeed"), bDeserialized);
@@ -198,8 +198,8 @@ bool FInstancedJsonRoundtrip_ArrayMixedTypes::RunTest(const FString& Parameters)
 		}
 
 		// Element 1: derived
-		USGTestInstancedDerived* elem1 = Cast<USGTestInstancedDerived>(target->InstancedArray[1].Get());
-		TestNotNull(TEXT("Element 1 should be USGTestInstancedDerived"), elem1);
+		USGDTATestInstancedDerived* elem1 = Cast<USGDTATestInstancedDerived>(target->InstancedArray[1].Get());
+		TestNotNull(TEXT("Element 1 should be USGDTATestInstancedDerived"), elem1);
 		if (elem1)
 		{
 			TestEqual(TEXT("Element 1 Name should match"), elem1->Name, TEXT("Derived"));
@@ -227,10 +227,10 @@ bool FInstancedJsonRoundtrip_OutputFormatContainsClassKey::RunTest(const FString
 {
 	AddExpectedMessage(TEXT("No valid Asset Type ID found for class"), EAutomationExpectedMessageFlags::Contains);
 	// Arrange
-	USGTestInstancedOwnerDTA* source = NewObject<USGTestInstancedOwnerDTA>();
+	USGDTATestInstancedOwnerDTA* source = NewObject<USGDTATestInstancedOwnerDTA>();
 	source->SetVersion(FSGDynamicTextAssetVersion(1, 0, 0));
 
-	USGTestInstancedBase* subObj = NewObject<USGTestInstancedBase>(source);
+	USGDTATestInstancedBase* subObj = NewObject<USGDTATestInstancedBase>(source);
 	subObj->Name = TEXT("FormatTest");
 	subObj->Value = 5.0f;
 	source->SingleInstanced = subObj;
@@ -244,8 +244,8 @@ bool FInstancedJsonRoundtrip_OutputFormatContainsClassKey::RunTest(const FString
 	// Assert: verify the class key is present in the raw JSON
 	TestTrue(TEXT("JSON should contain SG_INST_OBJ_CLASS key"),
 		jsonString.Contains(FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY));
-	TestTrue(TEXT("JSON should contain SGTestInstancedBase class name"),
-		jsonString.Contains(TEXT("SGTestInstancedBase")));
+	TestTrue(TEXT("JSON should contain SGDTATestInstancedBase class name"),
+		jsonString.Contains(TEXT("SGDTATestInstancedBase")));
 
 	return true;
 }

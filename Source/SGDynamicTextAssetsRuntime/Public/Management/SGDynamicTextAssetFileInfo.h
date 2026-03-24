@@ -6,7 +6,7 @@
 
 #include "Core/SGDynamicTextAssetTypeId.h"
 #include "Core/SGDynamicTextAssetVersion.h"
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 
 /**
  * File information extracted from a dynamic text asset file header.
@@ -41,7 +41,7 @@ public:
     FString ClassName;
 
     /** The serializer format that produced this file (e.g., JSON, XML, YAML). */
-    FSGSerializerFormat SerializerFormat;
+    FSGDTASerializerFormat SerializerFormat;
 
     /** Semantic version of the asset data, controlled by the asset author. */
     FSGDynamicTextAssetVersion Version;

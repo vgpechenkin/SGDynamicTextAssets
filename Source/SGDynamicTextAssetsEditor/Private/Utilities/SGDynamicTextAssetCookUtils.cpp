@@ -9,7 +9,7 @@
 #include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "Management/SGDynamicTextAssetTypeManifest.h"
-#include "Serialization/SGBinaryEncodeParams.h"
+#include "Serialization/SGDTABinaryEncodeParams.h"
 #include "Serialization/SGDynamicTextAssetBinarySerializer.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Settings/SGDynamicTextAssetSettings.h"
@@ -241,7 +241,7 @@ bool FSGDynamicTextAssetCookUtils::CookDynamicTextAssetFile(
 	}
 
 	// Convert string to binary, storing the serializer's type ID and asset type ID for routing on load
-	FSGBinaryEncodeParams encodeParams;
+	FSGDTABinaryEncodeParams encodeParams;
 	encodeParams.Id = cookFileInfo.Id;
 	encodeParams.SerializerFormat = serializer->GetSerializerFormat();
 	encodeParams.AssetTypeId = cookFileInfo.AssetTypeId;

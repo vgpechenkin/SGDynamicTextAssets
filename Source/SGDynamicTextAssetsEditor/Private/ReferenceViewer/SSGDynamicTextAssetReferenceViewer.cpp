@@ -465,7 +465,7 @@ TSharedRef<ITableRow> SSGDynamicTextAssetReferenceViewer::GenerateReferencerRow(
 	TOptional<const FSlateBrush*> overrideIcon;
 	switch (Item->ReferenceType)
 	{
-	case ESGReferenceType::Blueprint:
+	case ESGDTAReferenceType::Blueprint:
 		{
 			overrideIcon = FAppStyle::GetBrush("Persona.AssetClass.Blueprint");
 			typeText = INVTEXT("Blueprint");
@@ -473,18 +473,18 @@ TSharedRef<ITableRow> SSGDynamicTextAssetReferenceViewer::GenerateReferencerRow(
 			overrideColor = FSGDynamicTextAssetEditorConstants::BLUEPRINT_ASSET_COLOR;
 			break;
 		}
-	case ESGReferenceType::DynamicTextAsset:
+	case ESGDTAReferenceType::DynamicTextAsset:
 		{
 			weakSerializer = USGDynamicTextAssetStatics::FindSerializerForDynamicTextAssetId(Item->ReferencedId);
 			typeText = INVTEXT("Dynamic Text Asset");
 			break;
 		}
-	case ESGReferenceType::Level:
+	case ESGDTAReferenceType::Level:
 		{
 			typeText = INVTEXT("Level");
 			break;
 		}
-	// ESGReferenceType::Other
+	// ESGDTAReferenceType::Other
 	default:
 		{
 			typeText = INVTEXT("Asset");
@@ -494,7 +494,7 @@ TSharedRef<ITableRow> SSGDynamicTextAssetReferenceViewer::GenerateReferencerRow(
 
 	// Path shown in tooltip: file path for DynamicTextAssets, asset path for everything else
 	FString pathText;
-	if (Item->ReferenceType == ESGReferenceType::DynamicTextAsset && !Item->SourceFilePath.IsEmpty())
+	if (Item->ReferenceType == ESGDTAReferenceType::DynamicTextAsset && !Item->SourceFilePath.IsEmpty())
 	{
 		FString relativeSourceFilePath = Item->SourceFilePath;
 		FPaths::MakePathRelativeTo(relativeSourceFilePath, *FPaths::ProjectContentDir());
@@ -590,7 +590,7 @@ TSharedRef<ITableRow> SSGDynamicTextAssetReferenceViewer::GenerateDependencyRow(
 		weakSerializer = USGDynamicTextAssetStatics::FindSerializerForDynamicTextAssetId(Item->DependencyId);
 	}
 
-	const ESGReferenceType iconReferenceType = Item->bIsAssetReference ? Item->ReferenceType : ESGReferenceType::DynamicTextAsset;
+	const ESGDTAReferenceType iconReferenceType = Item->bIsAssetReference ? Item->ReferenceType : ESGDTAReferenceType::DynamicTextAsset;
 
 	return SNew(STableRow<TSharedPtr<FSGDynamicTextAssetDependencyEntry>>, OwnerTable)
 		.Padding(FMargin(4.0f, 2.0f))
@@ -757,7 +757,7 @@ void SSGDynamicTextAssetReferenceViewer::OnReferencerDoubleClicked(TSharedPtr<FS
 
 	switch (Item->ReferenceType)
 	{
-		case ESGReferenceType::DynamicTextAsset:
+		case ESGDTAReferenceType::DynamicTextAsset:
 		{
 			if (!Item->SourceFilePath.IsEmpty())
 			{
@@ -765,13 +765,13 @@ void SSGDynamicTextAssetReferenceViewer::OnReferencerDoubleClicked(TSharedPtr<FS
 			}
 			break;
 		}
-		case ESGReferenceType::Level:
+		case ESGDTAReferenceType::Level:
 		{
 			OpenLevel(Item->SourceAsset, Item->SourceDisplayName);
 			break;
 		}
-		// ESGReferenceType::Blueprint
-		// ESGReferenceType::Other
+		// ESGDTAReferenceType::Blueprint
+		// ESGDTAReferenceType::Other
 		default:
 		{
 			OpenAsset(Item->SourceAsset);
@@ -916,15 +916,15 @@ void SSGDynamicTextAssetReferenceViewer::OpenAsset(const FSoftObjectPath& AssetP
 	GEditor->GetEditorSubsystem<UAssetEditorSubsystem>()->OpenEditorForAsset(asset);
 }
 
-const FSlateBrush* SSGDynamicTextAssetReferenceViewer::GetReferencerAssetTypeIcon(const ESGReferenceType& Type)
+const FSlateBrush* SSGDynamicTextAssetReferenceViewer::GetReferencerAssetTypeIcon(const ESGDTAReferenceType& Type)
 {
 	switch (Type)
 	{
-	case ESGReferenceType::Level:
+	case ESGDTAReferenceType::Level:
 		{
 			return FAppStyle::GetBrush("Icons.Level");
 		}
-	case ESGReferenceType::DynamicTextAsset:
+	case ESGDTAReferenceType::DynamicTextAsset:
 		{
 			return FAppStyle::GetBrush("ClassIcon.Object");
 		}
@@ -935,15 +935,15 @@ const FSlateBrush* SSGDynamicTextAssetReferenceViewer::GetReferencerAssetTypeIco
 	}
 }
 
-FText SSGDynamicTextAssetReferenceViewer::GetReferencerAssetTypeTooltip(const ESGReferenceType& Type)
+FText SSGDynamicTextAssetReferenceViewer::GetReferencerAssetTypeTooltip(const ESGDTAReferenceType& Type)
 {
 	switch (Type)
 	{
-	case ESGReferenceType::Level:
+	case ESGDTAReferenceType::Level:
 		{
 			return INVTEXT("This dynamic text asset is being referenced by this level(or actor in this level)");
 		}
-	case ESGReferenceType::DynamicTextAsset:
+	case ESGDTAReferenceType::DynamicTextAsset:
 		{
 			return INVTEXT("This dynamic text asset is being referenced by this other dynamic text asset.");
 		}
@@ -954,11 +954,11 @@ FText SSGDynamicTextAssetReferenceViewer::GetReferencerAssetTypeTooltip(const ES
 	}
 }
 
-FLinearColor SSGDynamicTextAssetReferenceViewer::GetReferencerAssetTypeColor(const ESGReferenceType& Type)
+FLinearColor SSGDynamicTextAssetReferenceViewer::GetReferencerAssetTypeColor(const ESGDTAReferenceType& Type)
 {
 	switch (Type)
 	{
-	case ESGReferenceType::Level:
+	case ESGDTAReferenceType::Level:
 		{
 			return FAppStyle::Get().GetColor("LevelEditor.AssetColor");
 		}

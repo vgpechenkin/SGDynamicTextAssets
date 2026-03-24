@@ -28,7 +28,7 @@ public:
 	FSGDynamicTextAssetReferenceEntry(const FSGDynamicTextAssetId& InReferencedId,
 	                            const FSoftObjectPath& InSourceAsset,
 	                            const FString& InPropertyPath,
-	                            ESGReferenceType InReferenceType)
+	                            ESGDTAReferenceType InReferenceType)
 		: ReferencedId(InReferencedId)
 		, SourceAsset(InSourceAsset)
 		, PropertyPath(InPropertyPath)
@@ -49,7 +49,7 @@ public:
 
 	/** The type of asset containing the reference */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	ESGReferenceType ReferenceType = ESGReferenceType::Other;
+	ESGDTAReferenceType ReferenceType = ESGDTAReferenceType::Other;
 
 	/** Display name of the source asset for UI */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
@@ -63,7 +63,7 @@ public:
 /**
  * Content category for reference cache organization.
  */
-enum class ESGReferenceCacheContentType : uint8
+enum class ESGDTAReferenceCacheContentType : uint8
 {
 	/** Content from the project's Content folder */
 	GameContent,
@@ -88,7 +88,7 @@ struct SGDYNAMICTEXTASSETSEDITOR_API FSGReferenceCacheEntry
 	FDateTime LastModifiedTime;
 
 	/** Type of content this asset belongs to */
-	ESGReferenceCacheContentType ContentType = ESGReferenceCacheContentType::GameContent;
+	ESGDTAReferenceCacheContentType ContentType = ESGDTAReferenceCacheContentType::GameContent;
 
 	/** References found in this asset (ID -> property paths) */
 	TMap<FSGDynamicTextAssetId, TArray<FString>> FoundReferences;
@@ -97,7 +97,7 @@ struct SGDYNAMICTEXTASSETSEDITOR_API FSGReferenceCacheEntry
 	FString SourceDisplayName;
 
 	/** Reference type for all entries from this asset */
-	ESGReferenceType ReferenceType = ESGReferenceType::Other;
+	ESGDTAReferenceType ReferenceType = ESGDTAReferenceType::Other;
 };
 
 /**
@@ -118,13 +118,13 @@ public:
 		: DependencyId(InDependencyId)
 		, PropertyPath(InPropertyPath)
 		, UserFacingId(InUserFacingId)
-		, ReferenceType(ESGReferenceType::DynamicTextAsset)
+		, ReferenceType(ESGDTAReferenceType::DynamicTextAsset)
 	{ }
 
 	FSGDynamicTextAssetDependencyEntry(const FSoftObjectPath& InAssetPath,
 	                             const FString& InPropertyPath,
 	                             const FName& InAssetClass,
-	                             ESGReferenceType InReferenceType = ESGReferenceType::Blueprint)
+	                             ESGDTAReferenceType InReferenceType = ESGDTAReferenceType::Blueprint)
 		: PropertyPath(InPropertyPath)
 		, bIsAssetReference(true)
 		, AssetPath(InAssetPath)
@@ -158,7 +158,7 @@ public:
 
 	/** The type of reference (DynamicTextAsset, Blueprint, Level, etc.) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dependency")
-	ESGReferenceType ReferenceType = ESGReferenceType::Other;
+	ESGDTAReferenceType ReferenceType = ESGDTAReferenceType::Other;
 };
 
 /**
@@ -332,7 +332,7 @@ private:
 	                           const UObject* ObjectInstance,
 	                           const FSoftObjectPath& SourceAsset,
 	                           const FString& SourceDisplayName,
-	                           ESGReferenceType ReferenceType,
+	                           ESGDTAReferenceType ReferenceType,
 	                           TArray<FSGDynamicTextAssetReferenceEntry>& OutEntries);
 
 	/**
@@ -352,7 +352,7 @@ private:
 	                             const FString& PropertyPath,
 	                             const FSoftObjectPath& SourceAsset,
 	                             const FString& SourceDisplayName,
-	                             ESGReferenceType ReferenceType,
+	                             ESGDTAReferenceType ReferenceType,
 	                             TArray<FSGDynamicTextAssetReferenceEntry>& OutEntries);
 
 	/**
@@ -406,13 +406,13 @@ private:
 	TArray<FString> PendingDynamicTextAssetFiles;
 
 	/** Determines the content type for an asset path */
-	ESGReferenceCacheContentType GetContentTypeForPath(const FString& AssetPath) const;
+	ESGDTAReferenceCacheContentType GetContentTypeForPath(const FString& AssetPath) const;
 
 	/** Gets the full path to the cache folder in Saved directory */
 	FString GetCacheFolderPath() const;
 
 	/** Gets the cache file path for a specific content type */
-	FString GetCacheFilePath(ESGReferenceCacheContentType ContentType) const;
+	FString GetCacheFilePath(ESGDTAReferenceCacheContentType ContentType) const;
 
 	/** Checks if an asset needs to be rescanned based on its timestamp */
 	bool DoesAssetNeedRescan(const FString& AssetPath, const FDateTime& CurrentTimestamp) const;

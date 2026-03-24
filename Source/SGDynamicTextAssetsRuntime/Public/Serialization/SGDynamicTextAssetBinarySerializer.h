@@ -4,11 +4,11 @@
 
 #include "CoreMinimal.h"
 
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Settings/SGDynamicTextAssetSettings.h"
-#include "SGBinaryDynamicTextAssetHeader.h"
+#include "SGDTABinaryHeader.h"
 
-struct FSGBinaryEncodeParams;
+struct FSGDTABinaryEncodeParams;
 struct FSGDynamicTextAssetId;
 
 /**
@@ -47,7 +47,7 @@ public:
 	 */
 	static bool StringToBinary(
 		const FString& PayloadString,
-		const FSGBinaryEncodeParams& Params,
+		const FSGDTABinaryEncodeParams& Params,
 		TArray<uint8>& OutBinaryData);
 
 	/**
@@ -61,7 +61,7 @@ public:
 	static bool BinaryToString(
 		const TArray<uint8>& BinaryData,
 		FString& OutPayloadString,
-		FSGSerializerFormat& OutSerializerFormat);
+		FSGDTASerializerFormat& OutSerializerFormat);
 
 	/**
 	 * Reads the header from binary data without decompressing the payload.
@@ -73,7 +73,7 @@ public:
 	 */
 	static bool ReadHeader(
 		const TArray<uint8>& BinaryData,
-		FSGBinaryDynamicTextAssetHeader& OutHeader);
+		FSGDTABinaryHeader& OutHeader);
 
 	/**
 	 * Reads binary data from a file.
@@ -121,7 +121,7 @@ public:
 	 */
 	static bool BinaryReadSerializerFormat(
 		const TArray<uint8>& BinaryData,
-		FSGSerializerFormat& OutSerializerFormat);
+		FSGDTASerializerFormat& OutSerializerFormat);
 
 	/** @deprecated Use BinaryReadSerializerFormat instead. Will be removed in UE 5.7. */
 	UE_DEPRECATED(5.6, "Use BinaryReadSerializerFormat instead. Will be removed in UE 5.7.")
@@ -156,7 +156,7 @@ public:
 	static FString GetFileExtension();
 
 	/** Maximum allowed uncompressed payload size (64 MB). Prevents OOM from crafted headers. */
-	static constexpr uint32 MAX_UNCOMPRESSED_SIZE = FSGBinaryDynamicTextAssetHeader::HEADER_SIZE * 1024 * 1024;
+	static constexpr uint32 MAX_UNCOMPRESSED_SIZE = FSGDTABinaryHeader::HEADER_SIZE * 1024 * 1024;
 
 private:
 

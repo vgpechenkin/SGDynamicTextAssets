@@ -5,17 +5,17 @@
 #include "CoreMinimal.h"
 
 #include "Core/SGDynamicTextAssetVersion.h"
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 
 /**
  * Aggregated format version data for a single serializer type.
  * Tracks the distribution of file format versions across all DTA files
  * that use this serializer.
  */
-struct SGDYNAMICTEXTASSETSEDITOR_API FSGSerializerFormatVersionInfo
+struct SGDYNAMICTEXTASSETSEDITOR_API FSGDTASerializerFormatVersionInfo
 {
 	/** The serializer format (e.g., 1 for JSON, 2 for XML, 3 for YAML). */
-	FSGSerializerFormat SerializerFormat;
+	FSGDTASerializerFormat SerializerFormat;
 
 	/** Human-readable serializer name (e.g., "JSON"). */
 	FString SerializerName;
@@ -80,7 +80,7 @@ public:
 	 * @param SerializerFormat The serializer format that handles this file
 	 * @param FileFormatVersion The format version found in the file
 	 */
-	void RecordFileVersion(const FSGSerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion);
+	void RecordFileVersion(const FSGDTASerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion);
 
 	/**
 	 * Populate the CurrentSerializerVersion field for all tracked serializers
@@ -90,10 +90,10 @@ public:
 	void PopulateCurrentSerializerVersions();
 
 	/** Get format info for a specific serializer format. Returns nullptr if not tracked. */
-	const FSGSerializerFormatVersionInfo* GetInfoForSerializer(const FSGSerializerFormat& SerializerFormat) const;
+	const FSGDTASerializerFormatVersionInfo* GetInfoForSerializer(const FSGDTASerializerFormat& SerializerFormat) const;
 
 	/** Get all serializer format version infos. */
-	const TMap<FSGSerializerFormat, FSGSerializerFormatVersionInfo>& GetAllFormatVersions() const;
+	const TMap<FSGDTASerializerFormat, FSGDTASerializerFormatVersionInfo>& GetAllFormatVersions() const;
 
 	/** Returns the default cache file path under the project's Saved directory. */
 	static FString GetDefaultCachePath();
@@ -107,7 +107,7 @@ private:
 	FDateTime SavedAt;
 
 	/** Per-serializer format version tracking. Key = SerializerFormat. */
-	TMap<FSGSerializerFormat, FSGSerializerFormatVersionInfo> FormatVersionsBySerializerId;
+	TMap<FSGDTASerializerFormat, FSGDTASerializerFormatVersionInfo> FormatVersionsBySerializerId;
 
 	/** True if the cache has been loaded or populated by a scan. */
 	uint8 bIsLoaded : 1 = false;

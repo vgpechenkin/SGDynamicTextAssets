@@ -8,7 +8,7 @@
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "SGDynamicTextAssetLogs.h"
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Editor.h"
 
@@ -155,7 +155,7 @@ TScriptInterface<ISGDynamicTextAssetProvider> FSGDynamicTextAssetEditorCache::In
 
 	// Step 2: Read raw file contents
 	FString textPayload;
-	FSGSerializerFormat serializerFormat;
+	FSGDTASerializerFormat serializerFormat;
 	if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, textPayload, &serializerFormat))
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error,

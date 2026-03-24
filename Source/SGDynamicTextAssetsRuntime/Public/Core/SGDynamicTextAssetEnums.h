@@ -60,7 +60,7 @@ enum class ESGCompressionMethod : uint8
  * Type of reference to a dynamic text asset.
  */
 UENUM(BlueprintType)
-enum class ESGReferenceType : uint8
+enum class ESGDTAReferenceType : uint8
 {
     /** Reference from a Blueprint class */
     Blueprint   UMETA(DisplayName = "Blueprint"),

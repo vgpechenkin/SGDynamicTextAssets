@@ -32,7 +32,7 @@ const FString FSGDynamicTextAssetFileManager::DEFAULT_RELATIVE_ROOT_PATH = TEXT(
 FSGDataGenerateDefaultContentDelegate FSGDynamicTextAssetFileManager::ON_GENERATE_DEFAULT_CONTENT;
 
 TMap<FString, TSharedRef<ISGDynamicTextAssetSerializer>> FSGDynamicTextAssetFileManager::REGISTERED_SERIALIZERS;
-TMap<FSGSerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>> FSGDynamicTextAssetFileManager::REGISTERED_SERIALIZERS_BY_FORMAT;
+TMap<FSGDTASerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>> FSGDynamicTextAssetFileManager::REGISTERED_SERIALIZERS_BY_FORMAT;
 
 FString FSGDynamicTextAssetFileManager::GetDynamicTextAssetsRootPath()
 {
@@ -289,7 +289,7 @@ FSGDynamicTextAssetFileInfo FSGDynamicTextAssetFileManager::ExtractFileInfoFromF
         }
 
         // Read header (80 bytes, no decompression)
-        FSGBinaryDynamicTextAssetHeader header;
+        FSGDTABinaryHeader header;
         if (!FSGDynamicTextAssetBinarySerializer::ReadHeader(binaryData, header))
         {
             UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("Failed to read header from binary file at FilePath(%s)"), *FilePath);
@@ -336,7 +336,7 @@ FSGDynamicTextAssetFileInfo FSGDynamicTextAssetFileManager::ExtractFileInfoFromF
 
         // Fallback: decompress payload and route to the registered serializer via format
         FString payloadString;
-        FSGSerializerFormat payloadFormat;
+        FSGDTASerializerFormat payloadFormat;
         if (FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, payloadString, payloadFormat))
         {
             TSharedPtr<ISGDynamicTextAssetSerializer> payloadSerializer;
@@ -523,12 +523,12 @@ FString FSGDynamicTextAssetFileManager::StripClassPrefix(const FString& ClassNam
 }
 
 bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath, FString& OutContents,
-    FSGSerializerFormat* OutSerializerFormat /*= nullptr*/)
+    FSGDTASerializerFormat* OutSerializerFormat /*= nullptr*/)
 {
     OutContents.Empty();
     if (OutSerializerFormat)
     {
-        *OutSerializerFormat = FSGSerializerFormat();
+        *OutSerializerFormat = FSGDTASerializerFormat();
     }
 
     if (FilePath.IsEmpty())
@@ -549,7 +549,7 @@ bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath
             return false;
         }
 
-        FSGSerializerFormat serializerFormat;
+        FSGDTASerializerFormat serializerFormat;
         if (!FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, OutContents, serializerFormat))
         {
             UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::ReadRawFileContents: Failed to decompress binary file at FilePath(%s)"), *FilePath);
@@ -578,7 +578,7 @@ bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath
 bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath, FString& OutContents,
     uint32* OutSerializerTypeId)
 {
-    FSGSerializerFormat format;
+    FSGDTASerializerFormat format;
     const bool bSuccess = ReadRawFileContents(FilePath, OutContents, &format);
     if (OutSerializerTypeId)
     {
@@ -1211,7 +1211,7 @@ void FSGDynamicTextAssetFileManager::RegisterSerializerInstance(TSharedRef<ISGDy
     }
 
     // Validate the format identifier - invalid (zero) is reserved
-    const FSGSerializerFormat format = Serializer->GetSerializerFormat();
+    const FSGDTASerializerFormat format = Serializer->GetSerializerFormat();
     if (!format.IsValid())
     {
         UE_LOG(LogSGDynamicTextAssetsRuntime, Fatal, TEXT("RegisterSerializer: Serializer '%s' returned invalid format. IDs must be non-zero. Built-in range is 1-99, third-party must use >= 100."),
@@ -1304,7 +1304,7 @@ void FSGDynamicTextAssetFileManager::GetAllRegisteredExtensions(TArray<FString>&
     REGISTERED_SERIALIZERS.GetKeys(OutExtensions);
 }
 
-TSharedPtr<ISGDynamicTextAssetSerializer> FSGDynamicTextAssetFileManager::FindSerializerForFormat(FSGSerializerFormat Format)
+TSharedPtr<ISGDynamicTextAssetSerializer> FSGDynamicTextAssetFileManager::FindSerializerForFormat(FSGDTASerializerFormat Format)
 {
     if (TSharedRef<ISGDynamicTextAssetSerializer>* serializer = REGISTERED_SERIALIZERS_BY_FORMAT.Find(Format))
     {
@@ -1315,15 +1315,15 @@ TSharedPtr<ISGDynamicTextAssetSerializer> FSGDynamicTextAssetFileManager::FindSe
 
 TSharedPtr<ISGDynamicTextAssetSerializer> FSGDynamicTextAssetFileManager::FindSerializerForTypeId(uint32 TypeId)
 {
-    return FindSerializerForFormat(FSGSerializerFormat(TypeId));
+    return FindSerializerForFormat(FSGDTASerializerFormat(TypeId));
 }
 
-FSGSerializerFormat FSGDynamicTextAssetFileManager::GetFormatForExtension(const FString& Extension)
+FSGDTASerializerFormat FSGDynamicTextAssetFileManager::GetFormatForExtension(const FString& Extension)
 {
     TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FindSerializerForExtension(Extension);
     if (!serializer.IsValid())
     {
-        return FSGSerializerFormat::INVALID;
+        return FSGDTASerializerFormat::INVALID;
     }
     return serializer->GetSerializerFormat();
 }
@@ -1337,7 +1337,7 @@ void FSGDynamicTextAssetFileManager::GetAllRegisteredSerializerDescriptions(TArr
 {
     OutDescriptions.Empty();
     OutDescriptions.Reserve(REGISTERED_SERIALIZERS_BY_FORMAT.Num());
-    for (const TPair<FSGSerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>>& pair : REGISTERED_SERIALIZERS_BY_FORMAT)
+    for (const TPair<FSGDTASerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>>& pair : REGISTERED_SERIALIZERS_BY_FORMAT)
     {
         OutDescriptions.Add(FString::Printf(TEXT("TypeId(%u) | Extension(%s)| Format(%s)"),
             pair.Key.GetTypeId(), *pair.Value->GetFileExtension(), *pair.Value->GetFormatName_String()));
@@ -1347,7 +1347,7 @@ void FSGDynamicTextAssetFileManager::GetAllRegisteredSerializerDescriptions(TArr
 TArray<TSharedPtr<ISGDynamicTextAssetSerializer>> FSGDynamicTextAssetFileManager::GetAllRegisteredSerializers()
 {
     TArray<TSharedPtr<ISGDynamicTextAssetSerializer>> result;
-    for (const TPair<FSGSerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>>& pair : REGISTERED_SERIALIZERS_BY_FORMAT)
+    for (const TPair<FSGDTASerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>>& pair : REGISTERED_SERIALIZERS_BY_FORMAT)
     {
         result.Add(pair.Value.ToSharedPtr());
     }

@@ -65,7 +65,7 @@ private:
 	/**
 	 * Describes a single broken reference found during validation.
 	 */
-	struct FBrokenReference
+	struct FSGDTABrokenReference
 	{
 		/** The ID that was referenced but could not be resolved */
 		FSGDynamicTextAssetId ReferencedId;
@@ -83,7 +83,7 @@ private:
 	/**
 	 * Describes a warning found during validation (non-fatal).
 	 */
-	struct FValidationWarning
+	struct FSGDTAValidationWarning
 	{
 		/** Human-readable description of the warning */
 		FString Message;
@@ -113,8 +113,8 @@ private:
 	 * @param bVerbose If true, log all scanned assets
 	 */
 	void ValidateBlueprintAssets(const TSet<FSGDynamicTextAssetId>& KnownIds,
-	                             TArray<FBrokenReference>& OutBrokenRefs,
-	                             TArray<FValidationWarning>& OutWarnings,
+	                             TArray<FSGDTABrokenReference>& OutBrokenRefs,
+	                             TArray<FSGDTAValidationWarning>& OutWarnings,
 	                             bool bVerbose) const;
 
 	/**
@@ -127,8 +127,8 @@ private:
 	 * @param bVerbose If true, log all scanned files
 	 */
 	void ValidateDynamicTextAssetFiles(const TSet<FSGDynamicTextAssetId>& KnownIds,
-	                              TArray<FBrokenReference>& OutBrokenRefs,
-	                              TArray<FValidationWarning>& OutWarnings,
+	                              TArray<FSGDTABrokenReference>& OutBrokenRefs,
+	                              TArray<FSGDTAValidationWarning>& OutWarnings,
 	                              bool bVerbose) const;
 
 	/**
@@ -150,6 +150,6 @@ private:
 	                            const TSet<FSGDynamicTextAssetId>& KnownIds,
 	                            const FString& SourceAsset,
 	                            const FString& SourceDisplayName,
-	                            TArray<FBrokenReference>& OutBrokenRefs,
-	                            TArray<FValidationWarning>& OutWarnings) const;
+	                            TArray<FSGDTABrokenReference>& OutBrokenRefs,
+	                            TArray<FSGDTAValidationWarning>& OutWarnings) const;
 };

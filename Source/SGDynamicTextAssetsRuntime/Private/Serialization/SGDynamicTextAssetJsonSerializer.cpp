@@ -2,7 +2,7 @@
 
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
 
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "SGDynamicTextAssetLogs.h"
 #include "Core/SGDynamicTextAsset.h"
 #include "Core/SGDynamicTextAssetTypeId.h"
@@ -16,7 +16,7 @@
 #include "Statics/SGDynamicTextAssetSlateStyles.h"
 #include "UObject/UnrealType.h"
 
-const FSGSerializerFormat FSGDynamicTextAssetJsonSerializer::FORMAT(SGDynamicTextAssetConstants::JSON_SERIALIZER_TYPE_ID);
+const FSGDTASerializerFormat FSGDynamicTextAssetJsonSerializer::FORMAT(SGDynamicTextAssetConstants::JSON_SERIALIZER_TYPE_ID);
 
 #if WITH_EDITOR
 const FSlateBrush* FSGDynamicTextAssetJsonSerializer::GetIconBrush() const
@@ -73,7 +73,7 @@ JSON format uses a file information block (sgFileInformation), for example:
 #endif
 }
 
-FSGSerializerFormat FSGDynamicTextAssetJsonSerializer::GetSerializerFormat() const
+FSGDTASerializerFormat FSGDynamicTextAssetJsonSerializer::GetSerializerFormat() const
 {
     return FORMAT;
 }

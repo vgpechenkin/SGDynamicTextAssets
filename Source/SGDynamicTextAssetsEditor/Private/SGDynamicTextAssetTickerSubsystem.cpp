@@ -32,7 +32,7 @@ void USGDynamicTextAssetTickerSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void USGDynamicTextAssetTickerSubsystem::QueueWork(const FSGTickerWorkItem& WorkItem)
+void USGDynamicTextAssetTickerSubsystem::QueueWork(const FSGDTATickerWorkItem& WorkItem)
 {
 	if (!WorkItem.WorkId.IsValid())
 	{
@@ -42,7 +42,7 @@ void USGDynamicTextAssetTickerSubsystem::QueueWork(const FSGTickerWorkItem& Work
 	}
 
 	// Replace existing item with same ID
-	QueuedWork.RemoveAll([&WorkItem](const FSGTickerWorkItem& Existing)
+	QueuedWork.RemoveAll([&WorkItem](const FSGDTATickerWorkItem& Existing)
 	{
 		return Existing.WorkId == WorkItem.WorkId;
 	});
@@ -56,7 +56,7 @@ void USGDynamicTextAssetTickerSubsystem::QueueWork(const FSGTickerWorkItem& Work
 
 void USGDynamicTextAssetTickerSubsystem::DequeueWork(FName WorkId)
 {
-	QueuedWork.RemoveAll([WorkId](const FSGTickerWorkItem& Item)
+	QueuedWork.RemoveAll([WorkId](const FSGDTATickerWorkItem& Item)
 	{
 		return Item.WorkId == WorkId;
 	});
@@ -81,7 +81,7 @@ void USGDynamicTextAssetTickerSubsystem::StartProcessing()
 	// Move queued work to active, sorted by priority (ascending)
 	ActiveWork = MoveTemp(QueuedWork);
 	QueuedWork.Empty();
-	ActiveWork.Sort([](const FSGTickerWorkItem& A, const FSGTickerWorkItem& B)
+	ActiveWork.Sort([](const FSGDTATickerWorkItem& A, const FSGDTATickerWorkItem& B)
 	{
 		return A.Priority < B.Priority;
 	});
@@ -91,7 +91,7 @@ void USGDynamicTextAssetTickerSubsystem::StartProcessing()
 	ItemsProcessedAcrossAll = 0;
 	CurrentWorkIndex = 0;
 
-	for (FSGTickerWorkItem& workItem : ActiveWork)
+	for (FSGDTATickerWorkItem& workItem : ActiveWork)
 	{
 		if (workItem.Setup)
 		{
@@ -112,7 +112,7 @@ void USGDynamicTextAssetTickerSubsystem::StartProcessing()
 	if (TotalItemsAcrossAll == 0)
 	{
 		// Still call OnComplete for each work item
-		for (FSGTickerWorkItem& workItem : ActiveWork)
+		for (FSGDTATickerWorkItem& workItem : ActiveWork)
 		{
 			if (workItem.OnComplete)
 			{
@@ -158,7 +158,7 @@ bool USGDynamicTextAssetTickerSubsystem::ProcessBatch(float DeltaTime)
 			return false;
 		}
 
-		FSGTickerWorkItem& currentItem = ActiveWork[CurrentWorkIndex];
+		FSGDTATickerWorkItem& currentItem = ActiveWork[CurrentWorkIndex];
 
 		if (currentItem.ProcessOne && currentItem.ProcessOne())
 		{
@@ -187,7 +187,7 @@ bool USGDynamicTextAssetTickerSubsystem::ProcessBatch(float DeltaTime)
 	// Update progress
 	if (CurrentWorkIndex < ActiveWork.Num())
 	{
-		const FSGTickerWorkItem& currentItem = ActiveWork[CurrentWorkIndex];
+		const FSGDTATickerWorkItem& currentItem = ActiveWork[CurrentWorkIndex];
 		int32 remaining = currentItem.GetRemainingCount ? currentItem.GetRemainingCount() : 0;
 
 		FText statusText = FText::Format(

@@ -14,22 +14,22 @@
 #include "Widgets/Layout/SWidgetSwitcher.h"
 #include "Browser/SGDynamicTextAssetBrowserCommands.h"
 
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 
 /**
  * Item representing a dynamic text asset file in the browser.
  */
-struct FSGDynamicTextAssetListItem
+struct FSGDTAAssetListItem
 {
-    FSGDynamicTextAssetListItem() = default;
+    FSGDTAAssetListItem() = default;
 
-    FSGDynamicTextAssetListItem(const FSGDynamicTextAssetId& InId,
+    FSGDTAAssetListItem(const FSGDynamicTextAssetId& InId,
         const FString& InUserFacingId,
         const FString& InFilePath,
         UClass* InClass,
         const FSGDynamicTextAssetTypeId& InAssetTypeId,
-        const FSGSerializerFormat& InSerializerFormat)
+        const FSGDTASerializerFormat& InSerializerFormat)
         : Id(InId)
         , UserFacingId(InUserFacingId)
         , FilePath(InFilePath)
@@ -57,16 +57,16 @@ struct FSGDynamicTextAssetListItem
     FSGDynamicTextAssetTypeId AssetTypeId;
 
     /** The serializer format associated with this item. */
-    FSGSerializerFormat SerializerFormat;
+    FSGDTASerializerFormat SerializerFormat;
 };
 
-DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetSelected, TSharedPtr<FSGDynamicTextAssetListItem> /*SelectedItem*/);
-DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetDoubleClicked, TSharedPtr<FSGDynamicTextAssetListItem> /*ClickedItem*/);
-DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetSelectionChanged, const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& /*SelectedItems*/);
-DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetDeleteRequested, const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& /*Items*/);
-DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetValidateRequested, const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& /*Items*/);
-DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetOpenRequested, const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& /*Items*/);
-DECLARE_DELEGATE_TwoParams(FOnDynamicTextAssetContextMenuExtension, FMenuBuilder& /*MenuBuilder*/, const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& /*SelectedItems*/);
+DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetSelected, TSharedPtr<FSGDTAAssetListItem> /*SelectedItem*/);
+DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetDoubleClicked, TSharedPtr<FSGDTAAssetListItem> /*ClickedItem*/);
+DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetSelectionChanged, const TArray<TSharedPtr<FSGDTAAssetListItem>>& /*SelectedItems*/);
+DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetDeleteRequested, const TArray<TSharedPtr<FSGDTAAssetListItem>>& /*Items*/);
+DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetValidateRequested, const TArray<TSharedPtr<FSGDTAAssetListItem>>& /*Items*/);
+DECLARE_DELEGATE_OneParam(FOnDynamicTextAssetOpenRequested, const TArray<TSharedPtr<FSGDTAAssetListItem>>& /*Items*/);
+DECLARE_DELEGATE_TwoParams(FOnDynamicTextAssetContextMenuExtension, FMenuBuilder& /*MenuBuilder*/, const TArray<TSharedPtr<FSGDTAAssetListItem>>& /*SelectedItems*/);
 
 /**
  * List/tile view widget displaying dynamic text asset files.
@@ -105,16 +105,16 @@ public:
     void Construct(const FArguments& InArgs);
 
     /** Refreshes the view with new items */
-    void SetItems(const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& InItems);
+    void SetItems(const TArray<TSharedPtr<FSGDTAAssetListItem>>& InItems);
 
     /** Clears all items */
     void ClearItems();
 
     /** Gets the currently selected item (first if multiple selected) */
-    TSharedPtr<FSGDynamicTextAssetListItem> GetSelectedItem() const;
+    TSharedPtr<FSGDTAAssetListItem> GetSelectedItem() const;
 
     /** Gets all currently selected items */
-    TArray<TSharedPtr<FSGDynamicTextAssetListItem>> GetSelectedItems() const;
+    TArray<TSharedPtr<FSGDTAAssetListItem>> GetSelectedItems() const;
 
     /** Returns the number of items currently displayed (after filtering) */
     int32 GetFilteredItemCount() const;
@@ -131,13 +131,13 @@ public:
 private:
 
     /** Generates a row for the list view */
-    TSharedRef<ITableRow> GenerateRow(TSharedPtr<FSGDynamicTextAssetListItem> Item, const TSharedRef<STableViewBase>& OwnerTable);
+    TSharedRef<ITableRow> GenerateRow(TSharedPtr<FSGDTAAssetListItem> Item, const TSharedRef<STableViewBase>& OwnerTable);
 
     /** Called when selection changes */
-    void OnSelectionChanged(TSharedPtr<FSGDynamicTextAssetListItem> Item, ESelectInfo::Type SelectInfo);
+    void OnSelectionChanged(TSharedPtr<FSGDTAAssetListItem> Item, ESelectInfo::Type SelectInfo);
 
     /** Called when an item is double-clicked */
-    void OnDoubleClick(TSharedPtr<FSGDynamicTextAssetListItem> Item);
+    void OnDoubleClick(TSharedPtr<FSGDTAAssetListItem> Item);
 
     /** Generates the context menu for right-click actions */
     TSharedPtr<SWidget> GenerateContextMenu();
@@ -152,7 +152,7 @@ private:
     int32 GetContentIndex() const;
 
     /** The list view widget */
-    TSharedPtr<SListView<TSharedPtr<FSGDynamicTextAssetListItem>>> ListView = nullptr;
+    TSharedPtr<SListView<TSharedPtr<FSGDTAAssetListItem>>> ListView = nullptr;
 
     /** The instance search box widget */
     TSharedPtr<SSearchBox> InstanceSearchBox;
@@ -164,10 +164,10 @@ private:
     FString InstanceSearchText;
 
     /** All items in the view - unfiltered source of truth */
-    TArray<TSharedPtr<FSGDynamicTextAssetListItem>> AllItems;
+    TArray<TSharedPtr<FSGDTAAssetListItem>> AllItems;
 
     /** Filtered items displayed by the list view */
-    TArray<TSharedPtr<FSGDynamicTextAssetListItem>> FilteredItems;
+    TArray<TSharedPtr<FSGDTAAssetListItem>> FilteredItems;
 
     /** Selection callback (single item, backwards compat) */
     FOnDynamicTextAssetSelected OnItemSelected;

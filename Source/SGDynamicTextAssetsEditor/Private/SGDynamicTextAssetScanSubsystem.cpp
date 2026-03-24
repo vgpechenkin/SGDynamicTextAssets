@@ -154,7 +154,7 @@ const FSGDynamicTextAssetProjectInfoCache& USGDynamicTextAssetScanSubsystem::Get
 	return ProjectInfoCache;
 }
 
-void USGDynamicTextAssetScanSubsystem::UpdateProjectInfoForFile(const FSGSerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion)
+void USGDynamicTextAssetScanSubsystem::UpdateProjectInfoForFile(const FSGDTASerializerFormat& SerializerFormat, const FSGDynamicTextAssetVersion& FileFormatVersion)
 {
 	ProjectInfoCache.RecordFileVersion(SerializerFormat, FileFormatVersion);
 	ProjectInfoCache.SaveToFile(FSGDynamicTextAssetProjectInfoCache::GetDefaultCachePath());
@@ -165,9 +165,9 @@ const TArray<FString>& USGDynamicTextAssetScanSubsystem::GetDiscoveredDTAFiles()
 	return DiscoveredDTAFiles;
 }
 
-FSGTickerWorkItem USGDynamicTextAssetScanSubsystem::ConvertPhaseToWorkItem(const FSGDynamicTextAssetScanPhase& Phase) const
+FSGDTATickerWorkItem USGDynamicTextAssetScanSubsystem::ConvertPhaseToWorkItem(const FSGDynamicTextAssetScanPhase& Phase) const
 {
-	FSGTickerWorkItem workItem;
+	FSGDTATickerWorkItem workItem;
 	workItem.WorkId = Phase.PhaseId;
 	workItem.DisplayName = Phase.DisplayName;
 	workItem.Priority = Phase.Priority;

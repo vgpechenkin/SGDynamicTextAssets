@@ -95,7 +95,7 @@ public:
  * by interface implementation, not by class hierarchy.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, ClassGroup = "Start Games")
-class USGTestCustomProvider : public UObject, public ISGDynamicTextAssetProvider
+class USGDTATestCustomProvider : public UObject, public ISGDynamicTextAssetProvider
 {
 	GENERATED_BODY()
 public:
@@ -139,7 +139,7 @@ private:
  * Validates that inherited interface detection works for subclasses of custom providers.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, ClassGroup = "Start Games")
-class USGTestCustomProviderChild : public USGTestCustomProvider
+class USGDTATestCustomProviderChild : public USGDTATestCustomProvider
 {
 	GENERATED_BODY()
 public:
