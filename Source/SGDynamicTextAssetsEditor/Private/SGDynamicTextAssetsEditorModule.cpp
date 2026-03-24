@@ -6,8 +6,9 @@
 #include "Core/SGDynamicTextAsset.h"
 #include "Editor/FSGDynamicTextAssetIdCustomization.h"
 #include "Editor/SGDynamicTextAssetIdentityCustomization.h"
-#include "Customization/SGAssetTypeIdCustomization.h"
-#include "Customization/SGSerializerFormatCustomization.h"
+#include "Customization/SGDTAAssetTypeIdCustomization.h"
+#include "Customization/SGDTAClassIdCustomization.h"
+#include "Customization/SGDTASerializerFormatCustomization.h"
 #include "Browser/SGDynamicTextAssetBrowserCommands.h"
 #include "Editor/SGDynamicTextAssetEditorCommands.h"
 #include "Editor/SGDynamicTextAssetRefCustomization.h"
@@ -278,12 +279,17 @@ private:
         // Property type customization for FSGDynamicTextAssetTypeId (searchable type picker)
         propertyModule.RegisterCustomPropertyTypeLayout(
             TEXT("SGDynamicTextAssetTypeId"),
-            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGAssetTypeIdCustomization::MakeInstance));
+            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGDTAAssetTypeIdCustomization::MakeInstance));
 
-        // Property type customization for FSGSerializerFormat (serializer format dropdown)
+        // Property type customization for FSGDTASerializerFormat (serializer format dropdown)
         propertyModule.RegisterCustomPropertyTypeLayout(
-            TEXT("SGSerializerFormat"),
-            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGSerializerFormatCustomization::MakeInstance));
+            TEXT("SGDTASerializerFormat"),
+            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGDTASerializerFormatCustomization::MakeInstance));
+
+        // Property type customization for FSGDTAClassId (class picker with GUID controls)
+        propertyModule.RegisterCustomPropertyTypeLayout(
+            TEXT("SGDTAClassId"),
+            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGDTAClassIdCustomization::MakeInstance));
 
         UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Registered detail customizations"));
     }
@@ -298,7 +304,8 @@ private:
             propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDynamicTextAssetId"));
             propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDynamicTextAssetRef"));
             propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDynamicTextAssetTypeId"));
-            propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGSerializerFormat"));
+            propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDTASerializerFormat"));
+            propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDTAClassId"));
         }
     }
 
@@ -375,7 +382,7 @@ private:
         }
 
         const FSGDynamicTextAssetProjectInfoCache& cache = scanSubsystem->GetProjectInfoCache();
-        const TMap<FSGSerializerFormat, FSGSerializerFormatVersionInfo>& allVersions = cache.GetAllFormatVersions();
+        const TMap<FSGDTASerializerFormat, FSGDTASerializerFormatVersionInfo>& allVersions = cache.GetAllFormatVersions();
 
         // Collect serializers that need a major version upgrade
         struct FUpgradeInfo
@@ -387,9 +394,9 @@ private:
         };
         TArray<FUpgradeInfo> upgradesNeeded;
 
-        for (const TPair<FSGSerializerFormat, FSGSerializerFormatVersionInfo>& pair : allVersions)
+        for (const TPair<FSGDTASerializerFormat, FSGDTASerializerFormatVersionInfo>& pair : allVersions)
         {
-            const FSGSerializerFormatVersionInfo& info = pair.Value;
+            const FSGDTASerializerFormatVersionInfo& info = pair.Value;
             if (info.TotalFileCount > 0
                 && info.CurrentSerializerVersion.Major > info.LowestFound.Major)
             {

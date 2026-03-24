@@ -8,10 +8,11 @@
 #include "Core/SGDynamicTextAssetRef.h"
 #include "Core/SGDynamicTextAssetId.h"
 #include "Core/SGDynamicTextAssetTypeId.h"
+#include "Core/SGDTAClassId.h"
 #include "Core/ISGDynamicTextAssetProvider.h"
 #include "Core/SGDynamicTextAssetBundleData.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
-#include "Core/SGSerializerFormat.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "SGDynamicTextAssetDelegates.h"
 
 #include "SGDynamicTextAssetStatics.generated.h"
@@ -301,6 +302,56 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Asset Type ID", meta = (DevelopmentOnly))
 	static FSGDynamicTextAssetTypeId GenerateDynamicAssetTypeId();
 
+	/** Returns true if the DTA class ID has a valid (non-zero) GUID. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "Is Valid (DTA Class Id)"))
+	static bool IsValid_DTA_ClassId(const FSGDTAClassId& ClassId);
+
+	/** Returns true if the two DTA class IDs are equal (A == B). */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "Equal (DTA Class Id)",
+		CompactNodeTitle = "==", Keywords = "== equal"))
+	static bool EqualEqual_DTA_ClassId(const FSGDTAClassId& A, const FSGDTAClassId& B);
+
+	/** Returns true if the two DTA class IDs are not equal (A != B). */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "Not Equal (DTA Class Id)",
+		CompactNodeTitle = "!=", Keywords = "!= not equal"))
+	static bool NotEqual_DTA_ClassId(const FSGDTAClassId& A, const FSGDTAClassId& B);
+
+	/**
+	 * Converts a DTA class ID to its string representation.
+	 *
+	 * @param ClassId The class ID to convert
+	 * @return The ID as a hyphenated GUID string
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "To String (DTA Class Id)"))
+	static FString ToString_DTA_ClassId(const FSGDTAClassId& ClassId);
+
+	/**
+	 * Parses a string to a DTA class ID.
+	 *
+	 * @param ClassIdString The string to parse (hyphenated GUID format)
+	 * @param OutClassId The parsed class ID
+	 * @return True if parsing succeeded
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "From String (DTA Class Id)"))
+	static bool FromString_DTA_ClassId(const FString& ClassIdString, FSGDTAClassId& OutClassId);
+
+	/** Creates a DTA class ID from the inputted GUID. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "From GUID (DTA Class Id)"))
+	static FSGDTAClassId FromGuid_DTA_ClassId(const FGuid& Guid);
+
+	/** Returns a copy of the DTA class ID's GUID. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "Get GUID (DTA Class Id)"))
+	static FGuid GetGuid_DTA_ClassId(const FSGDTAClassId& ClassId);
+
+	/**
+	 * Creates a new randomly generated DTA class ID.
+	 * Primarily for editor/tooling use.
+	 *
+	 * @return A new unique class ID
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DevelopmentOnly))
+	static FSGDTAClassId GenerateDTAClassId();
+
 	/** Returns true if version fields represent a usable version (Major >= 1) */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Version")
 	static bool IsVersionValid(const FSGDynamicTextAssetVersion& Version);
@@ -568,7 +619,7 @@ public:
 	 * @return The constructed serializer format
 	 */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static FSGSerializerFormat MakeSerializerFormat(int32 TypeId);
+	static FSGDTASerializerFormat MakeSerializerFormat(int32 TypeId);
 
 	/**
 	 * Creates a serializer format by looking up a file extension.
@@ -578,11 +629,11 @@ public:
 	 * @return The resolved serializer format
 	 */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static FSGSerializerFormat MakeSerializerFormatFromExtension(const FString& Extension);
+	static FSGDTASerializerFormat MakeSerializerFormatFromExtension(const FString& Extension);
 
 	/** Returns true if the serializer format has a valid (non-zero) type ID. */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static bool IsValidSerializerFormat(const FSGSerializerFormat& Format);
+	static bool IsValidSerializerFormat(const FSGDTASerializerFormat& Format);
 
 	/**
 	 * Returns the integer type ID from a serializer format.
@@ -591,7 +642,7 @@ public:
 	 * @return The type ID (int32 for Blueprint compatibility)
 	 */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static int32 GetSerializerFormatTypeId(FSGSerializerFormat Format);
+	static int32 GetSerializerFormatTypeId(FSGDTASerializerFormat Format);
 
 	/**
 	 * Returns the human-readable name of the serializer format.
@@ -600,7 +651,7 @@ public:
 	 * @return The format name, or "Invalid" if not registered
 	 */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static FText GetSerializerFormatName(const FSGSerializerFormat& Format);
+	static FText GetSerializerFormatName(const FSGDTASerializerFormat& Format);
 
 	/**
 	 * Returns the file extension for the serializer format.
@@ -609,29 +660,29 @@ public:
 	 * @return The file extension, or empty string if not registered
 	 */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static FString GetSerializerFormatExtension(const FSGSerializerFormat& Format);
+	static FString GetSerializerFormatExtension(const FSGDTASerializerFormat& Format);
 
 	/** Returns the serializer format for JSON (.dta.json). */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static FSGSerializerFormat GetJsonSerializerFormat();
+	static FSGDTASerializerFormat GetJsonSerializerFormat();
 
 	/** Returns the serializer format for XML (.dta.xml). */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static FSGSerializerFormat GetXmlSerializerFormat();
+	static FSGDTASerializerFormat GetXmlSerializerFormat();
 
 	/** Returns the serializer format for YAML (.dta.yaml). */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static FSGSerializerFormat GetYamlSerializerFormat();
+	static FSGDTASerializerFormat GetYamlSerializerFormat();
 
 	/** Returns true if the two serializer formats are equal (A == B). */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format", meta = (DisplayName = "Equal (Serializer Format)",
 		CompactNodeTitle = "==", Keywords = "== equal"))
-	static bool EqualEqual_SerializerFormat(const FSGSerializerFormat& A, const FSGSerializerFormat& B);
+	static bool EqualEqual_SerializerFormat(const FSGDTASerializerFormat& A, const FSGDTASerializerFormat& B);
 
 	/** Returns true if the two serializer formats are not equal (A != B). */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format", meta = (DisplayName = "Not Equal (Serializer Format)",
 		CompactNodeTitle = "!=", Keywords = "!= not equal"))
-	static bool NotEqual_SerializerFormat(const FSGSerializerFormat& A, const FSGSerializerFormat& B);
+	static bool NotEqual_SerializerFormat(const FSGDTASerializerFormat& A, const FSGDTASerializerFormat& B);
 
 	/**
 	 * Returns all currently registered serializer formats.
@@ -639,7 +690,7 @@ public:
 	 * @param OutFormats Array populated with one entry per registered serializer
 	 */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
-	static void GetAllRegisteredSerializerFormats(TArray<FSGSerializerFormat>& OutFormats);
+	static void GetAllRegisteredSerializerFormats(TArray<FSGDTASerializerFormat>& OutFormats);
 
 	/**
 	 * Finds a registered serializer by its format.
@@ -648,7 +699,7 @@ public:
 	 * @param Format The serializer format to look up
 	 * @return The serializer, or nullptr if not found
 	 */
-	static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForFormat(FSGSerializerFormat Format);
+	static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForFormat(FSGDTASerializerFormat Format);
 
 	/** @deprecated Use FindSerializerForFormat instead. Will be removed in UE 5.7. */
 	UE_DEPRECATED(5.6, "Use FindSerializerForFormat instead. Will be removed in UE 5.7.")
@@ -673,7 +724,7 @@ public:
 	 *
 	 * @param Extension File extension without leading dot (e.g., "dta.json")
 	 */
-	static FSGSerializerFormat GetFormatForExtension(const FString& Extension);
+	static FSGDTASerializerFormat GetFormatForExtension(const FString& Extension);
 
 	/** @deprecated Use GetFormatForExtension instead. Will be removed in UE 5.7. */
 	UE_DEPRECATED(5.6, "Use GetFormatForExtension instead. Will be removed in UE 5.7.")

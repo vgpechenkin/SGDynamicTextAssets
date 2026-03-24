@@ -335,6 +335,50 @@ FSGDynamicTextAssetTypeId USGDynamicTextAssetStatics::GenerateDynamicAssetTypeId
 #endif
 }
 
+bool USGDynamicTextAssetStatics::IsValid_DTA_ClassId(const FSGDTAClassId& ClassId)
+{
+	return ClassId.IsValid();
+}
+
+bool USGDynamicTextAssetStatics::EqualEqual_DTA_ClassId(const FSGDTAClassId& A, const FSGDTAClassId& B)
+{
+	return A == B;
+}
+
+bool USGDynamicTextAssetStatics::NotEqual_DTA_ClassId(const FSGDTAClassId& A, const FSGDTAClassId& B)
+{
+	return A != B;
+}
+
+FString USGDynamicTextAssetStatics::ToString_DTA_ClassId(const FSGDTAClassId& ClassId)
+{
+	return ClassId.ToString();
+}
+
+bool USGDynamicTextAssetStatics::FromString_DTA_ClassId(const FString& ClassIdString, FSGDTAClassId& OutClassId)
+{
+	return OutClassId.ParseString(ClassIdString);
+}
+
+FSGDTAClassId USGDynamicTextAssetStatics::FromGuid_DTA_ClassId(const FGuid& Guid)
+{
+	return FSGDTAClassId(Guid);
+}
+
+FGuid USGDynamicTextAssetStatics::GetGuid_DTA_ClassId(const FSGDTAClassId& ClassId)
+{
+	return ClassId.GetGuid();
+}
+
+FSGDTAClassId USGDynamicTextAssetStatics::GenerateDTAClassId()
+{
+#if WITH_EDITORONLY_DATA
+	return FSGDTAClassId::NewGeneratedId();
+#else
+	return FSGDTAClassId::INVALID_CLASS_ID;
+#endif
+}
+
 bool USGDynamicTextAssetStatics::IsVersionValid(const FSGDynamicTextAssetVersion& Version)
 {
 	return Version.IsValid();
@@ -567,62 +611,62 @@ void USGDynamicTextAssetStatics::GetRegisteredSerializerDescriptions(TArray<FStr
 	FSGDynamicTextAssetFileManager::GetAllRegisteredSerializerDescriptions(OutDescriptions);
 }
 
-FSGSerializerFormat USGDynamicTextAssetStatics::MakeSerializerFormat(int32 TypeId)
+FSGDTASerializerFormat USGDynamicTextAssetStatics::MakeSerializerFormat(int32 TypeId)
 {
-	return FSGSerializerFormat(static_cast<uint32>(TypeId));
+	return FSGDTASerializerFormat(static_cast<uint32>(TypeId));
 }
 
-FSGSerializerFormat USGDynamicTextAssetStatics::MakeSerializerFormatFromExtension(const FString& Extension)
+FSGDTASerializerFormat USGDynamicTextAssetStatics::MakeSerializerFormatFromExtension(const FString& Extension)
 {
-	return FSGSerializerFormat::FromExtension(Extension);
+	return FSGDTASerializerFormat::FromExtension(Extension);
 }
 
-bool USGDynamicTextAssetStatics::IsValidSerializerFormat(const FSGSerializerFormat& Format)
+bool USGDynamicTextAssetStatics::IsValidSerializerFormat(const FSGDTASerializerFormat& Format)
 {
 	return Format.IsValid();
 }
 
-int32 USGDynamicTextAssetStatics::GetSerializerFormatTypeId(FSGSerializerFormat Format)
+int32 USGDynamicTextAssetStatics::GetSerializerFormatTypeId(FSGDTASerializerFormat Format)
 {
 	return static_cast<int32>(Format.GetTypeId());
 }
 
-FText USGDynamicTextAssetStatics::GetSerializerFormatName(const FSGSerializerFormat& Format)
+FText USGDynamicTextAssetStatics::GetSerializerFormatName(const FSGDTASerializerFormat& Format)
 {
 	return Format.GetFormatName();
 }
 
-FString USGDynamicTextAssetStatics::GetSerializerFormatExtension(const FSGSerializerFormat& Format)
+FString USGDynamicTextAssetStatics::GetSerializerFormatExtension(const FSGDTASerializerFormat& Format)
 {
 	return Format.GetFileExtension();
 }
 
-FSGSerializerFormat USGDynamicTextAssetStatics::GetJsonSerializerFormat()
+FSGDTASerializerFormat USGDynamicTextAssetStatics::GetJsonSerializerFormat()
 {
 	return FSGDynamicTextAssetJsonSerializer::FORMAT;
 }
 
-FSGSerializerFormat USGDynamicTextAssetStatics::GetXmlSerializerFormat()
+FSGDTASerializerFormat USGDynamicTextAssetStatics::GetXmlSerializerFormat()
 {
 	return FSGDynamicTextAssetXmlSerializer::FORMAT;
 }
 
-FSGSerializerFormat USGDynamicTextAssetStatics::GetYamlSerializerFormat()
+FSGDTASerializerFormat USGDynamicTextAssetStatics::GetYamlSerializerFormat()
 {
 	return FSGDynamicTextAssetYamlSerializer::FORMAT;
 }
 
-bool USGDynamicTextAssetStatics::EqualEqual_SerializerFormat(const FSGSerializerFormat& A, const FSGSerializerFormat& B)
+bool USGDynamicTextAssetStatics::EqualEqual_SerializerFormat(const FSGDTASerializerFormat& A, const FSGDTASerializerFormat& B)
 {
 	return A == B;
 }
 
-bool USGDynamicTextAssetStatics::NotEqual_SerializerFormat(const FSGSerializerFormat& A, const FSGSerializerFormat& B)
+bool USGDynamicTextAssetStatics::NotEqual_SerializerFormat(const FSGDTASerializerFormat& A, const FSGDTASerializerFormat& B)
 {
 	return A != B;
 }
 
-void USGDynamicTextAssetStatics::GetAllRegisteredSerializerFormats(TArray<FSGSerializerFormat>& OutFormats)
+void USGDynamicTextAssetStatics::GetAllRegisteredSerializerFormats(TArray<FSGDTASerializerFormat>& OutFormats)
 {
 	TArray<TSharedPtr<ISGDynamicTextAssetSerializer>> serializers = FSGDynamicTextAssetFileManager::GetAllRegisteredSerializers();
 	OutFormats.Reset(serializers.Num());
@@ -635,14 +679,14 @@ void USGDynamicTextAssetStatics::GetAllRegisteredSerializerFormats(TArray<FSGSer
 	}
 }
 
-TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerializerForFormat(FSGSerializerFormat Format)
+TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerializerForFormat(FSGDTASerializerFormat Format)
 {
 	return FSGDynamicTextAssetFileManager::FindSerializerForFormat(Format);
 }
 
 TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerializerForTypeId(uint32 TypeId)
 {
-	return FindSerializerForFormat(FSGSerializerFormat(TypeId));
+	return FindSerializerForFormat(FSGDTASerializerFormat(TypeId));
 }
 
 TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerializerForDynamicTextAssetId(const FSGDynamicTextAssetId& Id)
@@ -655,7 +699,7 @@ TSharedPtr<ISGDynamicTextAssetSerializer> USGDynamicTextAssetStatics::FindSerial
 	return FSGDynamicTextAssetFileManager::FindSerializerForFile(filePath);
 }
 
-FSGSerializerFormat USGDynamicTextAssetStatics::GetFormatForExtension(const FString& Extension)
+FSGDTASerializerFormat USGDynamicTextAssetStatics::GetFormatForExtension(const FString& Extension)
 {
 	return FSGDynamicTextAssetFileManager::GetFormatForExtension(Extension);
 }
