@@ -5,7 +5,7 @@
 #include "ReferenceViewer/SGDynamicTextAssetReferenceSubsystem.h"
 #include "Editor.h"
 #include "Editor/EditorEngine.h"
-#include "Editor/FSGDynamicTextAssetEditorToolkit.h"
+#include "Editor/SGDynamicTextAssetEditorToolkit.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "SGDynamicTextAssetEditorLogs.h"
 #include "Editor/SSGDynamicTextAssetIcon.h"

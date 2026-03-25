@@ -4,15 +4,15 @@
 
 #include "Browser/SSGDynamicTextAssetBrowser.h"
 #include "Core/SGDynamicTextAsset.h"
-#include "Editor/FSGDynamicTextAssetIdCustomization.h"
-#include "Editor/SGDynamicTextAssetIdentityCustomization.h"
+#include "Customization/SGDynamicTextAssetIdCustomization.h"
+#include "Editor/SGDTADetailCustomization.h"
 #include "Customization/SGDTAAssetTypeIdCustomization.h"
 #include "Customization/SGDTAClassIdCustomization.h"
 #include "Customization/SGDTASerializerFormatCustomization.h"
 #include "Browser/SGDynamicTextAssetBrowserCommands.h"
 #include "Editor/SGDynamicTextAssetEditorCommands.h"
-#include "Editor/SGDynamicTextAssetRefCustomization.h"
-#include "Editor/FSGDynamicTextAssetEditorToolkit.h"
+#include "Customization/SGDynamicTextAssetRefCustomization.h"
+#include "Editor/SGDynamicTextAssetEditorToolkit.h"
 #include "SGDynamicTextAssetScanSubsystem.h"
 #include "ReferenceViewer/SSGDynamicTextAssetReferenceViewer.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -264,7 +264,7 @@ private:
         // Class layout customization for USGDynamicTextAsset (identity section)
         propertyModule.RegisterCustomClassLayout(
             USGDynamicTextAsset::StaticClass()->GetFName(),
-            FOnGetDetailCustomizationInstance::CreateStatic(&FSGDynamicTextAssetIdentityCustomization::MakeInstance));
+            FOnGetDetailCustomizationInstance::CreateStatic(&FSGDTADetailCustomization::MakeInstance));
 
         // Property type customization for FSGDynamicTextAssetId (read-only ID display)
         propertyModule.RegisterCustomPropertyTypeLayout(

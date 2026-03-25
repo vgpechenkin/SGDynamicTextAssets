@@ -156,4 +156,25 @@ protected:
         const FObjectProperty* Property,
         void* PropertyValuePtr,
         UObject* Outer) const;
+
+    /**
+     * Resolves the asset bundle extender for the given provider, extracts bundles,
+     * and serializes them into the content string.
+     * Call this after the main serialized content is built.
+     *
+     * @param Provider The provider to extract and serialize bundles from
+     * @param InOutSerializedContent The serialized content to modify with bundle data
+     */
+    void SerializeAssetBundles(const ISGDynamicTextAssetProvider* Provider,
+        FString& InOutSerializedContent) const;
+
+    /**
+     * Resolves the asset bundle extender and deserializes bundles from the content string.
+     *
+     * @param SerializedContent The serialized content to extract bundles from
+     * @param OutBundleData The bundle data to populate
+     * @return True if bundle data was found and extracted
+     */
+    bool DeserializeAssetBundles(const FString& SerializedContent,
+        FSGDynamicTextAssetBundleData& OutBundleData) const;
 };

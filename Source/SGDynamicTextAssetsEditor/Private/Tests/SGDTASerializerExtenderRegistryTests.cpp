@@ -44,7 +44,7 @@ bool FExtenderRegistry_AddExtender_FindByClassName::RunTest(const FString& Param
 
 	registry.AddExtender(id, classPtr);
 
-	const FSGDTASerializerExtenderRegistryEntry* found = registry.FindByClassName(TEXT("SGSerializerExtenderBase"));
+	const FSGDTASerializerExtenderRegistryEntry* found = registry.FindByClassName(TEXT("SGDTASerializerExtenderBase"));
 	TestNotNull(TEXT("FindByClassName should return the added entry"), found);
 	if (found)
 	{

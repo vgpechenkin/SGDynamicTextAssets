@@ -16,7 +16,7 @@
 #include "Management/SGDynamicTextAssetTypeManifest.h"
 #include "Misc/Paths.h"
 #include "SGDynamicTextAssetLogs.h"
-#include "Serialization/SGDTAAssetBundleExtender.h"
+#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
 #include "UObject/UObjectIterator.h"
 
 USGDynamicTextAssetRegistry* USGDynamicTextAssetRegistry::Get()

@@ -1,7 +1,7 @@
 // Copyright Start Games, Inc. All Rights Reserved.
 
 #include "Editor/SSGDynamicTextAssetIdentityBlock.h"
-#include "Editor/SGDynamicTextAssetIdentityCustomization.h"
+#include "Editor/SGDTADetailCustomization.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "SGDynamicTextAssetEditorLogs.h"
 #include "Widgets/SBoxPanel.h"
@@ -51,7 +51,7 @@ void SSGDynamicTextAssetIdentityBlock::Construct(const FArguments& InArgs)
 					.VAlign(VAlign_Center)
 					.Padding(0.0f, 0.0f, SSGDynamicTextAssetIdentityBlockInternals::ButtonRightPadding, 0.0f)
 					[
-						FSGDynamicTextAssetIdentityCustomization::CreateCopyButton(
+						FSGDTADetailCustomization::CreateCopyButton(
 							FOnClicked::CreateLambda([this]() -> FReply
 							{
 								if (UserFacingIdTextblock.IsValid() && !UserFacingIdTextblock->GetText().IsEmpty())
@@ -104,7 +104,7 @@ void SSGDynamicTextAssetIdentityBlock::Construct(const FArguments& InArgs)
 					.VAlign(VAlign_Center)
 					.Padding(0.0f, 0.0f, SSGDynamicTextAssetIdentityBlockInternals::ButtonRightPadding, 0.0f)
 					[
-						FSGDynamicTextAssetIdentityCustomization::CreateCopyButton(
+						FSGDTADetailCustomization::CreateCopyButton(
 							FOnClicked::CreateLambda([this]() -> FReply
 							{
 								if (IdTextblock.IsValid() && !IdTextblock->GetText().IsEmpty())
@@ -169,7 +169,7 @@ void SSGDynamicTextAssetIdentityBlock::Construct(const FArguments& InArgs)
 					.VAlign(VAlign_Center)
 					.Padding(0.0f, 0.0f, SSGDynamicTextAssetIdentityBlockInternals::ButtonRightPadding, 0.0f)
 					[
-						FSGDynamicTextAssetIdentityCustomization::CreateCopyButton(
+						FSGDTADetailCustomization::CreateCopyButton(
 							FOnClicked::CreateLambda([this]() -> FReply
 							{
 								if (VersionTextblock.IsValid() && !VersionTextblock->GetText().IsEmpty())
@@ -255,7 +255,7 @@ void SSGDynamicTextAssetIdentityBlock::Construct(const FArguments& InArgs)
 							.VAlign(VAlign_Center)
 							.Padding(0.0f, 0.0f, SSGDynamicTextAssetIdentityBlockInternals::ButtonRightPadding, 0.0f)
 							[
-								FSGDynamicTextAssetIdentityCustomization::CreateCopyButton(
+								FSGDTADetailCustomization::CreateCopyButton(
 									FOnClicked::CreateLambda([this]() -> FReply
 									{
 										if (FileFormatVersionTextblock.IsValid() && !FileFormatVersionTextblock->GetText().IsEmpty())

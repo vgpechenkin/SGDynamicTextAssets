@@ -8,7 +8,7 @@
 #include "Browser/SSGDynamicTextAssetTileView.h"
 #include "Browser/SSGDynamicTextAssetTypeTree.h"
 #include "Core/SGDynamicTextAssetId.h"
-#include "Editor/FSGDynamicTextAssetEditorToolkit.h"
+#include "Editor/SGDynamicTextAssetEditorToolkit.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Management/SGDynamicTextAssetRegistry.h"

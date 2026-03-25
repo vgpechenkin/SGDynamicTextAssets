@@ -254,41 +254,10 @@ bool FSGDynamicTextAssetJsonSerializer::SerializeProvider(const ISGDynamicTextAs
         }
     }
 
-    // Extract and serialize asset bundle metadata from soft reference properties
-    FSGDynamicTextAssetBundleData bundleData;
-    bundleData.ExtractFromObject(providerObject);
-
-    TSharedPtr<FJsonObject> bundlesObject;
-    if (bundleData.HasBundles())
-    {
-        bundlesObject = MakeShared<FJsonObject>();
-
-        for (const FSGDynamicTextAssetBundle& bundle : bundleData.Bundles)
-        {
-            TArray<TSharedPtr<FJsonValue>> entryArray;
-            entryArray.Reserve(bundle.Entries.Num());
-
-            for (const FSGDynamicTextAssetBundleEntry& entry : bundle.Entries)
-            {
-                TSharedRef<FJsonObject> entryObj = MakeShared<FJsonObject>();
-                entryObj->SetStringField(TEXT("property"), entry.PropertyName.ToString());
-                entryObj->SetStringField(TEXT("path"), entry.AssetPath.ToString());
-                entryArray.Add(MakeShared<FJsonValueObject>(entryObj));
-            }
-
-            bundlesObject->SetField(bundle.BundleName.ToString(), MakeShared<FJsonValueArray>(entryArray));
-        }
-    }
-
-    // Build root object: file information block + data block + optional bundles
+    // Build root object: file information block + data block
     TSharedRef<FJsonObject> rootObject = MakeShared<FJsonObject>();
     rootObject->SetObjectField(KEY_FILE_INFORMATION, fileInfoObject);
     rootObject->SetObjectField(KEY_DATA, dataObject);
-
-    if (bundlesObject.IsValid())
-    {
-        rootObject->SetObjectField(KEY_SGDT_ASSET_BUNDLES, bundlesObject.ToSharedRef());
-    }
 
     // Convert to string with pretty printing
     TSharedRef<TJsonWriter<>> writer = TJsonWriterFactory<>::Create(&OutString);
@@ -297,6 +266,9 @@ bool FSGDynamicTextAssetJsonSerializer::SerializeProvider(const ISGDynamicTextAs
         UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetJsonSerializer: Failed to serialize JSON for Provider(%s)"), *GetNameSafe(providerObject));
         return false;
     }
+
+    // Serialize asset bundles via the extender system
+    SerializeAssetBundles(Provider, OutString);
 
     return true;
 }
@@ -862,69 +834,7 @@ bool FSGDynamicTextAssetJsonSerializer::ExtractSGDTAssetBundles(const FString& I
         return false;
     }
 
-    TSharedRef<TJsonReader<>> reader = TJsonReaderFactory<>::Create(InString);
-    TSharedPtr<FJsonObject> rootObject;
-    if (!FJsonSerializer::Deserialize(reader, rootObject) || !rootObject.IsValid())
-    {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("ExtractSGDTAssetBundles(JSON): Failed to parse JSON"));
-        return false;
-    }
-
-    const TSharedPtr<FJsonObject>* bundlesObject = nullptr;
-    if (!rootObject->TryGetObjectField(KEY_SGDT_ASSET_BUNDLES, bundlesObject) || !bundlesObject || !bundlesObject->IsValid())
-    {
-        return false;
-    }
-
-    for (const TPair<FString, TSharedPtr<FJsonValue>>& bundlePair : (*bundlesObject)->Values)
-    {
-        const FName bundleName = FName(*bundlePair.Key);
-
-        const TArray<TSharedPtr<FJsonValue>>* entryArray = nullptr;
-        if (!bundlePair.Value.IsValid() || bundlePair.Value->Type != EJson::Array)
-        {
-            continue;
-        }
-
-        entryArray = &bundlePair.Value->AsArray();
-
-        for (const TSharedPtr<FJsonValue>& entryValue : *entryArray)
-        {
-            if (!entryValue.IsValid() || entryValue->Type != EJson::Object)
-            {
-                continue;
-            }
-
-            const TSharedPtr<FJsonObject>& entryObj = entryValue->AsObject();
-            FString propertyName;
-            FString pathString;
-
-            if (entryObj->TryGetStringField(TEXT("property"), propertyName) &&
-                entryObj->TryGetStringField(TEXT("path"), pathString))
-            {
-                FSGDynamicTextAssetBundle* targetBundle = nullptr;
-                for (FSGDynamicTextAssetBundle& bundle : OutBundleData.Bundles)
-                {
-                    if (bundle.BundleName == bundleName)
-                    {
-                        targetBundle = &bundle;
-                        break;
-                    }
-                }
-
-                if (!targetBundle)
-                {
-                    FSGDynamicTextAssetBundle& newBundle = OutBundleData.Bundles.AddDefaulted_GetRef();
-                    newBundle.BundleName = bundleName;
-                    targetBundle = &newBundle;
-                }
-
-                targetBundle->Entries.Emplace(FSoftObjectPath(pathString), FName(*propertyName));
-            }
-        }
-    }
-
-    return OutBundleData.HasBundles();
+    return DeserializeAssetBundles(InString, OutBundleData);
 }
 
 bool FSGDynamicTextAssetJsonSerializer::UpdateFileFormatVersion(FString& InOutFileContents,

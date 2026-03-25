@@ -95,6 +95,9 @@ public:
 	 */
 	TSharedPtr<ISGDynamicTextAssetSerializer> GetSerializer() const;
 
+	/** Implicit conversion to uint32 so this struct can be used with switch statements. */
+	operator uint32() const;
+
 	void operator=(const uint32& Other);
 
 	bool operator==(const FSGDTASerializerFormat& Other) const;

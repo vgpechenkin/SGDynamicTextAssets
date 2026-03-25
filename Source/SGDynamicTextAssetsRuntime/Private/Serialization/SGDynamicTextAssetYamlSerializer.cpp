@@ -758,35 +758,13 @@ bool FSGDynamicTextAssetYamlSerializer::SerializeProvider(const ISGDynamicTextAs
 
         rootNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_DATA)] = dataNode;
 
-        // Extract and serialize asset bundle metadata from soft reference properties
-        FSGDynamicTextAssetBundleData bundleData;
-        bundleData.ExtractFromObject(providerObject);
-
-        if (bundleData.HasBundles())
-        {
-            fkyaml::node bundlesNode = fkyaml::node::mapping();
-
-            for (const FSGDynamicTextAssetBundle& bundle : bundleData.Bundles)
-            {
-                fkyaml::node entryArray = fkyaml::node::sequence();
-
-                for (const FSGDynamicTextAssetBundleEntry& entry : bundle.Entries)
-                {
-                    fkyaml::node entryNode = fkyaml::node::mapping();
-                    entryNode["property"] = fkyaml::node(FSGDynamicTextAssetYamlSerializerInternals::ToStdString(entry.PropertyName.ToString()));
-                    entryNode["path"] = fkyaml::node(FSGDynamicTextAssetYamlSerializerInternals::ToStdString(entry.AssetPath.ToString()));
-                    entryArray.as_seq().emplace_back(entryNode);
-                }
-
-                bundlesNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(bundle.BundleName.ToString())] = entryArray;
-            }
-
-            rootNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_SGDT_ASSET_BUNDLES)] = bundlesNode;
-        }
-
         // Serialize to YAML string
         const std::string yamlStr = fkyaml::node::serialize(rootNode);
         OutString = FSGDynamicTextAssetYamlSerializerInternals::ToFString(yamlStr);
+
+        // Serialize asset bundles via the extender system
+        SerializeAssetBundles(Provider, OutString);
+
         return true;
     }
     catch (const fkyaml::exception& e)
@@ -1463,80 +1441,7 @@ bool FSGDynamicTextAssetYamlSerializer::ExtractSGDTAssetBundles(const FString& I
         return false;
     }
 
-    try
-    {
-        fkyaml::node rootNode;
-        FString parseError;
-        if (!FSGDynamicTextAssetYamlSerializerInternals::ParseYaml(InString, rootNode, parseError))
-        {
-            return false;
-        }
-
-        if (!rootNode.is_mapping())
-        {
-            return false;
-        }
-
-        const std::string bundlesKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_SGDT_ASSET_BUNDLES);
-        if (!rootNode.contains(bundlesKey))
-        {
-            return false;
-        }
-
-        fkyaml::node& bundlesNode = rootNode[bundlesKey];
-        if (!bundlesNode.is_mapping())
-        {
-            return false;
-        }
-
-        for (auto itr = bundlesNode.begin(); itr != bundlesNode.end(); ++itr)
-        {
-            const FName bundleName = FName(*FSGDynamicTextAssetYamlSerializerInternals::ToFString(itr.key().get_value<std::string>()));
-
-            if (!itr->is_sequence())
-            {
-                continue;
-            }
-
-            FSGDynamicTextAssetBundle& bundle = OutBundleData.Bundles.AddDefaulted_GetRef();
-            bundle.BundleName = bundleName;
-
-            for (auto entryItr = itr->begin(); entryItr != itr->end(); ++entryItr)
-            {
-                if (!entryItr->is_mapping())
-                {
-                    continue;
-                }
-
-                FString propertyName;
-                FString pathStr;
-
-                if (entryItr->contains("property") && (*entryItr)["property"].is_string())
-                {
-                    propertyName = FSGDynamicTextAssetYamlSerializerInternals::ToFString((*entryItr)["property"].get_value<std::string>());
-                }
-                if (entryItr->contains("path") && (*entryItr)["path"].is_string())
-                {
-                    pathStr = FSGDynamicTextAssetYamlSerializerInternals::ToFString((*entryItr)["path"].get_value<std::string>());
-                }
-
-                if (!propertyName.IsEmpty() && !pathStr.IsEmpty())
-                {
-                    bundle.Entries.Emplace(FSoftObjectPath(pathStr), FName(*propertyName));
-                }
-            }
-        }
-
-        return OutBundleData.HasBundles();
-    }
-    catch (const fkyaml::exception&)
-    {
-        return false;
-    }
-    catch (const std::exception&)
-    {
-        return false;
-    }
+    return DeserializeAssetBundles(InString, OutBundleData);
 }
 
 bool FSGDynamicTextAssetYamlSerializer::UpdateFileFormatVersion(FString& InOutFileContents,

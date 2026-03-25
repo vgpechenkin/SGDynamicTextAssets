@@ -74,6 +74,11 @@ TSharedPtr<ISGDynamicTextAssetSerializer> FSGDTASerializerFormat::GetSerializer(
 	return FSGDynamicTextAssetFileManager::FindSerializerForFormat(*this);
 }
 
+FSGDTASerializerFormat::operator unsigned int() const
+{
+	return TypeId;
+}
+
 void FSGDTASerializerFormat::operator=(const uint32& Other)
 {
 	TypeId = Other;

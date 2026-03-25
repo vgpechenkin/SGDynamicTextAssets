@@ -580,37 +580,13 @@ bool FSGDynamicTextAssetXmlSerializer::SerializeProvider(const ISGDynamicTextAss
 
     xml += FString::Printf(TEXT("%s</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_DATA);
 
-    // Extract and serialize asset bundle metadata from soft reference properties
-    FSGDynamicTextAssetBundleData bundleData;
-    bundleData.ExtractFromObject(providerObject);
-
-    if (bundleData.HasBundles())
-    {
-        xml += FString::Printf(TEXT("%s<%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_SGDT_ASSET_BUNDLES);
-
-        for (const FSGDynamicTextAssetBundle& bundle : bundleData.Bundles)
-        {
-            xml += FString::Printf(TEXT("%s<bundle name=\"%s\">\n"),
-                *FSGDynamicTextAssetXmlSerializerInternals::Indent(2),
-                *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(bundle.BundleName.ToString()));
-
-            for (const FSGDynamicTextAssetBundleEntry& entry : bundle.Entries)
-            {
-                xml += FString::Printf(TEXT("%s<entry property=\"%s\" path=\"%s\"/>\n"),
-                    *FSGDynamicTextAssetXmlSerializerInternals::Indent(3),
-                    *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(entry.PropertyName.ToString()),
-                    *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(entry.AssetPath.ToString()));
-            }
-
-            xml += FString::Printf(TEXT("%s</bundle>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(2));
-        }
-
-        xml += FString::Printf(TEXT("%s</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_SGDT_ASSET_BUNDLES);
-    }
-
     xml += FString::Printf(TEXT("</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::XML_ROOT_TAG);
 
     OutString = MoveTemp(xml);
+
+    // Serialize asset bundles via the extender system
+    SerializeAssetBundles(Provider, OutString);
+
     return true;
 }
 
@@ -1162,60 +1138,7 @@ bool FSGDynamicTextAssetXmlSerializer::ExtractSGDTAssetBundles(const FString& In
         return false;
     }
 
-    FXmlFile xmlFile(InString, EConstructMethod::ConstructFromBuffer);
-    if (!xmlFile.IsValid())
-    {
-        return false;
-    }
-
-    const FXmlNode* rootNode = xmlFile.GetRootNode();
-    if (!rootNode)
-    {
-        return false;
-    }
-
-    const FXmlNode* bundlesNode = rootNode->FindChildNode(KEY_SGDT_ASSET_BUNDLES);
-    if (!bundlesNode)
-    {
-        return false;
-    }
-
-    for (const FXmlNode* bundleNode : bundlesNode->GetChildrenNodes())
-    {
-        if (bundleNode->GetTag() != TEXT("bundle"))
-        {
-            continue;
-        }
-
-        const FString bundleNameStr = bundleNode->GetAttribute(TEXT("name"));
-        if (bundleNameStr.IsEmpty())
-        {
-            continue;
-        }
-
-        const FName bundleName = FName(*bundleNameStr);
-
-        FSGDynamicTextAssetBundle& bundle = OutBundleData.Bundles.AddDefaulted_GetRef();
-        bundle.BundleName = bundleName;
-
-        for (const FXmlNode* entryNode : bundleNode->GetChildrenNodes())
-        {
-            if (entryNode->GetTag() != TEXT("entry"))
-            {
-                continue;
-            }
-
-            const FString propertyName = entryNode->GetAttribute(TEXT("property"));
-            const FString pathStr = entryNode->GetAttribute(TEXT("path"));
-
-            if (!propertyName.IsEmpty() && !pathStr.IsEmpty())
-            {
-                bundle.Entries.Emplace(FSoftObjectPath(pathStr), FName(*propertyName));
-            }
-        }
-    }
-
-    return OutBundleData.HasBundles();
+    return DeserializeAssetBundles(InString, OutBundleData);
 }
 
 bool FSGDynamicTextAssetXmlSerializer::UpdateFileFormatVersion(FString& InOutFileContents,

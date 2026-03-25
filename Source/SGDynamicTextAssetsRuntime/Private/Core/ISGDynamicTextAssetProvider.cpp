@@ -2,7 +2,7 @@
 
 #include "Core/ISGDynamicTextAssetProvider.h"
 
-#include "Serialization/SGDTAAssetBundleExtender.h"
+#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
 #include "Statics/SGDynamicTextAssetStatics.h"
 
 bool ISGDynamicTextAssetProvider::Native_ValidateDynamicTextAsset(FSGDynamicTextAssetValidationResult& OutResult) const

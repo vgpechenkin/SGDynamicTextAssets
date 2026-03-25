@@ -47,7 +47,7 @@ class SGDYNAMICTEXTASSETSRUNTIME_API USGDynamicTextAsset : public UObject, publi
     friend class FSGDynamicTextAssetJsonSerializer;
 
 #if WITH_EDITOR
-    friend class FSGDynamicTextAssetIdentityCustomization;
+    friend class FSGDTADetailCustomization;
 #endif
 
 public:
@@ -125,25 +125,27 @@ protected:
     virtual bool ValidateDynamicTextAsset_Implementation(FSGDynamicTextAssetValidationResult& OutResult) const { return true; }
 
     /**
-     * Optional per-DTA override for the asset bundle extender.
-     * When set, this extender is used instead of the settings-level mapping.
-     * When null, the system falls back to settings configuration.
+     * - Optional -
+     * Per-DTA override for the asset bundle extender.
+     *
+     * - Set: This extender is used instead of the settings-level mapping.
+     * - NULL: The system falls back to settings configuration.
      */
-    UPROPERTY(EditAnywhere, Category = "Dynamic Text Asset|File Information")
+    UPROPERTY(EditAnywhere, Category = "SGDTA|File Information")
     TSoftClassPtr<USGDTAAssetBundleExtender> AssetBundleExtenderOverride = nullptr;
 
 private:
 
     /** Unique identifier that never changes after creation */
-    UPROPERTY(VisibleAnywhere, Category = "Dynamic Text Asset|Identity", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(VisibleAnywhere, Category = "SGDTA|Identity", meta = (AllowPrivateAccess = "true"))
     FSGDynamicTextAssetId DynamicTextAssetId;
 
     /** Human-readable identifier, can be renamed */
-    UPROPERTY(VisibleAnywhere, Category = "Dynamic Text Asset|Identity", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(VisibleAnywhere, Category = "SGDTA|Identity", meta = (AllowPrivateAccess = "true"))
     FString UserFacingId;
 
     /** Semantic version of this dynamic text asset instance */
-    UPROPERTY(VisibleAnywhere, Category = "Dynamic Text Asset|Identity", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(VisibleAnywhere, Category = "SGDTA|Identity", meta = (AllowPrivateAccess = "true"))
     FSGDynamicTextAssetVersion Version;
 
     /** Asset bundle data extracted from soft reference properties with AssetBundles metadata. */

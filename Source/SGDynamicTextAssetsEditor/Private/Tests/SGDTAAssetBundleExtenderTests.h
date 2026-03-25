@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 
-#include "Serialization/SGDTAAssetBundleExtender.h"
+#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
 
 #include "SGDTAAssetBundleExtenderTests.generated.h"
 

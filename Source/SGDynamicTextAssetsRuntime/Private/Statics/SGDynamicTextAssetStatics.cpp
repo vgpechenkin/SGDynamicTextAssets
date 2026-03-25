@@ -15,7 +15,7 @@
 #include "Serialization/SGDynamicTextAssetYamlSerializer.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 #include "SGDynamicTextAssetLogs.h"
-#include "Serialization/SGDTAAssetBundleExtender.h"
+#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
 #include "Settings/SGDynamicTextAssetSettings.h"
 #include "Subsystem/SGDynamicTextAssetSubsystem.h"
 #include "Engine/GameInstance.h"

@@ -2,7 +2,12 @@
 
 #include "Serialization/SGDynamicTextAssetSerializerBase.h"
 
+#include "Core/ISGDynamicTextAssetProvider.h"
+#include "Management/SGDynamicTextAssetRegistry.h"
+#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
+#include "Settings/SGDynamicTextAssetSettings.h"
 #include "SGDynamicTextAssetLogs.h"
+#include "Statics/SGDynamicTextAssetStatics.h"
 #include "Core/SGDynamicTextAsset.h"
 #include "Dom/JsonObject.h"
 #include "JsonObjectConverter.h"
@@ -354,4 +359,81 @@ void FSGDynamicTextAssetSerializerBase::CollectInstancedObjectClasses(
     TSet<TObjectPtr<UClass>>& OutClasses)
 {
     SGDynamicTextAssetSerializerBasePrivate::CollectFromObject(Object, OutClasses);
+}
+
+void FSGDynamicTextAssetSerializerBase::SerializeAssetBundles(
+    const ISGDynamicTextAssetProvider* Provider,
+    FString& InOutSerializedContent) const
+{
+    if (!Provider)
+    {
+        return;
+    }
+
+    const UObject* providerObject = Cast<UObject>(const_cast<ISGDynamicTextAssetProvider*>(Provider));
+    if (!providerObject)
+    {
+        return;
+    }
+
+    TScriptInterface<ISGDynamicTextAssetProvider> providerInterface;
+    providerInterface.SetObject(const_cast<UObject*>(providerObject));
+    providerInterface.SetInterface(const_cast<ISGDynamicTextAssetProvider*>(Provider));
+
+    const TSoftClassPtr<USGDTAAssetBundleExtender> extenderClass =
+        USGDynamicTextAssetStatics::ResolveAssetBundleExtender(providerInterface, GetSerializerFormat());
+    if (extenderClass.IsNull())
+    {
+        return;
+    }
+
+    USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get();
+    if (!registry)
+    {
+        return;
+    }
+
+    USGDTAAssetBundleExtender* extender = registry->GetOrCreateAssetBundleExtender(extenderClass);
+    if (!extender)
+    {
+        return;
+    }
+
+    FSGDynamicTextAssetBundleData bundleData;
+    extender->NotifyExtractBundles(providerObject, bundleData);
+    extender->NotifySerializeBundles(bundleData, InOutSerializedContent, GetSerializerFormat());
+}
+
+bool FSGDynamicTextAssetSerializerBase::DeserializeAssetBundles(
+    const FString& SerializedContent,
+    FSGDynamicTextAssetBundleData& OutBundleData) const
+{
+    // No provider available for per-DTA override lookup.
+    // Resolve from settings mapping for this format only.
+    const USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings();
+    if (!settings)
+    {
+        return false;
+    }
+
+    USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get();
+    if (!registry)
+    {
+        return false;
+    }
+
+    const uint32 formatBit = 1u << GetSerializerFormat().GetTypeId();
+    for (const FSGAssetBundleExtenderMapping& mapping : settings->AssetBundleExtenderMappings)
+    {
+        if ((mapping.AppliesTo.GetTypeId() & formatBit) != 0 && !mapping.ExtenderClass.IsNull())
+        {
+            if (USGDTAAssetBundleExtender* extender =
+                registry->GetOrCreateAssetBundleExtender(mapping.ExtenderClass))
+            {
+                return extender->NotifyDeserializeBundles(SerializedContent, OutBundleData, GetSerializerFormat());
+            }
+        }
+    }
+
+    return false;
 }

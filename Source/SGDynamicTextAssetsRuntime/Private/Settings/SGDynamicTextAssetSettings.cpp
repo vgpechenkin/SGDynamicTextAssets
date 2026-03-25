@@ -5,7 +5,9 @@
 #include "Engine/AssetManager.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
+#include "Serialization/AssetBundleExtenders/SGDTADefaultAssetBundleExtender.h"
 #include "SGDynamicTextAssetLogs.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
@@ -13,12 +15,23 @@
 
 USGDynamicTextAssetSettingsAsset::USGDynamicTextAssetSettingsAsset()
 {
-	// TODO Fill in with the default asset bundle extender when its made
-	{
-		// Iterate over all serializers to setup default configurations for all serializers
-		//TArray<TSharedPtr<ISGDynamicTextAssetSerializer>> serializers =
-			//FSGDynamicTextAssetFileManager::GetAllRegisteredSerializers();
-	}
+	// Default mapping: USGDTADefaultAssetBundleExtender covers all built-in formats
+	const uint32 allFormatsBitmask =
+		(1u << SGDynamicTextAssetConstants::JSON_SERIALIZER_TYPE_ID) |
+		(1u << SGDynamicTextAssetConstants::XML_SERIALIZER_TYPE_ID) |
+		(1u << SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID);
+
+	FSGAssetBundleExtenderMapping defaultMapping;
+
+	defaultMapping.AppliesTo = FSGDTASerializerFormat::FromTypeId(
+		(1u << SGDynamicTextAssetConstants::JSON_SERIALIZER_TYPE_ID)
+		| (1u << SGDynamicTextAssetConstants::XML_SERIALIZER_TYPE_ID)
+		| (1u << SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID));
+
+	defaultMapping.ExtenderClass = TSoftClassPtr<USGDTAAssetBundleExtender>(
+		USGDTADefaultAssetBundleExtender::StaticClass());
+
+	AssetBundleExtenderMappings.Add(defaultMapping);
 }
 
 #if WITH_EDITOR

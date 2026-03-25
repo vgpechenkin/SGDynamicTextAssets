@@ -2,7 +2,7 @@
 
 #include "Core/SGDynamicTextAsset.h"
 
-#include "Serialization/SGDTAAssetBundleExtender.h"
+#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
 
 USGDynamicTextAsset::USGDynamicTextAsset()
 {

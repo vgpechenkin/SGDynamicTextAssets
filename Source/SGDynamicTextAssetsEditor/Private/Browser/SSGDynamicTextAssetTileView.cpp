@@ -4,13 +4,13 @@
 
 #include "Browser/SSGDynamicTextAssetDuplicateDialog.h"
 #include "Browser/SSGDynamicTextAssetRenameDialog.h"
-#include "Editor/FSGDynamicTextAssetEditorToolkit.h"
+#include "Editor/SGDynamicTextAssetEditorToolkit.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "ReferenceViewer/SSGDynamicTextAssetReferenceViewer.h"
 #include "SGDynamicTextAssetEditorLogs.h"
-#include "Editor/SGDynamicTextAssetIdentityCustomization.h"
+#include "Editor/SGDTADetailCustomization.h"
 #include "Editor/SSGDynamicTextAssetIcon.h"
 #include "Framework/Commands/GenericCommands.h"
 #include "HAL/PlatformApplicationMisc.h"
@@ -316,7 +316,7 @@ TSharedRef<ITableRow> SSGDynamicTextAssetTileView::GenerateRow(TSharedPtr<FSGDTA
                 .AutoWidth()
                 .Padding(4.0f, 0.0f, 0.0f, 0.0f)
                 [
-                    FSGDynamicTextAssetIdentityCustomization::CreateCopyButton(
+                    FSGDTADetailCustomization::CreateCopyButton(
                         FOnClicked::CreateLambda([Item]() -> FReply
                         {
                             if (Item.IsValid())
