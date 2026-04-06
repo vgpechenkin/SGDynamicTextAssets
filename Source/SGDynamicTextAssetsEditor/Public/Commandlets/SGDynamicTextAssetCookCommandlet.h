@@ -21,7 +21,7 @@
  * - Converts them to compressed binary .dta.bin format
  * - Outputs flat ID-named files + dta_manifest.bin
  *
- * Default output: Content/SGDynamicTextAssetsCooked/
+ * Default output: Content/_SGDynamicTextAssetsCooked/
  * The -output flag overrides this for custom workflows.
  *
  * Command Line Usage:
@@ -32,7 +32,7 @@
  *   -clean       Clean only: delete all cooked files without cooking
  *   -noclean     Skip pre-cook directory cleaning (for build machine iterative builds)
  *   -output=Path Output directory for cooked files (relative to project root)
- *                Overrides default Content/SGDynamicTextAssetsCooked/
+ *                Overrides default Content/_SGDynamicTextAssetsCooked/
  *   -class=Name  Only process files for a specific class (e.g., UWeaponData)
  *
  * Examples:

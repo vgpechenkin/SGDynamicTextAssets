@@ -95,7 +95,7 @@ public:
 	 * Returns the root directory for cooked dynamic text assets.
 	 * Delegates to FSGDynamicTextAssetFileManager::GetCookedDynamicTextAssetsRootPath().
 	 *
-	 * @return Absolute path to Content/SGDynamicTextAssetsCooked/
+	 * @return Absolute path to Content/_SGDynamicTextAssetsCooked/
 	 */
 	static FString GetCookedOutputRootPath();
 

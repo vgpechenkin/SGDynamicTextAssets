@@ -262,20 +262,20 @@ public:
 
     /**
      * Returns the root directory for cooked dynamic text assets.
-     * @return Absolute path to Content/SGDynamicTextAssetsCooked/
+     * @return Absolute path to Content/_SGDynamicTextAssetsCooked/
      */
     static FString GetCookedDynamicTextAssetsRootPath();
 
     /**
      * Returns the path to the generated metadata subdirectory within the cooked output.
      * Contains the cook manifest, extender manifests, and type manifests.
-     * @return Absolute path to Content/SGDynamicTextAssetsCooked/_Generated/
+     * @return Absolute path to Content/_SGDynamicTextAssetsCooked/_Generated/
      */
     static FString GetCookedGeneratedPath();
 
     /**
      * Returns the path to the cooked type manifests subdirectory.
-     * @return Absolute path to Content/SGDynamicTextAssetsCooked/_Generated/_TypeManifests/
+     * @return Absolute path to Content/_SGDynamicTextAssetsCooked/_Generated/_TypeManifests/
      */
     static FString GetCookedTypeManifestsPath();
 

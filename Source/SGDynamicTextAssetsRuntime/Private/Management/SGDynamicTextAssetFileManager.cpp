@@ -1155,7 +1155,7 @@ FString FSGDynamicTextAssetFileManager::GetInternalFilesRootPath()
 
 FString FSGDynamicTextAssetFileManager::GetCookedDynamicTextAssetsRootPath()
 {
-    return FPaths::Combine(FPaths::ProjectContentDir(), TEXT("SGDynamicTextAssetsCooked"));
+    return FPaths::Combine(FPaths::ProjectContentDir(), TEXT("_SGDynamicTextAssetsCooked"));
 }
 
 FString FSGDynamicTextAssetFileManager::GetCookedGeneratedPath()

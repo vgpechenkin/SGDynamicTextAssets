@@ -27,7 +27,7 @@ using Microsoft.Extensions.Logging;
 [CustomDeploymentHandler("SGDynamicTextAssetsCleanup")]
 public class SGDynamicTextAssetsPostPackageCleanup : CustomDeploymentHandler
 {
-	private static readonly string COOKED_DIRECTORY_NAME = "SGDynamicTextAssetsCooked";
+	private static readonly string COOKED_DIRECTORY_NAME = "_SGDynamicTextAssetsCooked";
 	private static readonly string BINARY_EXTENSION = ".dta.bin";
 	private static readonly string MANIFEST_FILENAME = "dta_manifest.bin";
 	private static readonly string TYPE_MANIFESTS_DIRECTORY = "_TypeManifests";

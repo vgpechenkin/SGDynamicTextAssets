@@ -586,11 +586,11 @@ private:
             UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
                 TEXT("Cooked dynamic text asset binaries in '%s' are tracked by source control. "
                      "These are generated artifacts and should be excluded. "
-                     "Add 'Content/SGDynamicTextAssetsCooked/' to your source control's ignore file."),
+                     "Add 'Content/_SGDynamicTextAssetsCooked/' to your source control's ignore file."),
                 *cookedRoot);
 
             FNotificationInfo notificationInfo(INVTEXT("SGDynamicTextAssets: Cooked binary files are tracked by source control.\n"
-                "Add 'Content/SGDynamicTextAssetsCooked/' to your source control's ignore file."));
+                "Add 'Content/_SGDynamicTextAssetsCooked/' to your source control's ignore file."));
             notificationInfo.bFireAndForget = true;
             notificationInfo.ExpireDuration = 10.0f;
             notificationInfo.bUseThrobber = false;
@@ -601,12 +601,12 @@ private:
 
     /**
      * Registers the cooked dynamic text assets directory for staging into packaged builds.
-     * Ensures SGDynamicTextAssetsCooked is added to DirectoriesToAlwaysStageAsUFS
+     * Ensures _SGDynamicTextAssetsCooked is added to DirectoriesToAlwaysStageAsUFS
      * so that .dta.bin files and dta_manifest.bin are included in the pak file.
      */
     void RegisterCookedDirectoryForStaging()
     {
-        static const FString COOKED_DIRECTORY_NAME = TEXT("SGDynamicTextAssetsCooked");
+        static const FString COOKED_DIRECTORY_NAME = TEXT("_SGDynamicTextAssetsCooked");
 
         UProjectPackagingSettings* packagingSettings = GetMutableDefault<UProjectPackagingSettings>();
         if (!packagingSettings)
