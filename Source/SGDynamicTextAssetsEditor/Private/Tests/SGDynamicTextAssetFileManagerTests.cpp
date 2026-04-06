@@ -5,6 +5,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "Serialization/SGDynamicTextAssetBinarySerializer.h"
 #include "Core/SGDynamicTextAsset.h"
 #include "Serialization/SGDTABinaryEncodeParams.h"
@@ -169,7 +170,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSGDynamicTextAssetFileManager_BuildFilePath_JsonExtension::RunTest(const FString& Parameters)
 {
 	// Passing nullptr for class should still work (uses root path)
-    FString result = FSGDynamicTextAssetFileManager::BuildFilePath(nullptr, TEXT("test_item"), FSGDynamicTextAssetFileManager::DEFAULT_TEXT_EXTENSION);
+    FString result = FSGDynamicTextAssetFileManager::BuildFilePath(nullptr, TEXT("test_item"), SGDynamicTextAssetConstants::JSON_FILE_EXTENSION);
 
 	TestTrue(TEXT("Path with bBinary=false should end with .dta.json"), result.EndsWith(TEXT(".dta.json")));
 	TestTrue(TEXT("Path should contain the user facing ID"), result.Contains(TEXT("test_item")));
@@ -184,7 +185,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetFileManager_BuildFilePath_BinaryExtension::RunTest(const FString& Parameters)
 {
-	FString result = FSGDynamicTextAssetFileManager::BuildFilePath(nullptr, TEXT("test_item"), FSGDynamicTextAssetFileManager::BINARY_EXTENSION);
+	FString result = FSGDynamicTextAssetFileManager::BuildFilePath(nullptr, TEXT("test_item"), SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION);
 
 	TestTrue(TEXT("Path with bBinary=true should end with .dta.bin"), result.EndsWith(TEXT(".dta.bin")));
 	TestTrue(TEXT("Path should contain the user facing ID"), result.Contains(TEXT("test_item")));
@@ -201,7 +202,7 @@ bool FSGDynamicTextAssetFileManager_BuildFilePath_WithClass::RunTest(const FStri
 {
 	// Use USGDynamicTextAsset as the class (even though it's abstract, BuildFilePath should handle it)
 	UClass* testClass = USGDynamicTextAsset::StaticClass();
-	FString result = FSGDynamicTextAssetFileManager::BuildFilePath(testClass, TEXT("my_data_object"), FSGDynamicTextAssetFileManager::DEFAULT_TEXT_EXTENSION);
+	FString result = FSGDynamicTextAssetFileManager::BuildFilePath(testClass, TEXT("my_data_object"), SGDynamicTextAssetConstants::JSON_FILE_EXTENSION);
 
 	TestTrue(TEXT("Path should end with .dta.json"), result.EndsWith(TEXT(".dta.json")));
 	TestTrue(TEXT("Path should contain the user facing ID"), result.Contains(TEXT("my_data_object")));
@@ -294,7 +295,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSGDynamicTextAssetFileManager_ReadRawFileContents_BinaryRoundtrip::RunTest(const FString& Parameters)
 {
-	// This test validates T13.1 binary-aware reading:
+	// This test validates binary-aware reading:
 	// 1. Create a known JSON string
 	// 2. Use FSGDynamicTextAssetBinarySerializer::StringToBinary() to convert to binary
 	// 3. Use FSGDynamicTextAssetBinarySerializer::WriteBinaryFile() to write to temp file

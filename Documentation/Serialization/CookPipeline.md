@@ -124,7 +124,7 @@ If `SGDynamicTextAssetsCooked` is missing from the staging list:
    +DirectoriesToAlwaysStageAsUFS=(Path="SGDynamicTextAssetsCooked")
    ```
 3. **Restart the editor** after enabling the plugin. The staging directory registration happens at module startup, not dynamically.
-4. **Verify the cooked directory exists.** The directory `Content/SGDynamicTextAssetsCooked/` must contain cooked `.dta.bin` files and `dta_manifest.bin` before packaging. Run the cook commandlet or trigger a cook via File > Package Project to populate it.
+4. **Verify the cooked directory exists.** The directory `Content/SGDynamicTextAssetsCooked/` must contain cooked `.dta.bin` files and `_Generated/dta_manifest.bin` before packaging. Run the cook commandlet or trigger a cook via File > Package Project to populate it.
 
 If the directory is registered but files are still missing from the packaged build, confirm that the cook delegate or commandlet ran successfully by checking the Output Log for `LogSGDynamicTextAssetsEditor` messages during the cook.
 
@@ -218,7 +218,7 @@ After the packaging process completes (after pak file staging), cooked directory
 
 **Configuration:**
 - **INI:** `CustomDeployment=SGDynamicTextAssetsCleanup` in `DefaultEngine.ini` under `[/Script/WindowsTargetPlatform.WindowsTargetSettings]`
-- **Setting:** `bDeleteCookedAssetsAfterPackaging` in `DefaultGame.ini` under `[SGDynamicTextAssets]` (default: `true`). Set to `false` to disable post-package cleanup.
+- **Setting:** `bDeleteCookedAssetsAfterPackaging` in `DefaultGame.ini` under `[/Script/SGDynamicTextAssetsRuntime.SGDynamicTextAssetSettings]` (default: `true`). Set to `false` to disable post-package cleanup.
 
 **Note:** The `CustomDeploymentHandler` mechanism currently supports one handler per platform. If the project requires an additional custom deployment handler, a composite handler pattern would be needed to chain both handlers.
 
@@ -244,7 +244,7 @@ After pak staging, the handler deletes:
 | Setting | Location | Default | Description |
 |---------|----------|---------|-------------|
 | `CustomDeployment` | `DefaultEngine.ini` under platform target settings | - | Set to `SGDynamicTextAssetsCleanup` to activate the handler |
-| `bDeleteCookedAssetsAfterPackaging` | `DefaultGame.ini` under `[SGDynamicTextAssets]` | `true` | Set to `false` to disable cleanup |
+| `bDeleteCookedAssetsAfterPackaging` | `DefaultGame.ini` under `[/Script/SGDynamicTextAssetsRuntime.SGDynamicTextAssetSettings]` | `true` | Set to `false` to disable cleanup |
 
 ### Platform Support
 

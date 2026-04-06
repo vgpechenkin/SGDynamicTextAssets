@@ -2,7 +2,6 @@
 
 #include "Serialization/SGDynamicTextAssetBinarySerializer.h"
 
-#include "SGDynamicTextAssetLogs.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/SecureHash.h"
@@ -11,6 +10,8 @@
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/SGDTABinaryEncodeParams.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
+#include "SGDynamicTextAssetLogs.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 
 bool FSGDynamicTextAssetBinarySerializer::StringToBinary(
 	const FString& PayloadString,
@@ -426,7 +427,7 @@ bool FSGDynamicTextAssetBinarySerializer::IsValidBinaryData(const TArray<uint8>&
 
 FString FSGDynamicTextAssetBinarySerializer::GetFileExtension()
 {
-	return FSGDynamicTextAssetFileManager::BINARY_EXTENSION;
+	return SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION;
 }
 
 FName FSGDynamicTextAssetBinarySerializer::GetCompressionFormatName(ESGDynamicTextAssetCompressionMethod CompressionMethod)
@@ -451,8 +452,7 @@ FName FSGDynamicTextAssetBinarySerializer::GetCompressionFormatName(ESGDynamicTe
 		}
 		case ESGDynamicTextAssetCompressionMethod::Custom:
 		{
-			USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings();
-			return settings ? settings->GetCustomCompressionName() : NAME_None;
+			return USGDynamicTextAssetSettings::Get()->GetCustomCompressionName();
 		}
 		default:
 		{

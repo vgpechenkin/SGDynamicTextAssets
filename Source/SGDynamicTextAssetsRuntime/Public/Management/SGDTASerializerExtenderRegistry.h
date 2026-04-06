@@ -6,7 +6,7 @@
 #include "Core/SGDTAClassId.h"
 #include "UObject/SoftObjectPtr.h"
 
-class FJsonObject;
+class FSGDTAExtenderManifest;
 
 /**
  * Single entry in the serializer extender registry.
@@ -36,30 +36,16 @@ public:
 };
 
 /**
- * Flat registry mapping FSGDTAClassId to serializer extender UClasses.
+ * Manifest manager that coordinates multiple FSGDTAExtenderManifest instances,
+ * one per extender framework.
  *
- * Follows the FSGDynamicTextAssetTypeManifest pattern but without
- * hierarchy (no parent IDs, no root type ID). Provides O(1) lookup
- * by extender ID or class name, JSON persistence with schema versioning,
- * and runtime server overlay support.
+ * All per-entry operations (add, remove, find, lookup) go through individual
+ * manifests obtained via GetOrCreateManifest() or GetManifest(). The registry
+ * handles directory-level persistence: scanning for manifest files, loading
+ * them, and saving dirty manifests back to disk.
  *
- * Registry JSON format:
- * {
- *   "schema": "dta_extender_registry",
- *   "version": 1,
- *   "extenders": [
- *     {
- *       "extenderId": "A1B2C3D4-...",
- *       "className": "USGDefaultAssetBundleExtender",
- *       "classPath": "/Script/SGDynamicTextAssetsRuntime.USGDefaultAssetBundleExtender"
- *     }
- *   ]
- * }
- *
- * Server overlay support: server-provided extender data can override or
- * extend the local registry without modifying the on-disk file. Overlay
- * entries take precedence over local entries when resolving via
- * GetEffectiveEntry().
+ * File naming convention: DTA_{FrameworkKey}_extenders.dta.json / .dta.bin
+ * Example: DTA_AssetBundleExtenders_extenders.dta.json
  */
 class SGDYNAMICTEXTASSETSRUNTIME_API FSGDTASerializerExtenderRegistry
 {
@@ -68,181 +54,89 @@ public:
 	FSGDTASerializerExtenderRegistry() = default;
 
 	/**
-	 * Loads the registry from a JSON file.
+	 * Returns the manifest for the given framework key, creating one if it does not exist.
+	 * The returned pointer is never null.
 	 *
-	 * @param FilePath Absolute path to the registry JSON file
-	 * @return True if file was loaded and parsed successfully
+	 * @param FrameworkKey Identifies which extender framework this manifest serves
+	 * @return Shared pointer to the manifest (always valid)
 	 */
-	bool LoadFromFile(const FString& FilePath);
+	TSharedPtr<FSGDTAExtenderManifest> GetOrCreateManifest(FName FrameworkKey);
 
 	/**
-	 * Saves the registry to a JSON file.
+	 * Returns the manifest for the given framework key, or nullptr if none exists.
 	 *
-	 * @param FilePath Absolute path to write the registry JSON file
-	 * @return True if file was written successfully
+	 * @param FrameworkKey Identifies which extender framework to look up
+	 * @return Shared pointer to the manifest, or nullptr if not found
 	 */
-	bool SaveToFile(const FString& FilePath) const;
+	TSharedPtr<FSGDTAExtenderManifest> GetManifest(FName FrameworkKey) const;
 
 	/**
-	 * Finds a local registry entry by extender ID. O(1) lookup.
-	 * Does not consider server overlays. Use GetEffectiveEntry() for that.
+	 * Returns all registered framework keys.
 	 *
-	 * @param ExtenderId The extender ID to search for
-	 * @return Pointer to the entry if found, nullptr otherwise
+	 * @return Array of framework keys for all managed manifests
 	 */
-	const FSGDTASerializerExtenderRegistryEntry* FindByExtenderId(const FSGDTAClassId& ExtenderId) const;
+	TArray<FName> GetAllManifestKeys() const;
 
 	/**
-	 * Finds a local registry entry by class name. O(1) lookup.
-	 * Does not consider server overlays.
+	 * Scans a directory for manifest files and loads each into a managed manifest.
+	 * Files must match the naming pattern: DTA_{FrameworkKey}_extenders.dta.json
 	 *
-	 * @param ClassName Class name to search for (e.g., "USGDefaultAssetBundleExtender")
-	 * @return Pointer to the entry if found, nullptr otherwise
+	 * @param Directory Absolute path to the directory containing manifest files
+	 * @return True if at least one manifest was loaded successfully
 	 */
-	const FSGDTASerializerExtenderRegistryEntry* FindByClassName(const FString& ClassName) const;
+	bool LoadAllManifests(const FString& Directory);
 
 	/**
-	 * Adds an extender entry to the registry.
-	 * If an extender with the same ID already exists, it is replaced.
+	 * Saves all dirty manifests to the given directory.
+	 * Each manifest is written as DTA_{FrameworkKey}_extenders.dta.json.
 	 *
-	 * @param ExtenderId Unique extender identifier
-	 * @param InClass Soft class reference to the extender class
+	 * @param Directory Absolute path to write manifest files
+	 * @return True if all saves succeeded
 	 */
-	void AddExtender(const FSGDTAClassId& ExtenderId, const TSoftClassPtr<UObject>& InClass);
+	bool SaveAllManifests(const FString& Directory) const;
 
 	/**
-	 * Removes an extender entry from the registry.
+	 * Scans a directory for binary manifest files and loads each into a managed manifest.
+	 * Files must match the naming pattern: DTA_{FrameworkKey}_extenders.dta.bin
 	 *
-	 * @param ExtenderId The extender ID to remove
-	 * @return True if the entry was found and removed
+	 * @param Directory Absolute path to the directory containing binary manifest files
+	 * @return True if at least one manifest was loaded successfully
 	 */
-	bool RemoveExtender(const FSGDTAClassId& ExtenderId);
-
-	/** Returns all local extender entries. Does not include server overlay entries. */
-	const TArray<FSGDTASerializerExtenderRegistryEntry>& GetAllExtenders() const;
+	bool LoadAllManifestsBinary(const FString& Directory);
 
 	/**
-	 * Returns all effective extender entries, combining local entries with server overlay.
-	 * Local entries overridden by server are replaced, server-disabled entries are excluded,
-	 * and server-added entries (not present locally) are appended.
+	 * Saves all managed manifests as binary files to the given directory.
+	 * Each manifest is written as DTA_{FrameworkKey}_extenders.dta.bin.
+	 * Unlike SaveAllManifests, this always writes every manifest regardless of dirty state.
 	 *
-	 * @param OutEntries Array to populate with all effective extender entries
+	 * @param CookedDirectory Absolute path to write binary manifest files
+	 * @return True if all saves succeeded
 	 */
-	void GetAllEffectiveExtenders(TArray<FSGDTASerializerExtenderRegistryEntry>& OutEntries) const;
+	bool BakeAllManifests(const FString& CookedDirectory) const;
+
+	/** Returns true if any managed manifest has been modified since last save/load. */
+	bool HasAnyDirty() const;
+
+	/** Removes all managed manifests. */
+	void ClearAllManifests();
+
+	/** Returns the number of managed manifests. */
+	int32 NumManifests() const;
+
+	/** Returns true if managed manifests is empty. False if there are actual manifests. */
+	bool IsEmptyManfiests() const;
 
 	/**
-	 * Returns the soft class pointer for a given extender ID.
-	 * Checks the server overlay first, then local entries.
+	 * Searches all managed manifests for an entry matching the given class.
+	 * Returns the extender ID if found, or FSGDTAClassId::INVALID_CLASS_ID.
 	 *
-	 * @param ExtenderId The extender ID to look up
-	 * @return The soft class pointer, or a null TSoftClassPtr if not found
+	 * @param InClass The UClass to look up
+	 * @return The extender's ClassId, or INVALID_CLASS_ID if not registered
 	 */
-	TSoftClassPtr<UObject> GetSoftClassPtr(const FSGDTAClassId& ExtenderId) const;
-
-	/**
-	 * Returns the soft class pointer for a given class name.
-	 * Only checks local entries (not server overlay).
-	 *
-	 * @param ClassName Class name to look up
-	 * @return The soft class pointer, or a null TSoftClassPtr if not found
-	 */
-	TSoftClassPtr<UObject> GetSoftClassPtrByClassName(const FString& ClassName) const;
-
-	/** Returns the number of local extender entries. */
-	int32 Num() const;
-
-	/** Returns true if the registry has been modified since last save/load. */
-	bool IsDirty() const;
-
-	/** Clears all local entries and indices. Does not affect server overlay. */
-	void Clear();
-
-	/**
-	 * Applies server-provided extender overrides.
-	 * Server overlay is stored separately; the local registry file is never modified.
-	 *
-	 * Expected JSON format (same "extenders" array as the registry):
-	 * {
-	 *   "extenders": [
-	 *     { "extenderId": "...", "className": "..." }
-	 *   ]
-	 * }
-	 *
-	 * Server can: add new extender entries, override existing entries (remap ID
-	 * to different class), or remove entries by providing an entry with an empty
-	 * className.
-	 *
-	 * @param ServerData JSON object containing server extender overrides
-	 */
-	void ApplyServerOverrides(const TSharedPtr<FJsonObject>& ServerData);
-
-	/**
-	 * Returns the effective entry for an extender ID, considering server overlay.
-	 * Server overlay entries take precedence over local entries.
-	 * An overlay entry with empty ClassName means the extender is disabled.
-	 *
-	 * @param ExtenderId The extender ID to look up
-	 * @return Pointer to the effective entry, or nullptr if not found or disabled
-	 */
-	const FSGDTASerializerExtenderRegistryEntry* GetEffectiveEntry(const FSGDTAClassId& ExtenderId) const;
-
-	/** Clears all server overlay entries, reverting to local-only state. */
-	void ClearServerOverrides();
-
-	/** Returns true if there are any active server overlay entries. */
-	bool HasServerOverrides() const;
-
-	/** Current registry format version. */
-	static constexpr int32 REGISTRY_VERSION = 1;
-
-	/** Key for schema type. */
-	static const FString KEY_SCHEMA;
-
-	/** Value for schema type. */
-	static const FString VALUE_SCHEMA;
-
-	/** Key for registry version. */
-	static const FString KEY_VERSION;
-
-	/** Key for extenders array. */
-	static const FString KEY_EXTENDERS;
-
-	/** Key for an extender entry's extender ID. */
-	static const FString KEY_EXTENDER_ID;
-
-	/** Key for an extender entry's class name. */
-	static const FString KEY_CLASS_NAME;
-
-	/** Key for an extender entry's full soft class path. */
-	static const FString KEY_CLASS_PATH;
+	FSGDTAClassId FindExtenderIdByClass(const UClass* InClass) const;
 
 private:
 
-	/** Rebuilds the ExtenderId and ClassName lookup indices from the entries array. */
-	void RebuildIndices();
-
-	/**
-	 * Parses a single extender entry from a JSON object.
-	 *
-	 * @param EntryObject JSON object to parse
-	 * @param OutEntry Populated on success
-	 * @return True if the entry was valid and parsed successfully
-	 */
-	static bool ParseExtenderEntry(const TSharedPtr<FJsonObject>& EntryObject,
-		FSGDTASerializerExtenderRegistryEntry& OutEntry);
-
-	/** All local registry entries. */
-	TArray<FSGDTASerializerExtenderRegistryEntry> Extenders;
-
-	/** ExtenderId -> index into Extenders array for O(1) lookup. */
-	TMap<FSGDTAClassId, int32> ExtenderIdIndex;
-
-	/** ClassName -> index into Extenders array for O(1) lookup. */
-	TMap<FString, int32> ClassNameIndex;
-
-	/** Server overlay entries. Stored separately from local entries. */
-	TMap<FSGDTAClassId, FSGDTASerializerExtenderRegistryEntry> ServerOverlayEntries;
-
-	/** Whether the registry has been modified since last save/load. */
-	uint8 bIsDirty : 1 = 0;
+	/** All managed manifests, keyed by framework name. */
+	TMap<FName, TSharedRef<FSGDTAExtenderManifest>> ManagedManifests;
 };

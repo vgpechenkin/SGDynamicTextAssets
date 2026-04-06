@@ -39,7 +39,7 @@
  *
  * Operates on a single instance on this machine.
  */
-UCLASS(Abstract, Blueprintable, BlueprintType, ClassGroup = "Start Games")
+UCLASS(Abstract, Blueprintable, BlueprintType, ClassGroup = "Start Games", DisplayName = "Asset Bundle Extender (Abstract Base)")
 class SGDYNAMICTEXTASSETSRUNTIME_API USGDTAAssetBundleExtender : public USGDTASerializerExtenderBase
 {
 	GENERATED_BODY()
@@ -59,27 +59,50 @@ public:
 		FSGDynamicTextAssetBundleData& OutBundleData) const;
 
 	/**
-	 * Writes bundle data into the serialized content string.
-	 * Calls Native_SerializeBundles followed by BP_SerializeBundles.
+	 * Pre-serialization hook. Called before provider properties are serialized.
+	 * Calls Native_PreSerialize followed by BP_PreSerialize.
 	 *
-	 * @param BundleData The bundle data to serialize
-	 * @param InOutSerializedContent The full serialized file content to modify
+	 * @param InOutContent The serialized content to pre-process
 	 * @param Format The serializer format of the content
 	 */
-	void NotifySerializeBundles(const FSGDynamicTextAssetBundleData& BundleData,
-		FString& InOutSerializedContent, const FSGDTASerializerFormat& Format) const;
+	void NotifyPreSerialize(FString& InOutContent, const FSGDTASerializerFormat& Format) const;
 
 	/**
-	 * Reads bundle data from the serialized content string.
-	 * Calls Native_DeserializeBundles followed by BP_DeserializeBundles.
+	 * Post-serialization hook. Called after provider properties are serialized.
+	 * Writes bundle data into the serialized content string.
+	 * Calls Native_PostSerialize followed by BP_PostSerialize.
 	 *
-	 * @param SerializedContent The full serialized file content to read from
-	 * @param OutBundleData Populated with deserialized bundle metadata
+	 * @param BundleData The bundle data to serialize
+	 * @param InOutContent The full serialized file content to modify
 	 * @param Format The serializer format of the content
-	 * @return True if bundle data was successfully deserialized
 	 */
-	bool NotifyDeserializeBundles(const FString& SerializedContent,
+	void NotifyPostSerialize(const FSGDynamicTextAssetBundleData& BundleData,
+		FString& InOutContent, const FSGDTASerializerFormat& Format) const;
+
+	/**
+	 * Pre-deserialization hook. Called before provider properties are deserialized.
+	 * Extracts bundle metadata AND restores wrapped properties to plain format.
+	 * Calls Native_PreDeserialize followed by BP_PreDeserialize.
+	 *
+	 * @param InOutContent The serialized content (mutable, extender may unwrap properties)
+	 * @param OutBundleData Populated with extracted bundle metadata
+	 * @param Format The serializer format of the content
+	 * @return True if pre-deserialization succeeded
+	 */
+	bool NotifyPreDeserialize(FString& InOutContent,
 		FSGDynamicTextAssetBundleData& OutBundleData, const FSGDTASerializerFormat& Format) const;
+
+	/**
+	 * Post-deserialization hook. Called after provider properties are deserialized.
+	 * Calls Native_PostDeserialize followed by BP_PostDeserialize.
+	 *
+	 * @param Content The serialized content (read-only)
+	 * @param InOutBundleData Bundle data to post-process
+	 * @param Format The serializer format of the content
+	 * @return True if post-deserialization succeeded
+	 */
+	bool NotifyPostDeserialize(const FString& Content,
+		FSGDynamicTextAssetBundleData& InOutBundleData, const FSGDTASerializerFormat& Format) const;
 
 protected:
 
@@ -94,30 +117,37 @@ protected:
 		FSGDynamicTextAssetBundleData& OutBundleData) const;
 
 	/**
-	 * C++ implementation of bundle serialization.
-	 * Default: no-op. Subclasses must override to produce meaningful output.
-	 *
-	 * @param BundleData The bundle data to serialize
-	 * @param InOutSerializedContent The full serialized file content to modify
-	 * @param Format The serializer format of the content
+	 * C++ implementation of pre-serialization.
+	 * Default: no-op. Override to prepare content before property serialization.
 	 */
-	virtual void Native_SerializeBundles(const FSGDynamicTextAssetBundleData& BundleData,
-		FString& InOutSerializedContent, const FSGDTASerializerFormat& Format) const;
+	virtual void Native_PreSerialize(FString& InOutContent,
+		const FSGDTASerializerFormat& Format) const;
 
 	/**
-	 * C++ implementation of bundle deserialization.
-	 * Default: returns true (passthrough).
-	 *
-	 * @param SerializedContent The full serialized file content to read from
-	 * @param OutBundleData Populated with deserialized bundle metadata
-	 * @param Format The serializer format of the content
-	 * @return True if bundle data was successfully deserialized
+	 * C++ implementation of post-serialization.
+	 * Default: no-op. Subclasses override to inject bundle data into content.
 	 */
-	virtual bool Native_DeserializeBundles(const FString& SerializedContent,
+	virtual void Native_PostSerialize(const FSGDynamicTextAssetBundleData& BundleData,
+		FString& InOutContent, const FSGDTASerializerFormat& Format) const;
+
+	/**
+	 * C++ implementation of pre-deserialization.
+	 * Default: returns true (passthrough). Subclasses override to extract
+	 * bundle metadata and restore wrapped properties to plain format.
+	 */
+	virtual bool Native_PreDeserialize(FString& InOutContent,
 		FSGDynamicTextAssetBundleData& OutBundleData, const FSGDTASerializerFormat& Format) const;
 
 	/**
-	 * Blueprint hook for additional bundle extraction logic.
+	 * C++ implementation of post-deserialization.
+	 * Default: returns true (passthrough). Override for post-processing
+	 * after properties are deserialized.
+	 */
+	virtual bool Native_PostDeserialize(const FString& Content,
+		FSGDynamicTextAssetBundleData& InOutBundleData, const FSGDTASerializerFormat& Format) const;
+
+	/**
+	 * Blueprint hook for bundle extraction.
 	 * Called by NotifyExtractBundles after Native_ExtractBundles.
 	 * Default: no-op.
 	 */
@@ -128,27 +158,35 @@ protected:
 	virtual void BP_ExtractBundles_Implementation(const UObject* Provider,
 		FSGDynamicTextAssetBundleData& OutBundleData) const { }
 
-	/**
-	 * Blueprint hook for additional bundle serialization logic.
-	 * Called by NotifySerializeBundles after Native_SerializeBundles.
-	 * Default: no-op.
-	 */
+	/** Blueprint hook for pre-serialization. Called after Native_PreSerialize. */
 	UFUNCTION(BlueprintNativeEvent, Category = "Asset Bundles",
-		meta = (DisplayName = "Serialize Bundles"))
-	void BP_SerializeBundles(const FSGDynamicTextAssetBundleData& BundleData,
-		UPARAM(ref) FString& InOutSerializedContent, const FSGDTASerializerFormat& Format) const;
-	virtual void BP_SerializeBundles_Implementation(const FSGDynamicTextAssetBundleData& BundleData,
-		FString& InOutSerializedContent, const FSGDTASerializerFormat& Format) const { }
+		meta = (DisplayName = "Pre Serialize"))
+	void BP_PreSerialize(UPARAM(ref) FString& InOutContent,
+		const FSGDTASerializerFormat& Format) const;
+	virtual void BP_PreSerialize_Implementation(FString& InOutContent,
+		const FSGDTASerializerFormat& Format) const { }
 
-	/**
-	 * Blueprint hook for additional bundle deserialization logic.
-	 * Called by NotifyDeserializeBundles after Native_DeserializeBundles.
-	 * Default: returns true (passthrough).
-	 */
+	/** Blueprint hook for post-serialization. Called after Native_PostSerialize. */
 	UFUNCTION(BlueprintNativeEvent, Category = "Asset Bundles",
-		meta = (DisplayName = "Deserialize Bundles"))
-	bool BP_DeserializeBundles(const FString& SerializedContent,
+		meta = (DisplayName = "Post Serialize"))
+	void BP_PostSerialize(const FSGDynamicTextAssetBundleData& BundleData,
+		UPARAM(ref) FString& InOutContent, const FSGDTASerializerFormat& Format) const;
+	virtual void BP_PostSerialize_Implementation(const FSGDynamicTextAssetBundleData& BundleData,
+		FString& InOutContent, const FSGDTASerializerFormat& Format) const { }
+
+	/** Blueprint hook for pre-deserialization. Called after Native_PreDeserialize. */
+	UFUNCTION(BlueprintNativeEvent, Category = "Asset Bundles",
+		meta = (DisplayName = "Pre Deserialize"))
+	bool BP_PreDeserialize(UPARAM(ref) FString& InOutContent,
 		FSGDynamicTextAssetBundleData& OutBundleData, const FSGDTASerializerFormat& Format) const;
-	virtual bool BP_DeserializeBundles_Implementation(const FString& SerializedContent,
+	virtual bool BP_PreDeserialize_Implementation(FString& InOutContent,
 		FSGDynamicTextAssetBundleData& OutBundleData, const FSGDTASerializerFormat& Format) const { return true; }
+
+	/** Blueprint hook for post-deserialization. Called after Native_PostDeserialize. */
+	UFUNCTION(BlueprintNativeEvent, Category = "Asset Bundles",
+		meta = (DisplayName = "Post Deserialize"))
+	bool BP_PostDeserialize(const FString& Content,
+		FSGDynamicTextAssetBundleData& InOutBundleData, const FSGDTASerializerFormat& Format) const;
+	virtual bool BP_PostDeserialize_Implementation(const FString& Content,
+		FSGDynamicTextAssetBundleData& InOutBundleData, const FSGDTASerializerFormat& Format) const { return true; }
 };

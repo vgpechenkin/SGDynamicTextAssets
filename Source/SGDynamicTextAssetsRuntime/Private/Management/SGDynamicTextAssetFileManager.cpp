@@ -2,6 +2,7 @@
 
 #include "Management/SGDynamicTextAssetFileManager.h"
 
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "SGDynamicTextAssetLogs.h"
 #include "Core/SGDynamicTextAsset.h"
 #include "HAL/FileManager.h"
@@ -25,8 +26,6 @@
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 
-const FString FSGDynamicTextAssetFileManager::DEFAULT_TEXT_EXTENSION = TEXT(".dta.json");
-const FString FSGDynamicTextAssetFileManager::BINARY_EXTENSION = TEXT(".dta.bin");
 const FString FSGDynamicTextAssetFileManager::DEFAULT_RELATIVE_ROOT_PATH = TEXT("SGDynamicTextAssets");
 
 FSGDataGenerateDefaultContentDelegate FSGDynamicTextAssetFileManager::ON_GENERATE_DEFAULT_CONTENT;
@@ -163,11 +162,11 @@ void FSGDynamicTextAssetFileManager::FindAllFilesForClass(const UClass* DynamicT
     TArray<FString> binaryFiles;
     if (bIncludeSubclasses)
     {
-        fileManager.FindFilesRecursive(binaryFiles, *folderPath, *(TEXT("*") + BINARY_EXTENSION), true, false);
+        fileManager.FindFilesRecursive(binaryFiles, *folderPath, *(TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
     }
     else
     {
-        fileManager.FindFiles(binaryFiles, *(folderPath / TEXT("*") + BINARY_EXTENSION), true, false);
+        fileManager.FindFiles(binaryFiles, *(folderPath / TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
         // FindFiles returns filenames only, convert to full paths
         for (FString& fileName : binaryFiles)
         {
@@ -185,7 +184,7 @@ void FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles(TArray<FString
     if (ShouldUseCookedDirectory())
     {
         const FString cookedRoot = GetCookedDynamicTextAssetsRootPath();
-        IFileManager::Get().FindFilesRecursive(OutFilePaths, *cookedRoot, *(TEXT("*") + BINARY_EXTENSION), true, false);
+        IFileManager::Get().FindFilesRecursive(OutFilePaths, *cookedRoot, *(TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
         return;
     }
 
@@ -211,7 +210,7 @@ void FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles(TArray<FString
     }
 
     TArray<FString> binaryFiles;
-    fileManager.FindFilesRecursive(binaryFiles, *rootPath, *(TEXT("*") + BINARY_EXTENSION), true, false);
+    fileManager.FindFilesRecursive(binaryFiles, *rootPath, *(TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
     OutFilePaths.Append(binaryFiles);
 
     UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose, TEXT("FindAllDynamicTextAssetFiles: Found %d total file(s)"), OutFilePaths.Num());
@@ -222,9 +221,9 @@ FString FSGDynamicTextAssetFileManager::ExtractUserFacingIdFromPath(const FStrin
     FString filename = FPaths::GetCleanFilename(FilePath);
 
     // Remove .dta.bin explicitly if it's the cooked format
-    if (filename.EndsWith(BINARY_EXTENSION))
+    if (filename.EndsWith(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION))
     {
-        filename.LeftChopInline(BINARY_EXTENSION.Len());
+        filename.LeftChopInline(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION.Len());
         return filename;
     }
 
@@ -240,7 +239,7 @@ FString FSGDynamicTextAssetFileManager::ExtractUserFacingIdFromPath(const FStrin
 
 bool FSGDynamicTextAssetFileManager::IsDynamicTextAssetFile(const FString& FilePath)
 {
-    if (FilePath.EndsWith(BINARY_EXTENSION))
+    if (FilePath.EndsWith(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION))
     {
         return true;
     }
@@ -279,7 +278,7 @@ FSGDynamicTextAssetFileInfo FSGDynamicTextAssetFileManager::ExtractFileInfoFromF
     }
 
     // Binary files: extract ID from header without decompression
-    if (FilePath.EndsWith(BINARY_EXTENSION))
+    if (FilePath.EndsWith(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION))
     {
         TArray<uint8> binaryData;
         if (!FSGDynamicTextAssetBinarySerializer::ReadBinaryFile(FilePath, binaryData))
@@ -540,7 +539,7 @@ bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath
     // Binary files require decompression before returning the payload string.
     // The format stored in the binary header identifies which deserializer
     // to use. Pass it to FindSerializerForFormat() after this call returns.
-    if (FilePath.EndsWith(BINARY_EXTENSION))
+    if (FilePath.EndsWith(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION))
     {
         TArray<uint8> binaryData;
         if (!FSGDynamicTextAssetBinarySerializer::ReadBinaryFile(FilePath, binaryData))
@@ -1149,19 +1148,34 @@ bool FSGDynamicTextAssetFileManager::FindFileForId(const FSGDynamicTextAssetId& 
     return false;
 }
 
+FString FSGDynamicTextAssetFileManager::GetInternalFilesRootPath()
+{
+    return FPaths::Combine(FPaths::ProjectContentDir(), TEXT("_SGDynamicTextAssets"));
+}
+
 FString FSGDynamicTextAssetFileManager::GetCookedDynamicTextAssetsRootPath()
 {
     return FPaths::Combine(FPaths::ProjectContentDir(), TEXT("SGDynamicTextAssetsCooked"));
 }
 
+FString FSGDynamicTextAssetFileManager::GetCookedGeneratedPath()
+{
+    return FPaths::Combine(GetCookedDynamicTextAssetsRootPath(), TEXT("_Generated"));
+}
+
 FString FSGDynamicTextAssetFileManager::GetCookedTypeManifestsPath()
 {
-    return FPaths::Combine(GetCookedDynamicTextAssetsRootPath(), TEXT("_TypeManifests"));
+    return FPaths::Combine(GetCookedGeneratedPath(), TEXT("_TypeManifests"));
+}
+
+FString FSGDynamicTextAssetFileManager::GetSerializerExtendersPath()
+{
+    return FPaths::Combine(GetInternalFilesRootPath(), TEXT("SerializerExtenders"));
 }
 
 FString FSGDynamicTextAssetFileManager::BuildBinaryFilePath(const FSGDynamicTextAssetId& Id)
 {
-    return FPaths::Combine(GetCookedDynamicTextAssetsRootPath(), Id.ToString() + BINARY_EXTENSION);
+    return FPaths::Combine(GetCookedDynamicTextAssetsRootPath(), Id.ToString() + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION);
 }
 
 bool FSGDynamicTextAssetFileManager::ShouldUseCookedDirectory()
@@ -1184,10 +1198,10 @@ const FSGDynamicTextAssetCookManifest* FSGDynamicTextAssetFileManager::GetCookMa
     {
         cachedManifest.Emplace();
 
-        FString cookedRoot = GetCookedDynamicTextAssetsRootPath();
-        if (!cachedManifest->LoadFromFileBinary(cookedRoot))
+        FString generatedDir = GetCookedGeneratedPath();
+        if (!cachedManifest->LoadFromFileBinary(generatedDir))
         {
-            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("GetCookManifest: Failed to load cook manifest from cookedRoot(%s)"), *cookedRoot);
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("GetCookManifest: Failed to load cook manifest from '%s'"), *generatedDir);
         }
     }
 

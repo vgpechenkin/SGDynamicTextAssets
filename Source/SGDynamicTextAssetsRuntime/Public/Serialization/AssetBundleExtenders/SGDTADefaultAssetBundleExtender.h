@@ -29,9 +29,9 @@ class SGDYNAMICTEXTASSETSRUNTIME_API USGDTADefaultAssetBundleExtender : public U
 protected:
 
 	// USGDTAAssetBundleExtender overrides
-	virtual void Native_SerializeBundles(const FSGDynamicTextAssetBundleData& BundleData,
-		FString& InOutSerializedContent, const FSGDTASerializerFormat& Format) const override;
-	virtual bool Native_DeserializeBundles(const FString& SerializedContent,
+	virtual void Native_PostSerialize(const FSGDynamicTextAssetBundleData& BundleData,
+		FString& InOutContent, const FSGDTASerializerFormat& Format) const override;
+	virtual bool Native_PreDeserialize(FString& InOutContent,
 		FSGDynamicTextAssetBundleData& OutBundleData, const FSGDTASerializerFormat& Format) const override;
 	// ~USGDTAAssetBundleExtender overrides
 

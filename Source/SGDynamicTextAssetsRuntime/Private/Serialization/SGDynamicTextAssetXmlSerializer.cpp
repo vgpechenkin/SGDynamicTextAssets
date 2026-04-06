@@ -350,8 +350,7 @@ const FSlateBrush* FSGDynamicTextAssetXmlSerializer::GetIconBrush() const
 
 FString FSGDynamicTextAssetXmlSerializer::GetFileExtension() const
 {
-    static const FString extension = ".dta.xml";
-    return extension;
+    return SGDynamicTextAssetConstants::XML_FILE_EXTENSION;
 }
 
 FText FSGDynamicTextAssetXmlSerializer::GetFormatName() const
@@ -450,6 +449,18 @@ bool FSGDynamicTextAssetXmlSerializer::SerializeProvider(const ISGDynamicTextAss
     xml += FString::Printf(TEXT("%s<%s>%s</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(2), *KEY_ID, *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(Provider->GetDynamicTextAssetId().ToString()), *KEY_ID);
     xml += FString::Printf(TEXT("%s<%s>%s</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(2), *KEY_USER_FACING_ID, *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(Provider->GetUserFacingId()), *KEY_USER_FACING_ID);
     xml += FString::Printf(TEXT("%s<%s>%s</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(2), *KEY_FILE_FORMAT_VERSION, *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(GetFileFormatVersion().ToString()), *KEY_FILE_FORMAT_VERSION);
+
+    // Write AssetBundleExtenderOverride only when set (optional field)
+    const FSGDTAClassId assetBundleExtenderOverride = Provider->GetAssetBundleExtenderOverride();
+    if (assetBundleExtenderOverride.IsValid())
+    {
+        xml += FString::Printf(TEXT("%s<%s>%s</%s>\n"),
+            *FSGDynamicTextAssetXmlSerializerInternals::Indent(2),
+            *KEY_ASSET_BUNDLE_EXTENDER,
+            *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(assetBundleExtenderOverride.ToString()),
+            *KEY_ASSET_BUNDLE_EXTENDER);
+    }
+
     xml += FString::Printf(TEXT("%s</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_FILE_INFORMATION);
 
     // Data block
@@ -585,7 +596,7 @@ bool FSGDynamicTextAssetXmlSerializer::SerializeProvider(const ISGDynamicTextAss
     OutString = MoveTemp(xml);
 
     // Serialize asset bundles via the extender system
-    SerializeAssetBundles(Provider, OutString);
+    PostSerializeAssetBundles(Provider, OutString);
 
     return true;
 }
@@ -704,6 +715,17 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
             FSGDynamicTextAssetXmlSerializerInternals::XmlUnescape(formatVersionNode->GetContent()));
     }
 
+    // Extract and apply AssetBundleExtenderOverride (optional, only present when set)
+    if (const FXmlNode* extenderNode = fileInfoNode->FindChildNode(KEY_ASSET_BUNDLE_EXTENDER))
+    {
+        const FSGDTAClassId extenderClassId = FSGDTAClassId::FromString(
+            FSGDynamicTextAssetXmlSerializerInternals::XmlUnescape(extenderNode->GetContent()));
+        if (extenderClassId.IsValid())
+        {
+            OutProvider->SetAssetBundleExtenderOverride(extenderClassId);
+        }
+    }
+
     UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
         TEXT("FSGDynamicTextAssetXmlSerializer: File format version: %s (serializer current: %s)"),
         *fileFormatVersion.ToString(), *GetFileFormatVersion().ToString());
@@ -738,6 +760,27 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
             TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Provider(%s) has file major version fileVersion Major(%d) which is newer than class currentVersion Major(%d). Loading with best-effort."),
             *OutProvider->GetDynamicTextAssetId().ToString(), fileVersion.Major, currentVersion.Major);
     }
+    // Pre-deserialize: let the extender unwrap properties and extract bundle metadata
+    FSGDynamicTextAssetBundleData bundleData;
+    {
+        TScriptInterface<ISGDynamicTextAssetProvider> providerInterface(providerObject);
+        FString mutableContent = InString;
+        PreDeserializeAssetBundles(mutableContent, bundleData, providerInterface);
+
+        // If the extender modified the content, re-parse
+        if (mutableContent != InString)
+        {
+            xmlFile.LoadFile(mutableContent, EConstructMethod::ConstructFromBuffer);
+            if (!xmlFile.IsValid())
+            {
+                UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
+                    TEXT("FSGDynamicTextAssetXmlSerializer::DeserializeProvider: Failed to re-parse XML after PreDeserialize"));
+                return false;
+            }
+            rootNode = xmlFile.GetRootNode();
+        }
+    }
+
     // Find data block
     const FXmlNode* dataNode = rootNode->FindChildNode(KEY_DATA);
     if (!dataNode)
@@ -887,6 +930,13 @@ bool FSGDynamicTextAssetXmlSerializer::DeserializeProvider(const FString& InStri
             }
         }
     }
+
+    // Post-deserialize hook and set bundle data on the provider
+    {
+        TScriptInterface<ISGDynamicTextAssetProvider> providerInterface(providerObject);
+        PostDeserializeAssetBundles(InString, bundleData, providerInterface);
+    }
+    OutProvider->GetSGDTAssetBundleData_Mutable() = MoveTemp(bundleData);
 
     return true;
 }
@@ -1129,7 +1179,8 @@ FString FSGDynamicTextAssetXmlSerializer::GetDefaultFileContent(const UClass* Dy
     );
 }
 
-bool FSGDynamicTextAssetXmlSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData) const
+bool FSGDynamicTextAssetXmlSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData,
+    const TScriptInterface<ISGDynamicTextAssetProvider>& Provider) const
 {
     OutBundleData.Reset();
 
@@ -1138,7 +1189,8 @@ bool FSGDynamicTextAssetXmlSerializer::ExtractSGDTAssetBundles(const FString& In
         return false;
     }
 
-    return DeserializeAssetBundles(InString, OutBundleData);
+    FString mutableContent = InString;
+    return PreDeserializeAssetBundles(mutableContent, OutBundleData, Provider);
 }
 
 bool FSGDynamicTextAssetXmlSerializer::UpdateFileFormatVersion(FString& InOutFileContents,

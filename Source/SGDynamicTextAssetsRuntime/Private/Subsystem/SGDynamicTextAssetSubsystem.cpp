@@ -257,7 +257,7 @@ void USGDynamicTextAssetSubsystem::Internal_LoadDynamicTextAssetFromFileAsync_Ga
     // Extract asset bundle data from the serialized text payload.
     // In non-editor builds, property metadata is stripped so ExtractFromObject is a no-op.
     // The serializer parses the bundle block directly from the text instead.
-    serializer->ExtractSGDTAssetBundles(TextPayload, dataObject->GetMutableSGDTAssetBundleData());
+    serializer->ExtractSGDTAssetBundles(TextPayload, dataObject->GetSGDTAssetBundleData_Mutable(), dataObject);
 
 #if WITH_EDITOR
     // If migration occurred, re-save the file with the updated version
@@ -433,7 +433,7 @@ TScriptInterface<ISGDynamicTextAssetProvider> USGDynamicTextAssetSubsystem::Load
     // Extract asset bundle data from the serialized text payload.
     // In non-editor builds, property metadata is stripped so ExtractFromObject is a no-op.
     // The serializer parses the bundle block directly from the text instead.
-    serializer->ExtractSGDTAssetBundles(jsonContents, dataObject->GetMutableSGDTAssetBundleData());
+    serializer->ExtractSGDTAssetBundles(jsonContents, dataObject->GetSGDTAssetBundleData_Mutable(), dataObject);
 
 #if WITH_EDITOR
     // If migration occurred, re-save the file with the updated version

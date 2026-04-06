@@ -33,6 +33,8 @@
 - [XML Format](Serialization/XmlFormat.md): .dta.xml schema, FXmlFile integration
 - [YAML Format](Serialization/YamlFormat.md): .dta.yaml schema, fkYAML integration
 - [Binary Format](Serialization/BinaryFormat.md): .dta.bin header, compression, content hashes
+- [Serializer Extenders](Serialization/SerializerExtenders.md): Extender framework, registry, manifests, automatic discovery
+- [Asset Bundle Extenders](Serialization/AssetBundleExtenders.md): Custom bundle storage strategies, built-in extenders, resolution order
 - [Cook Pipeline](Serialization/CookPipeline.md): Cook commandlet, cook delegate, flat GUID output, manifest
 - [Cook Manifest](Serialization/CookManifest.md): Manifest format, integrity hash, runtime lookups
 

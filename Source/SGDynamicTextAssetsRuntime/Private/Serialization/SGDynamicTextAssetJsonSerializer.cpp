@@ -130,6 +130,13 @@ bool FSGDynamicTextAssetJsonSerializer::SerializeProvider(const ISGDynamicTextAs
     fileInfoObject->SetStringField(KEY_USER_FACING_ID, Provider->GetUserFacingId());
     fileInfoObject->SetStringField(KEY_FILE_FORMAT_VERSION, GetFileFormatVersion().ToString());
 
+    // Write AssetBundleExtenderOverride only when set (optional field)
+    const FSGDTAClassId assetBundleExtenderOverride = Provider->GetAssetBundleExtenderOverride();
+    if (assetBundleExtenderOverride.IsValid())
+    {
+        fileInfoObject->SetStringField(KEY_ASSET_BUNDLE_EXTENDER, assetBundleExtenderOverride.ToString());
+    }
+
     // Serialize properties into data block
     TSharedRef<FJsonObject> dataObject = MakeShared<FJsonObject>();
 
@@ -267,8 +274,8 @@ bool FSGDynamicTextAssetJsonSerializer::SerializeProvider(const ISGDynamicTextAs
         return false;
     }
 
-    // Serialize asset bundles via the extender system
-    SerializeAssetBundles(Provider, OutString);
+    // Post-serialize: extender injects bundle data into the serialized content
+    PostSerializeAssetBundles(Provider, OutString);
 
     return true;
 }
@@ -398,6 +405,17 @@ bool FSGDynamicTextAssetJsonSerializer::DeserializeProvider(const FString& InStr
         fileFormatVersion = FSGDynamicTextAssetVersion::ParseFromString(formatVersionString);
     }
 
+    // Extract and apply AssetBundleExtenderOverride (optional, only present when set)
+    FString assetBundleExtenderString;
+    if (fileInfoObject->TryGetStringField(KEY_ASSET_BUNDLE_EXTENDER, assetBundleExtenderString))
+    {
+        const FSGDTAClassId extenderClassId = FSGDTAClassId::FromString(assetBundleExtenderString);
+        if (extenderClassId.IsValid())
+        {
+            OutProvider->SetAssetBundleExtenderOverride(extenderClassId);
+        }
+    }
+
     UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
         TEXT("FSGDynamicTextAssetJsonSerializer: File format version: %s (serializer current: %s)"),
         *fileFormatVersion.ToString(), *GetFileFormatVersion().ToString());
@@ -432,6 +450,27 @@ bool FSGDynamicTextAssetJsonSerializer::DeserializeProvider(const FString& InStr
         UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
             TEXT("FSGDynamicTextAssetJsonSerializer: Provider(%s) has file major version %d which is newer than class major version %d. Loading with best-effort."),
             *OutProvider->GetDynamicTextAssetId().ToString(), fileVersion.Major, currentVersion.Major);
+    }
+
+    // Pre-deserialize: let the extender unwrap properties and extract bundle metadata
+    FSGDynamicTextAssetBundleData bundleData;
+    {
+        TScriptInterface<ISGDynamicTextAssetProvider> providerInterface(providerObject);
+        FString mutableContent = InString;
+        PreDeserializeAssetBundles(mutableContent, bundleData, providerInterface);
+
+        // If the extender modified the content (e.g., per-property unwrapping), re-parse
+        if (mutableContent != InString)
+        {
+            rootObject.Reset();
+            TSharedRef<TJsonReader<>> reReader = TJsonReaderFactory<>::Create(mutableContent);
+            if (!FJsonSerializer::Deserialize(reReader, rootObject) || !rootObject.IsValid())
+            {
+                UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
+                    TEXT("FSGDynamicTextAssetJsonSerializer: Failed to re-parse JSON after PreDeserialize"));
+                return false;
+            }
+        }
     }
 
     // Get data block
@@ -585,6 +624,13 @@ bool FSGDynamicTextAssetJsonSerializer::DeserializeProvider(const FString& InStr
                 *property->GetName(), *GetNameSafe(providerObject));
         }
     }
+
+    // Post-deserialize hook and set bundle data on the provider
+    {
+        TScriptInterface<ISGDynamicTextAssetProvider> providerInterface(providerObject);
+        PostDeserializeAssetBundles(InString, bundleData, providerInterface);
+    }
+    OutProvider->GetSGDTAssetBundleData_Mutable() = MoveTemp(bundleData);
 
     return true;
 }
@@ -824,7 +870,8 @@ FString FSGDynamicTextAssetJsonSerializer::GetDefaultFileContent(const UClass* D
     );
 }
 
-bool FSGDynamicTextAssetJsonSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData) const
+bool FSGDynamicTextAssetJsonSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData,
+    const TScriptInterface<ISGDynamicTextAssetProvider>& Provider) const
 {
     OutBundleData.Reset();
 
@@ -834,7 +881,8 @@ bool FSGDynamicTextAssetJsonSerializer::ExtractSGDTAssetBundles(const FString& I
         return false;
     }
 
-    return DeserializeAssetBundles(InString, OutBundleData);
+    FString mutableContent = InString;
+    return PreDeserializeAssetBundles(mutableContent, OutBundleData, Provider);
 }
 
 bool FSGDynamicTextAssetJsonSerializer::UpdateFileFormatVersion(FString& InOutFileContents,

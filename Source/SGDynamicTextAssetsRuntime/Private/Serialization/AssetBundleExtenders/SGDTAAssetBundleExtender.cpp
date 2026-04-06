@@ -18,19 +18,33 @@ void USGDTAAssetBundleExtender::NotifyExtractBundles(const UObject* Provider,
 	BP_ExtractBundles(Provider, OutBundleData);
 }
 
-void USGDTAAssetBundleExtender::NotifySerializeBundles(const FSGDynamicTextAssetBundleData& BundleData,
-	FString& InOutSerializedContent, const FSGDTASerializerFormat& Format) const
+void USGDTAAssetBundleExtender::NotifyPreSerialize(FString& InOutContent,
+	const FSGDTASerializerFormat& Format) const
 {
-	Native_SerializeBundles(BundleData, InOutSerializedContent, Format);
-	BP_SerializeBundles(BundleData, InOutSerializedContent, Format);
+	Native_PreSerialize(InOutContent, Format);
+	BP_PreSerialize(InOutContent, Format);
 }
 
-bool USGDTAAssetBundleExtender::NotifyDeserializeBundles(const FString& SerializedContent,
+void USGDTAAssetBundleExtender::NotifyPostSerialize(const FSGDynamicTextAssetBundleData& BundleData,
+	FString& InOutContent, const FSGDTASerializerFormat& Format) const
+{
+	Native_PostSerialize(BundleData, InOutContent, Format);
+	BP_PostSerialize(BundleData, InOutContent, Format);
+}
+
+bool USGDTAAssetBundleExtender::NotifyPreDeserialize(FString& InOutContent,
 	FSGDynamicTextAssetBundleData& OutBundleData, const FSGDTASerializerFormat& Format) const
 {
-	const bool bNativeResult = Native_DeserializeBundles(SerializedContent, OutBundleData, Format);
-	const bool bBPResult = BP_DeserializeBundles(SerializedContent, OutBundleData, Format);
+	const bool bNativeResult = Native_PreDeserialize(InOutContent, OutBundleData, Format);
+	const bool bBPResult = BP_PreDeserialize(InOutContent, OutBundleData, Format);
+	return bNativeResult && bBPResult;
+}
 
+bool USGDTAAssetBundleExtender::NotifyPostDeserialize(const FString& Content,
+	FSGDynamicTextAssetBundleData& InOutBundleData, const FSGDTASerializerFormat& Format) const
+{
+	const bool bNativeResult = Native_PostDeserialize(Content, InOutBundleData, Format);
+	const bool bBPResult = BP_PostDeserialize(Content, InOutBundleData, Format);
 	return bNativeResult && bBPResult;
 }
 
@@ -42,15 +56,28 @@ void USGDTAAssetBundleExtender::Native_ExtractBundles(const UObject* Provider,
 #endif
 }
 
-void USGDTAAssetBundleExtender::Native_SerializeBundles(const FSGDynamicTextAssetBundleData& BundleData,
-	FString& InOutSerializedContent, const FSGDTASerializerFormat& Format) const
+void USGDTAAssetBundleExtender::Native_PreSerialize(FString& InOutContent,
+	const FSGDTASerializerFormat& Format) const
 {
-	// No-op default. Concrete subclasses must override to produce output.
+	// No-op default. Override to prepare content before property serialization.
 }
 
-bool USGDTAAssetBundleExtender::Native_DeserializeBundles(const FString& SerializedContent,
+void USGDTAAssetBundleExtender::Native_PostSerialize(const FSGDynamicTextAssetBundleData& BundleData,
+	FString& InOutContent, const FSGDTASerializerFormat& Format) const
+{
+	// No-op default. Concrete subclasses override to inject bundle data.
+}
+
+bool USGDTAAssetBundleExtender::Native_PreDeserialize(FString& InOutContent,
 	FSGDynamicTextAssetBundleData& OutBundleData, const FSGDTASerializerFormat& Format) const
 {
-	// No-op default. Concrete subclasses must override.
+	// No-op default. Concrete subclasses override to extract bundles and unwrap content.
+	return true;
+}
+
+bool USGDTAAssetBundleExtender::Native_PostDeserialize(const FString& Content,
+	FSGDynamicTextAssetBundleData& InOutBundleData, const FSGDTASerializerFormat& Format) const
+{
+	// No-op default. Override for post-deserialization processing.
 	return true;
 }

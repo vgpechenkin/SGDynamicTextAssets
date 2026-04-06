@@ -9,7 +9,7 @@ The cook manifest (`dta_manifest.bin`) maps IDs to class names, asset type IDs, 
 ## File Location
 
 ```
-Content/SGDynamicTextAssetsCooked/dta_manifest.bin
+Content/SGDynamicTextAssetsCooked/_Generated/dta_manifest.bin
 ```
 
 ## Binary Format

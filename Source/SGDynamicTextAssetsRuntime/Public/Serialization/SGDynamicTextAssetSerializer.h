@@ -180,13 +180,16 @@ public:
 
 	/**
 	 * Extracts asset bundle metadata from a serialized string without full deserialization.
-	 * Parses the sgdtAssetBundles block and populates OutBundleData with the entries.
+	 * Resolves the appropriate extender via the Provider's per-DTA override or settings mapping,
+	 * then delegates to the extender for format-specific parsing.
 	 *
 	 * @param InString The serialized string to extract from
 	 * @param OutBundleData The bundle data to populate
-	 * @return True if bundle data was found and extracted
+	 * @param Provider The provider used to resolve the asset bundle extender
+	 * @return True if deserialization completed (even with no bundles). False only on system failure.
 	 */
-	virtual bool ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData) const;
+	virtual bool ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData,
+		const TScriptInterface<ISGDynamicTextAssetProvider>& Provider) const;
 
 	/**
 	 * Migrates file content from one file format version to another.
@@ -274,6 +277,14 @@ public:
 	 * Value: "fileFormatVersion"
 	 */
 	static const FString KEY_FILE_FORMAT_VERSION;
+
+	/**
+	 * Key for the per-DTA asset bundle extender override inside the file information block.
+	 * When present, the stored ClassId GUID overrides the settings-level extender mapping.
+	 * Omitted when no per-DTA override is set (default case).
+	 * Value: "assetBundleExtender"
+	 */
+	static const FString KEY_ASSET_BUNDLE_EXTENDER;
 
 	/**
 	 * Key for the property data block at the root level alongside file information.

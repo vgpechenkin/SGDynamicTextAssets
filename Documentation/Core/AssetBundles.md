@@ -259,6 +259,8 @@ The `sgdtAssetBundles` block is serialized into each format. See the format-spec
 - [XML Format](../Serialization/XmlFormat.md#asset-bundle-metadata)
 - [YAML Format](../Serialization/YamlFormat.md#asset-bundle-metadata)
 
+The storage format is controlled by [Asset Bundle Extenders](../Serialization/AssetBundleExtenders.md). The default extender writes a root-level `sgdtAssetBundles` block. An alternative per-property extender stores bundle metadata inline next to each property value. Custom extenders can implement project-specific formats.
+
 The file snapshot is informational during editor loads (meta tags are the source of truth) but becomes the primary source in packaged builds where property metadata is stripped.
 
 ## Cook Integration

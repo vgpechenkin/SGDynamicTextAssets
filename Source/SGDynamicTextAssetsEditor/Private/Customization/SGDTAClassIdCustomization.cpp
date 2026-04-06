@@ -8,6 +8,9 @@
 #include "Framework/Notifications/NotificationManager.h"
 #include "HAL/PlatformApplicationMisc.h"
 #include "Input/Reply.h"
+#include "Management/SGDTAExtenderManifest.h"
+#include "Management/SGDTASerializerExtenderRegistry.h"
+#include "Management/SGDynamicTextAssetRegistry.h"
 #include "Modules/ModuleManager.h"
 #include "SGDynamicTextAssetEditorLogs.h"
 #include "Widgets/Images/SImage.h"
@@ -39,7 +42,7 @@ public:
 		{
 			return false;
 		}
-		return InClass->IsChildOf(AllowedBaseClass);
+		return InClass->IsChildOf(AllowedBaseClass) && InClass != AllowedBaseClass;
 	}
 
 	virtual bool IsUnloadedClassAllowed(const FClassViewerInitializationOptions& InInitOptions,
@@ -97,7 +100,8 @@ void FSGDTAClassIdCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> Pro
 
 	FClassViewerInitializationOptions classViewerOptions;
 	classViewerOptions.Mode = EClassViewerMode::ClassPicker;
-	classViewerOptions.DisplayMode = EClassViewerDisplayMode::TreeView;
+	classViewerOptions.DisplayMode = EClassViewerDisplayMode::ListView;
+	classViewerOptions.NameTypeToDisplay = EClassViewerNameTypeToDisplay::DisplayName;
 	classViewerOptions.bShowNoneOption = true;
 	classViewerOptions.bShowUnloadedBlueprints = true;
 	classViewerOptions.ClassFilters.Add(classFilter);
@@ -207,22 +211,31 @@ void FSGDTAClassIdCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> P
 
 void FSGDTAClassIdCustomization::OnClassPicked(UClass* NewClass)
 {
-	// The extender registry (E135) will provide UClass -> FSGDTAClassId mapping.
-	// Until then, the class picker logs a notice and does not modify the GUID.
-	// Use Copy/Paste to set GUIDs directly.
 	if (NewClass)
 	{
-		UE_LOG(LogSGDynamicTextAssetsEditor, Log,
-			TEXT("Class picker selected '%s' but the extender registry is not yet available. Use Copy/Paste to set Class IDs manually."),
-			*NewClass->GetName());
+		// Resolve UClass -> FSGDTAClassId via the extender registry
+		if (const USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
+		{
+			const FSGDTAClassId resolvedId =
+				registry->GetExtenderRegistry().FindExtenderIdByClass(NewClass);
+
+			if (resolvedId.IsValid())
+			{
+				WriteValue(resolvedId);
+			}
+			else
+			{
+				UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+					TEXT("Class(%s) is not registered in any extender manifest. Cannot assign ClassId."),
+					*NewClass->GetName());
+			}
+		}
 	}
 	else
 	{
-		// None was picked - clear the value
 		WriteValue(FSGDTAClassId::INVALID_CLASS_ID);
 	}
 
-	// Close the combo button menu
 	if (ClassPickerCombo.IsValid())
 	{
 		ClassPickerCombo->SetIsOpen(false);
@@ -236,7 +249,30 @@ FText FSGDTAClassIdCustomization::GetCurrentDisplayText() const
 		return INVTEXT("None");
 	}
 
-	// Display the raw GUID string until the extender registry (E135) provides class resolution
+	// Resolve ClassId to UClass via the extender registry, then use its display name
+	if (const USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
+	{
+		for (const FName& key : registry->GetExtenderRegistry().GetAllManifestKeys())
+		{
+			if (TSharedPtr<FSGDTAExtenderManifest> manifest = registry->GetExtenderRegistry().GetManifest(key))
+			{
+				if (const FSGDTASerializerExtenderRegistryEntry* entry = manifest->FindByExtenderId(CurrentClassId))
+				{
+					if (UClass* resolvedClass = entry->Class.Get())
+					{
+						return resolvedClass->GetDisplayNameText();
+					}
+
+					if (!entry->ClassName.IsEmpty())
+					{
+						return FText::FromString(entry->ClassName);
+					}
+				}
+			}
+		}
+	}
+
+	// Fallback to GUID string if no manifest entry found
 	return FText::FromString(CurrentClassId.ToString());
 }
 

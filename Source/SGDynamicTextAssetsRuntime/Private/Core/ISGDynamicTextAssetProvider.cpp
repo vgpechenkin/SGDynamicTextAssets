@@ -2,7 +2,6 @@
 
 #include "Core/ISGDynamicTextAssetProvider.h"
 
-#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
 #include "Statics/SGDynamicTextAssetStatics.h"
 
 bool ISGDynamicTextAssetProvider::Native_ValidateDynamicTextAsset(FSGDynamicTextAssetValidationResult& OutResult) const
@@ -49,9 +48,14 @@ bool ISGDynamicTextAssetProvider::HasSGDTAssetBundles() const
 	return GetSGDTAssetBundleData().HasBundles();
 }
 
-TSoftClassPtr<USGDTAAssetBundleExtender> ISGDynamicTextAssetProvider::GetAssetBundleExtenderOverride() const
+FSGDTAClassId ISGDynamicTextAssetProvider::GetAssetBundleExtenderOverride() const
 {
-	return nullptr;
+	return FSGDTAClassId::INVALID_CLASS_ID;
+}
+
+void ISGDynamicTextAssetProvider::SetAssetBundleExtenderOverride(const FSGDTAClassId& InOverride)
+{
+	// Default no-op. Concrete providers override this to persist the value.
 }
 
 #if WITH_EDITOR

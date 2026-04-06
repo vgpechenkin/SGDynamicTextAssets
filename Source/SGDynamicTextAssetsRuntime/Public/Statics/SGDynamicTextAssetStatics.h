@@ -20,7 +20,6 @@
 struct FSGDynamicTextAssetValidationResult;
 
 class USGDynamicTextAsset;
-class USGDTAAssetBundleExtender;
 
 /**
  * Blueprint function library for working with FSGDynamicTextAssetRef.
@@ -365,10 +364,10 @@ public:
 	 *
 	 * @param Provider The DTA provider to resolve an extender for
 	 * @param Format The serializer format to match against settings mappings
-	 * @return The resolved extender class, or null if none found
+	 * @return The resolved extender class ID, or FSGDTAClassId::INVALID_CLASS_ID if none found
 	 */
 	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Asset Bundles")
-	static TSoftClassPtr<USGDTAAssetBundleExtender> ResolveAssetBundleExtender(
+	static FSGDTAClassId ResolveAssetBundleExtender(
 		const TScriptInterface<ISGDynamicTextAssetProvider>& Provider,
 		FSGDTASerializerFormat Format);
 

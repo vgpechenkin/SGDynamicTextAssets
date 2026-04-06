@@ -654,7 +654,9 @@ bool FSGDynamicTextAssetEditorToolkit::SaveToFile()
 
 bool FSGDynamicTextAssetEditorToolkit::CanSaveAsset() const
 {
-    return HasUnsavedChanges();
+    // Always allow saving so the user can force re-serialization
+    // without requiring property modifications (e.g., testing serialization changes).
+    return true;
 }
 
 void FSGDynamicTextAssetEditorToolkit::SaveAsset_Execute()

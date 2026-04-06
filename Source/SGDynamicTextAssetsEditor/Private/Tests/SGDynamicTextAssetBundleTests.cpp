@@ -266,8 +266,12 @@ bool FBundle_JsonRoundTrip_PreservesBundleMetadata::RunTest(const FString& Param
 		jsonOutput.Contains(ISGDynamicTextAssetSerializer::KEY_SGDT_ASSET_BUNDLES));
 
 	// Extract bundles from the serialized string
+	TScriptInterface<ISGDynamicTextAssetProvider> providerInterface;
+	providerInterface.SetObject(provider->_getUObject());
+	providerInterface.SetInterface(provider);
+
 	FSGDynamicTextAssetBundleData extractedBundles;
-	bool bExtracted = serializer.ExtractSGDTAssetBundles(jsonOutput, extractedBundles);
+	bool bExtracted = serializer.ExtractSGDTAssetBundles(jsonOutput, extractedBundles, providerInterface);
 	TestTrue(TEXT("Bundle extraction should succeed"), bExtracted);
 	TestTrue(TEXT("Extracted bundles should have data"), extractedBundles.HasBundles());
 

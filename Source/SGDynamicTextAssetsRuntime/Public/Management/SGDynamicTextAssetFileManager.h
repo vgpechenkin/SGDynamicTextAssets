@@ -3,7 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
 #include "Core/SGDynamicTextAssetId.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
+
 #include "Core/SGDTASerializerFormat.h"
 
 class USGDynamicTextAsset;
@@ -67,7 +70,7 @@ public:
      * @param Extension File extension to use (defaults to JSON)
      * @return Full absolute path with extension
      */
-    static FString BuildFilePath(const UClass* DynamicTextAssetClass, const FString& UserFacingId, const FString& Extension = DEFAULT_TEXT_EXTENSION);
+    static FString BuildFilePath(const UClass* DynamicTextAssetClass, const FString& UserFacingId, const FString& Extension = SGDynamicTextAssetConstants::JSON_FILE_EXTENSION);
 
     /**
      * Builds the relative file path (from Content directory) for a dynamic text asset.
@@ -77,7 +80,7 @@ public:
      * @param Extension File extension to use (defaults to JSON)
      * @return Relative path with extension
      */
-    static FString BuildRelativeFilePath(const UClass* DynamicTextAssetClass, const FString& UserFacingId, const FString& Extension = DEFAULT_TEXT_EXTENSION);
+    static FString BuildRelativeFilePath(const UClass* DynamicTextAssetClass, const FString& UserFacingId, const FString& Extension = SGDynamicTextAssetConstants::JSON_FILE_EXTENSION);
 
     /**
      * Finds all dynamic text asset files of a given class.
@@ -251,16 +254,36 @@ public:
     static bool FindFileForId(const FSGDynamicTextAssetId& Id, FString& OutFilePath, const UClass* SearchClass = nullptr);
 
     /**
+     * Returns the root directory for internal plugin files (manifests, extender configs, etc.).
+     * Separate from the asset data directory to avoid scanner interference.
+     * @return Absolute path to Content/_SGDynamicTextAssets/
+     */
+    static FString GetInternalFilesRootPath();
+
+    /**
      * Returns the root directory for cooked dynamic text assets.
      * @return Absolute path to Content/SGDynamicTextAssetsCooked/
      */
     static FString GetCookedDynamicTextAssetsRootPath();
 
     /**
+     * Returns the path to the generated metadata subdirectory within the cooked output.
+     * Contains the cook manifest, extender manifests, and type manifests.
+     * @return Absolute path to Content/SGDynamicTextAssetsCooked/_Generated/
+     */
+    static FString GetCookedGeneratedPath();
+
+    /**
      * Returns the path to the cooked type manifests subdirectory.
-     * @return Absolute path to Content/SGDynamicTextAssetsCooked/_TypeManifests/
+     * @return Absolute path to Content/SGDynamicTextAssetsCooked/_Generated/_TypeManifests/
      */
     static FString GetCookedTypeManifestsPath();
+
+    /**
+     * Returns the absolute path to the serializer extender manifests directory.
+     * @return Absolute path to Content/_SGDynamicTextAssets/SerializerExtenders/
+     */
+    static FString GetSerializerExtendersPath();
 
     /**
      * Builds the full file path for a cooked binary file using its Id.
@@ -397,12 +420,6 @@ public:
      * to produce valid default content, or return a custom string for editor UX needs.
      */
     static FSGDataGenerateDefaultContentDelegate ON_GENERATE_DEFAULT_CONTENT;
-
-    /** File extension for dynamic text assets (includes dot) as the text file. Currently using JSON. */
-    static const FString DEFAULT_TEXT_EXTENSION;
-
-    /** File extension for binary dynamic text assets (includes dot) */
-    static const FString BINARY_EXTENSION;
 
     /** Relative root directory (from Content). */
     static const FString DEFAULT_RELATIVE_ROOT_PATH;

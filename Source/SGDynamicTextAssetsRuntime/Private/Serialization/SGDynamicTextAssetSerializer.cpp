@@ -13,6 +13,7 @@ const FString ISGDynamicTextAssetSerializer::KEY_VERSION = TEXT("version");
 const FString ISGDynamicTextAssetSerializer::KEY_ID = TEXT("id");
 const FString ISGDynamicTextAssetSerializer::KEY_USER_FACING_ID = TEXT("userfacingid");
 const FString ISGDynamicTextAssetSerializer::KEY_FILE_FORMAT_VERSION = TEXT("fileFormatVersion");
+const FString ISGDynamicTextAssetSerializer::KEY_ASSET_BUNDLE_EXTENDER = TEXT("assetBundleExtender");
 const FString ISGDynamicTextAssetSerializer::KEY_DATA = TEXT("data");
 const FString ISGDynamicTextAssetSerializer::KEY_SGDT_ASSET_BUNDLES = TEXT("sgdtAssetBundles");
 
@@ -45,7 +46,8 @@ bool ISGDynamicTextAssetSerializer::ExtractMetadata(const FString& InString, FSG
 	return true;
 }
 
-bool ISGDynamicTextAssetSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData) const
+bool ISGDynamicTextAssetSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData,
+	const TScriptInterface<ISGDynamicTextAssetProvider>& Provider) const
 {
 	// Default implementation does not extract bundles.
 	// Format-specific serializers override this to parse their bundle block.

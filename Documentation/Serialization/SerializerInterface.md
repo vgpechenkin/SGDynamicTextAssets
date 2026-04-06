@@ -12,6 +12,7 @@ The SGDynamicTextAssets plugin uses a polymorphic serialization architecture tha
 - [XML Format](XmlFormat.md): `.dta.xml` files (TypeId=2)
 - [YAML Format](YamlFormat.md): `.dta.yaml` files (TypeId=3)
 - [Binary Format](BinaryFormat.md): `.dta.bin` cooked files
+- [Serializer Extenders](SerializerExtenders.md): Modular extensions for customizing serializer behavior (e.g., [asset bundle storage](AssetBundleExtenders.md))
 
 ## Architecture
 

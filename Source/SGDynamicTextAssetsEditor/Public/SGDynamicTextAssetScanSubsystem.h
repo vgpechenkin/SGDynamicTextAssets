@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "EditorSubsystem.h"
-#include "ReferenceViewer/SGDynamicTextAssetProjectInfoCache.h"
+#include "Management/SGDTAProjectManifest.h"
 
 #include "SGDynamicTextAssetScanSubsystem.generated.h"
 
@@ -55,7 +55,7 @@ struct SGDYNAMICTEXTASSETSEDITOR_API FSGDynamicTextAssetScanPhase
  * in the scan. When StartScan() is called, phases are converted to ticker work
  * items and processed in priority order.
  *
- * Also owns the FSGDynamicTextAssetProjectInfoCache and registers the built-in
+ * Also owns the FSGDTAProjectManifest and registers the built-in
  * "Project Info" scan phase for format version tracking.
  */
 UCLASS()
@@ -92,9 +92,9 @@ public:
 	/** Returns true if a scan is currently in progress. */
 	bool IsScanningInProgress() const;
 
-	/** Access the project info cache (format version tracking). */
-	FSGDynamicTextAssetProjectInfoCache& GetProjectInfoCache();
-	const FSGDynamicTextAssetProjectInfoCache& GetProjectInfoCache() const;
+	/** Access the project manifest (organization versioning and format version tracking). */
+	FSGDTAProjectManifest& GetProjectManifest();
+	const FSGDTAProjectManifest& GetProjectManifest() const;
 
 	/**
 	 * Incrementally update the project info cache for a single file.
@@ -125,6 +125,15 @@ private:
 	/** Called when the ticker subsystem finishes all queued work. */
 	void OnTickerAllWorkComplete();
 
+	/** Setup callback for the built-in extender discovery scan phase. */
+	void SetupExtenderDiscoveryPhase();
+
+	/** Process one class in the extender discovery scan phase. */
+	bool ProcessOneExtenderDiscoveryItem();
+
+	/** Completion callback for the extender discovery scan phase. */
+	void OnExtenderDiscoveryPhaseComplete();
+
 	/** Setup callback for the built-in project info scan phase. */
 	void SetupProjectInfoPhase();
 
@@ -134,14 +143,23 @@ private:
 	/** Completion callback for the project info scan phase. */
 	void OnProjectInfoPhaseComplete();
 
+	/** Scan manifest directories and update the ProjectManifest's file list fields. */
+	void UpdateProjectManifestFileLists();
+
+	/** Run organization v0-to-v1 migration (move type manifests to new location). */
+	void MigrateOrganizationV0ToV1();
+
 	/** Registered scan phases from external systems. */
 	TArray<FSGDynamicTextAssetScanPhase> RegisteredPhases;
 
-	/** The project info cache instance. */
-	FSGDynamicTextAssetProjectInfoCache ProjectInfoCache;
+	/** The project manifest instance. */
+	FSGDTAProjectManifest ProjectManifest;
 
 	/** DTA files discovered at the start of a scan. Shared across phases. */
 	TArray<FString> DiscoveredDTAFiles;
+
+	/** Extender discovery phase's pending classes to process. */
+	TArray<UClass*> PendingExtenderClasses;
 
 	/** Project info phase's own copy of files to process. */
 	TArray<FString> PendingProjectInfoFiles;

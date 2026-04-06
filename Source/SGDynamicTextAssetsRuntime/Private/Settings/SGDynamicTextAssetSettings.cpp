@@ -5,34 +5,12 @@
 #include "Engine/AssetManager.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
-#include "Serialization/AssetBundleExtenders/SGDTADefaultAssetBundleExtender.h"
 #include "SGDynamicTextAssetLogs.h"
 #include "Statics/SGDynamicTextAssetConstants.h"
 
 #if WITH_EDITOR
 #include "Misc/DataValidation.h"
 #endif
-
-USGDynamicTextAssetSettingsAsset::USGDynamicTextAssetSettingsAsset()
-{
-	// Default mapping: USGDTADefaultAssetBundleExtender covers all built-in formats
-	const uint32 allFormatsBitmask =
-		(1u << SGDynamicTextAssetConstants::JSON_SERIALIZER_TYPE_ID) |
-		(1u << SGDynamicTextAssetConstants::XML_SERIALIZER_TYPE_ID) |
-		(1u << SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID);
-
-	FSGAssetBundleExtenderMapping defaultMapping;
-
-	defaultMapping.AppliesTo = FSGDTASerializerFormat::FromTypeId(
-		(1u << SGDynamicTextAssetConstants::JSON_SERIALIZER_TYPE_ID)
-		| (1u << SGDynamicTextAssetConstants::XML_SERIALIZER_TYPE_ID)
-		| (1u << SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID));
-
-	defaultMapping.ExtenderClass = TSoftClassPtr<USGDTAAssetBundleExtender>(
-		USGDTADefaultAssetBundleExtender::StaticClass());
-
-	AssetBundleExtenderMappings.Add(defaultMapping);
-}
 
 #if WITH_EDITOR
 EDataValidationResult USGDynamicTextAssetSettingsAsset::IsDataValid(FDataValidationContext& Context) const
@@ -46,12 +24,12 @@ EDataValidationResult USGDynamicTextAssetSettingsAsset::IsDataValid(FDataValidat
 	// Track which formats are covered and check for overlaps
 	TMap<uint32, uint32> formatCoverageCount;
 
-	for (const FSGAssetBundleExtenderMapping& mapping : AssetBundleExtenderMappings)
+	for (const FSGAssetBundleExtenderMapping& mapping : AssetBundleExtenderOverrides)
 	{
-		// Validate the extender class is set
-		if (mapping.ExtenderClass.IsNull())
+		// Validate the extender class ID is set
+		if (!mapping.ExtenderClassId.IsValid())
 		{
-			Context.AddError(INVTEXT("Asset bundle extender mapping has a null ExtenderClass. Each mapping must specify an extender."));
+			Context.AddError(INVTEXT("Asset bundle extender mapping has an invalid ExtenderClassId. Each mapping must specify an extender."));
 			result = EDataValidationResult::Invalid;
 		}
 
@@ -72,7 +50,7 @@ EDataValidationResult USGDynamicTextAssetSettingsAsset::IsDataValid(FDataValidat
 		}
 	}
 
-	// Check for formats with no coverage
+	// Check for formats with duplicate coverage (overrides only, not baseline)
 	for (const TSharedPtr<ISGDynamicTextAssetSerializer>& serializer : serializers)
 	{
 		if (!serializer.IsValid())
@@ -85,22 +63,12 @@ EDataValidationResult USGDynamicTextAssetSettingsAsset::IsDataValid(FDataValidat
 
 		if (!countPtr)
 		{
-			Context.AddError(FText::Format(
-				INVTEXT("Serializer format `{0}` could not be found due to unknown error."),
-				serializer->GetFormatName()));
-			result = EDataValidationResult::Invalid;
+			// No override for this format is valid (baseline default handles it)
 			continue;
 		}
 		const uint32& count = *countPtr;
 
-		if (count == 0)
-		{
-			Context.AddError(FText::Format(
-				INVTEXT("Serializer format '{0}' has no asset bundle extender assigned. Add a mapping that covers this format."),
-				serializer->GetFormatName()));
-			result = EDataValidationResult::Invalid;
-		}
-		else if (count > 1)
+		if (count > 1)
 		{
 			Context.AddError(FText::Format(
 				INVTEXT("Serializer format '{0}' is assigned to multiple asset bundle extenders. Only one extender per format is allowed."),
@@ -112,11 +80,6 @@ EDataValidationResult USGDynamicTextAssetSettingsAsset::IsDataValid(FDataValidat
 	return result;
 }
 #endif
-
-FName USGDynamicTextAssetSettingsAsset::GetCustomCompressionName() const
-{
-	return CustomCompressionName;
-}
 
 USGDynamicTextAssetSettings* USGDynamicTextAssetSettings::Get()
 {

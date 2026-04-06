@@ -20,10 +20,12 @@ class FSGDynamicTextAssetCookManifest;
  *   ├── {Id1}.dta.bin
  *   ├── {Id2}.dta.bin
  *   ├── ...
- *   ├── dta_manifest.bin
- *   └── _TypeManifests/
- *       ├── {RootTypeId1}.json
- *       └── {RootTypeId2}.json
+ *   └── _Generated/
+ *       ├── dta_manifest.bin
+ *       ├── DTA_{FrameworkKey}_extenders.dta.bin
+ *       └── _TypeManifests/
+ *           ├── {RootTypeId1}.json
+ *           └── {RootTypeId2}.json
  *
  * @see USGDynamicTextAssetCookCommandlet
  * @see FSGDynamicTextAssetCookManifest

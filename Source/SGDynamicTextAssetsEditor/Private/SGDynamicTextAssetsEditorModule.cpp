@@ -20,7 +20,8 @@
 #include "Widgets/Docking/SDockTab.h"
 #include "Framework/Docking/TabManager.h"
 #include "Commandlets/SGDynamicTextAssetFormatVersionCommandlet.h"
-#include "ReferenceViewer/SGDynamicTextAssetProjectInfoCache.h"
+#include "Management/SGDTAProjectManifest.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "Utilities/SGDynamicTextAssetCookUtils.h"
 #include "Utilities/SGDynamicTextAssetSourceControl.h"
 #include "Misc/ScopedSlowTask.h"
@@ -30,10 +31,10 @@
 #include "SGDynamicTextAssetEditorLogs.h"
 #include "UObject/ICookInfo.h"
 #include "Settings/ProjectPackagingSettings.h"
+#include "HAL/FileManager.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Widgets/Notifications/SNotificationList.h"
-#include "HAL/FileManager.h"
 
 #define LOCTEXT_NAMESPACE "FSGDynamicTextAssetsEditorModule"
 
@@ -381,8 +382,8 @@ private:
             return;
         }
 
-        const FSGDynamicTextAssetProjectInfoCache& cache = scanSubsystem->GetProjectInfoCache();
-        const TMap<FSGDTASerializerFormat, FSGDTASerializerFormatVersionInfo>& allVersions = cache.GetAllFormatVersions();
+        const FSGDTAProjectManifest& manifest = scanSubsystem->GetProjectManifest();
+        const TMap<FSGDTASerializerFormat, FSGDTASerializerFormatVersionInfo>& allVersions = manifest.GetAllFormatVersions();
 
         // Collect serializers that need a major version upgrade
         struct FUpgradeInfo
@@ -556,7 +557,7 @@ private:
 
         // Scan for .dta.bin files
         TArray<FString> cookedFiles;
-        IFileManager::Get().FindFiles(cookedFiles, *FPaths::Combine(cookedRoot, TEXT("*") + FString(FSGDynamicTextAssetFileManager::BINARY_EXTENSION)), true, false);
+        IFileManager::Get().FindFiles(cookedFiles, *FPaths::Combine(cookedRoot, TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
 
         if (cookedFiles.IsEmpty())
         {

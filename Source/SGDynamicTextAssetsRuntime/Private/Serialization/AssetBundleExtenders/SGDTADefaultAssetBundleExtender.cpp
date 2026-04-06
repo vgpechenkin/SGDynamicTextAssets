@@ -44,9 +44,9 @@ namespace SGDTADefaultExtenderInternals
 	}
 }
 
-void USGDTADefaultAssetBundleExtender::Native_SerializeBundles(
+void USGDTADefaultAssetBundleExtender::Native_PostSerialize(
 	const FSGDynamicTextAssetBundleData& BundleData,
-	FString& InOutSerializedContent, const FSGDTASerializerFormat& Format) const
+	FString& InOutContent, const FSGDTASerializerFormat& Format) const
 {
 	if (!BundleData.HasBundles())
 	{
@@ -57,53 +57,55 @@ void USGDTADefaultAssetBundleExtender::Native_SerializeBundles(
 	{
 		case SGDynamicTextAssetConstants::JSON_SERIALIZER_TYPE_ID:
 		{
-			SerializeBundlesJson(BundleData, InOutSerializedContent);
+			SerializeBundlesJson(BundleData, InOutContent);
 			break;
 		}
 		case SGDynamicTextAssetConstants::XML_SERIALIZER_TYPE_ID:
 		{
-			SerializeBundlesXml(BundleData, InOutSerializedContent);
+			SerializeBundlesXml(BundleData, InOutContent);
 			break;
 		}
 		case SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID:
 		{
-			SerializeBundlesYaml(BundleData, InOutSerializedContent);
+			SerializeBundlesYaml(BundleData, InOutContent);
 			break;
 		}
 		// Unrecognized format
 		default:
 		{
 			UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-				TEXT("USGDTADefaultAssetBundleExtender::Native_SerializeBundles: Unrecognized format TypeId=%u"),
+				TEXT("USGDTADefaultAssetBundleExtender::Native_PostSerialize: Unrecognized format TypeId=%u"),
 				Format.GetTypeId());
 			break;
 		}
 	}
 }
 
-bool USGDTADefaultAssetBundleExtender::Native_DeserializeBundles(
-	const FString& SerializedContent,
+bool USGDTADefaultAssetBundleExtender::Native_PreDeserialize(
+	FString& InOutContent,
 	FSGDynamicTextAssetBundleData& OutBundleData, const FSGDTASerializerFormat& Format) const
 {
+	// The default extender reads from a root-level block and does not modify property values,
+	// so InOutContent is read but not modified.
 	switch (Format.GetTypeId())
 	{
 		case SGDynamicTextAssetConstants::JSON_SERIALIZER_TYPE_ID:
 		{
-			return DeserializeBundlesJson(SerializedContent, OutBundleData);
+			return DeserializeBundlesJson(InOutContent, OutBundleData);
 		}
 		case SGDynamicTextAssetConstants::XML_SERIALIZER_TYPE_ID:
 		{
-			return DeserializeBundlesXml(SerializedContent, OutBundleData);
+			return DeserializeBundlesXml(InOutContent, OutBundleData);
 		}
 		case SGDynamicTextAssetConstants::YAML_SERIALIZER_TYPE_ID:
 		{
-			return DeserializeBundlesYaml(SerializedContent, OutBundleData);
+			return DeserializeBundlesYaml(InOutContent, OutBundleData);
 		}
 		// Unrecognized format
 		default:
 		{
 			UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-				TEXT("USGDTADefaultAssetBundleExtender::Native_DeserializeBundles: Unrecognized format TypeId=%u"),
+				TEXT("USGDTADefaultAssetBundleExtender::Native_PreDeserialize: Unrecognized format TypeId=%u"),
 				Format.GetTypeId());
 			return false;
 		}
@@ -120,7 +122,7 @@ void USGDTADefaultAssetBundleExtender::SerializeBundlesJson(
 	if (!FJsonSerializer::Deserialize(reader, rootObject) || !rootObject.IsValid())
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-			TEXT("USGDTADefaultAssetBundleExtender::Native_SerializeBundles: Failed to parse JSON content"));
+			TEXT("USGDTADefaultAssetBundleExtender::Native_PostSerialize: Failed to parse JSON content"));
 		return;
 	}
 
@@ -160,7 +162,7 @@ void USGDTADefaultAssetBundleExtender::SerializeBundlesJson(
 	else
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-			TEXT("USGDTADefaultAssetBundleExtender::Native_SerializeBundles: Failed to re-serialize JSON content"));
+			TEXT("USGDTADefaultAssetBundleExtender::Native_PostSerialize: Failed to re-serialize JSON content"));
 	}
 }
 

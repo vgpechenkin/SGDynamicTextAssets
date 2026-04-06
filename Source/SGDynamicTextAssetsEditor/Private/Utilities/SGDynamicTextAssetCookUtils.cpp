@@ -6,8 +6,10 @@
 #include "UObject/Package.h"
 #include "Management/SGDynamicTextAssetCookManifest.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
+#include "Management/SGDTASerializerExtenderRegistry.h"
 #include "Management/SGDynamicTextAssetTypeManifest.h"
 #include "Serialization/SGDTABinaryEncodeParams.h"
 #include "Serialization/SGDynamicTextAssetBinarySerializer.h"
@@ -32,17 +34,13 @@ bool FSGDynamicTextAssetCookUtils::CleanCookedDirectory()
 		return true;
 	}
 
-	// Collect .dta.bin files
+	// Collect .dta.bin files from root (individual cooked DTAs)
 	TArray<FString> binFiles;
-	fileManager.FindFiles(binFiles, *FPaths::Combine(cookedDir, TEXT("*") + FSGDynamicTextAssetFileManager::BINARY_EXTENSION), true, false);
-
-	// Check for manifest file
-	FString manifestPath = FPaths::Combine(cookedDir, FSGDynamicTextAssetCookManifest::MANIFEST_FILENAME);
-	uint8 bManifestExists = fileManager.FileExists(*manifestPath) ? 1 : 0;
+	fileManager.FindFiles(binFiles, *FPaths::Combine(cookedDir, TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
 
 	int32 deletedCount = 0;
 
-	// Delete .dta.bin files
+	// Delete .dta.bin files from root
 	for (const FString& binFile : binFiles)
 	{
 		FString fullPath = FPaths::Combine(cookedDir, binFile);
@@ -57,38 +55,18 @@ bool FSGDynamicTextAssetCookUtils::CleanCookedDirectory()
 		}
 	}
 
-	// Delete manifest
-	if (bManifestExists)
+	// Delete _Generated/ subdirectory (manifest, extenders, type manifests)
+	FString generatedDir = FPaths::Combine(cookedDir, TEXT("_Generated"));
+	if (fileManager.DirectoryExists(*generatedDir))
 	{
-		if (fileManager.Delete(*manifestPath))
+		if (fileManager.DeleteDirectory(*generatedDir, false, true))
 		{
-			UE_LOG(LogSGDynamicTextAssetsEditor, Verbose, TEXT("  Deleted manifest file: %s"), FSGDynamicTextAssetCookManifest::MANIFEST_FILENAME);
-			deletedCount++;
+			UE_LOG(LogSGDynamicTextAssetsEditor, Verbose, TEXT("  Deleted _Generated/ directory and contents"));
 		}
 		else
 		{
-			UE_LOG(LogSGDynamicTextAssetsEditor, Warning, TEXT("FSGDynamicTextAssetCookUtils: Failed to delete manifest: %s"), *manifestPath);
+			UE_LOG(LogSGDynamicTextAssetsEditor, Warning, TEXT("FSGDynamicTextAssetCookUtils: Failed to delete _Generated/ directory"));
 		}
-	}
-
-	// Delete _TypeManifests/ subdirectory if it exists
-	FString typeManifestsDir = FPaths::Combine(cookedDir, TEXT("_TypeManifests"));
-	if (fileManager.DirectoryExists(*typeManifestsDir))
-	{
-		TArray<FString> typeManifestFiles;
-		fileManager.FindFiles(typeManifestFiles, *FPaths::Combine(typeManifestsDir, TEXT("*.json")), true, false);
-
-		for (const FString& typeManifestFile : typeManifestFiles)
-		{
-			FString fullPath = FPaths::Combine(typeManifestsDir, typeManifestFile);
-			if (fileManager.Delete(*fullPath))
-			{
-				UE_LOG(LogSGDynamicTextAssetsEditor, Verbose, TEXT("  Deleted type manifest: %s"), *typeManifestFile);
-				deletedCount++;
-			}
-		}
-
-		fileManager.DeleteDirectory(*typeManifestsDir);
 	}
 
 	fileManager.DeleteDirectory(*cookedDir);
@@ -227,7 +205,7 @@ bool FSGDynamicTextAssetCookUtils::CookDynamicTextAssetFile(
 	// Build flat ID-named output path: {OutputDirectory}/{Id}.dta.bin
 	FString binaryFilePath = FPaths::Combine(
 		OutputDirectory,
-		cookFileInfo.Id.ToString() + FSGDynamicTextAssetFileManager::BINARY_EXTENSION);
+		cookFileInfo.Id.ToString() + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION);
 
 	// Ensure output directory exists
 	IPlatformFile& platformFile = FPlatformFileManager::Get().GetPlatformFile();
@@ -263,12 +241,9 @@ bool FSGDynamicTextAssetCookUtils::CookDynamicTextAssetFile(
 
 	// Add entry to manifest (strip UserFacingId if setting is enabled)
 	FString manifestUserFacingId = cookFileInfo.UserFacingId;
-	if (USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings())
+	if (USGDynamicTextAssetSettings::Get()->ShouldStripUserFacingIdFromCookedManifest())
 	{
-		if (settings->ShouldStripUserFacingIdFromCookedManifest())
-		{
-			manifestUserFacingId.Empty();
-		}
+		manifestUserFacingId.Empty();
 	}
 	OutManifest.AddEntry(cookFileInfo.Id, cookFileInfo.ClassName, manifestUserFacingId, cookFileInfo.AssetTypeId);
 
@@ -290,13 +265,7 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 	// Pre-cook clean: delete stale cooked files unless explicitly skipped
 	if (!bSkipPreClean)
 	{
-		bool bShouldClean = true;
-		if (USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings())
-		{
-			bShouldClean = settings->ShouldCleanCookedDirectoryBeforeCook();
-		}
-
-		if (bShouldClean)
+		if (USGDynamicTextAssetSettings::Get()->ShouldCleanCookedDirectoryBeforeCook())
 		{
 			UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("FSGDynamicTextAssetCookUtils: Pre-cook clean enabled, cleaning cooked directory..."));
 			CleanCookedDirectory();
@@ -386,10 +355,7 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 
 	// Get compression method from settings
 	ESGDynamicTextAssetCompressionMethod compressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
-	if (USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings())
-	{
-		compressionMethod = settings->GetDefaultCompressionMethod();
-	}
+	compressionMethod = USGDynamicTextAssetSettings::Get()->GetDefaultCompressionMethod();
 
 	// Cook pass
 	FSGDynamicTextAssetCookManifest manifest;
@@ -413,17 +379,40 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 		}
 	}
 
-	// Save manifest to output directory
+	// Save manifest and metadata to _Generated/ subdirectory
+	FString generatedDir = FPaths::Combine(OutputDirectory, TEXT("_Generated"));
+
 	if (filesCooked > 0)
 	{
-		if (!manifest.SaveToFileBinary(OutputDirectory))
+		if (!manifest.SaveToFileBinary(generatedDir))
 		{
-			UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("FSGDynamicTextAssetCookUtils: Failed to save cook manifest to: %s"), *OutputDirectory);
+			UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("FSGDynamicTextAssetCookUtils: Failed to save cook manifest to: %s"), *generatedDir);
 			OutErrors.Add(TEXT("Failed to save cook manifest"));
 			return false;
 		}
 
 		UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("FSGDynamicTextAssetCookUtils: Manifest saved with %d entries"), manifest.Num());
+	}
+
+	// Bake extender manifests to binary
+	if (USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
+	{
+		FSGDTASerializerExtenderRegistry& extenderRegistry = registry->GetExtenderRegistry();
+		if (!extenderRegistry.IsEmptyManfiests())
+		{
+			if (!extenderRegistry.BakeAllManifests(generatedDir))
+			{
+				UE_LOG(LogSGDynamicTextAssetsEditor, Error,
+					TEXT("FSGDynamicTextAssetCookUtils: Failed to bake extender manifests"));
+				OutErrors.Add(TEXT("Failed to bake extender manifests"));
+			}
+			else
+			{
+				UE_LOG(LogSGDynamicTextAssetsEditor, Log,
+					TEXT("FSGDynamicTextAssetCookUtils: Baked %d extender manifest(s)"),
+					extenderRegistry.NumManifests());
+			}
+		}
 	}
 
 	// Copy _TypeManifest.json files to _TypeManifests/ subdirectory in cooked output
@@ -434,7 +423,7 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 
 		if (rootClasses.Num() > 0)
 		{
-			FString typeManifestsDir = FPaths::Combine(OutputDirectory, TEXT("_TypeManifests"));
+			FString typeManifestsDir = FPaths::Combine(generatedDir, TEXT("_TypeManifests"));
 			IPlatformFile& platformFileRef = FPlatformFileManager::Get().GetPlatformFile();
 			platformFileRef.CreateDirectoryTree(*typeManifestsDir);
 
@@ -488,7 +477,7 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 			if (manifestsCopied > 0)
 			{
 				UE_LOG(LogSGDynamicTextAssetsEditor, Log,
-					TEXT("FSGDynamicTextAssetCookUtils: Copied %d type manifest(s) to _TypeManifests/"), manifestsCopied);
+					TEXT("FSGDynamicTextAssetCookUtils: Copied %d type manifest(s) to _Generated/_TypeManifests/"), manifestsCopied);
 			}
 		}
 	}

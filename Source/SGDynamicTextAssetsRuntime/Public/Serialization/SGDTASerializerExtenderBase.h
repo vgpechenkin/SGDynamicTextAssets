@@ -21,7 +21,7 @@
  * Whether callers use the CDO or create instances is a design choice
  * per extender type and is not enforced by this base class.
  */
-UCLASS(Abstract, Blueprintable, BlueprintType, ClassGroup = "Start Games")
+UCLASS(Abstract, Blueprintable, BlueprintType, ClassGroup = "Start Games", DisplayName = "DTA Serializer Extender (Abstract Base)")
 class SGDYNAMICTEXTASSETSRUNTIME_API USGDTASerializerExtenderBase : public UObject
 {
 	GENERATED_BODY()

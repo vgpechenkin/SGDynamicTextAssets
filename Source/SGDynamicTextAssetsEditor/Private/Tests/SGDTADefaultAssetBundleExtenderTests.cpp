@@ -149,13 +149,13 @@ bool FDefaultAssetBundleExtender_JsonRoundTrip_SingleBundle::RunTest(const FStri
 
 	// Serialize
 	FString content = GetMinimalJsonContent();
-	extender->NotifySerializeBundles(original, content, format);
+	extender->NotifyPostSerialize(original, content, format);
 	TestTrue(TEXT("Content should contain sgdtAssetBundles key"),
 		content.Contains(ISGDynamicTextAssetSerializer::KEY_SGDT_ASSET_BUNDLES));
 
 	// Deserialize
 	FSGDynamicTextAssetBundleData deserialized;
-	const bool result = extender->NotifyDeserializeBundles(content, deserialized, format);
+	const bool result = extender->NotifyPreDeserialize(content, deserialized, format);
 	TestTrue(TEXT("Deserialization should succeed"), result);
 
 	VerifyBundleDataMatches(this, original, deserialized, TEXT("JSON SingleBundle"));
@@ -177,10 +177,10 @@ bool FDefaultAssetBundleExtender_JsonRoundTrip_MultipleBundles::RunTest(const FS
 	const FSGDynamicTextAssetBundleData original = MakeTestBundleData();
 
 	FString content = GetMinimalJsonContent();
-	extender->NotifySerializeBundles(original, content, format);
+	extender->NotifyPostSerialize(original, content, format);
 
 	FSGDynamicTextAssetBundleData deserialized;
-	const bool result = extender->NotifyDeserializeBundles(content, deserialized, format);
+	const bool result = extender->NotifyPreDeserialize(content, deserialized, format);
 	TestTrue(TEXT("Deserialization should succeed"), result);
 
 	VerifyBundleDataMatches(this, original, deserialized, TEXT("JSON MultipleBundles"));
@@ -203,7 +203,7 @@ bool FDefaultAssetBundleExtender_JsonRoundTrip_PreservesExistingData::RunTest(co
 
 	// JSON with extra fields that must survive round-trip
 	FString content = TEXT("{\n  \"sgdtFormatVersion\": \"1.0.0\",\n  \"customField\": \"customValue\"\n}");
-	extender->NotifySerializeBundles(bundleData, content, format);
+	extender->NotifyPostSerialize(bundleData, content, format);
 
 	TestTrue(TEXT("Existing field should be preserved"),
 		content.Contains(TEXT("customField")));
@@ -229,10 +229,10 @@ bool FDefaultAssetBundleExtender_XmlRoundTrip_SingleBundle::RunTest(const FStrin
 	const FSGDynamicTextAssetBundleData original = MakeSingleBundleData();
 
 	FString content = GetMinimalXmlContent();
-	extender->NotifySerializeBundles(original, content, format);
+	extender->NotifyPostSerialize(original, content, format);
 
 	FSGDynamicTextAssetBundleData deserialized;
-	const bool result = extender->NotifyDeserializeBundles(content, deserialized, format);
+	const bool result = extender->NotifyPreDeserialize(content, deserialized, format);
 	TestTrue(TEXT("Deserialization should succeed"), result);
 
 	VerifyBundleDataMatches(this, original, deserialized, TEXT("XML SingleBundle"));
@@ -254,10 +254,10 @@ bool FDefaultAssetBundleExtender_XmlRoundTrip_MultipleBundles::RunTest(const FSt
 	const FSGDynamicTextAssetBundleData original = MakeTestBundleData();
 
 	FString content = GetMinimalXmlContent();
-	extender->NotifySerializeBundles(original, content, format);
+	extender->NotifyPostSerialize(original, content, format);
 
 	FSGDynamicTextAssetBundleData deserialized;
-	const bool result = extender->NotifyDeserializeBundles(content, deserialized, format);
+	const bool result = extender->NotifyPreDeserialize(content, deserialized, format);
 	TestTrue(TEXT("Deserialization should succeed"), result);
 
 	VerifyBundleDataMatches(this, original, deserialized, TEXT("XML MultipleBundles"));
@@ -286,13 +286,13 @@ bool FDefaultAssetBundleExtender_XmlRoundTrip_SpecialCharacterEscaping::RunTest(
 		FName(TEXT("UMyAsset.SpecialTexture")));
 
 	FString content = GetMinimalXmlContent();
-	extender->NotifySerializeBundles(original, content, format);
+	extender->NotifyPostSerialize(original, content, format);
 
 	// Verify escaped characters are in the XML
 	TestTrue(TEXT("Should contain escaped ampersand"), content.Contains(TEXT("&amp;")));
 
 	FSGDynamicTextAssetBundleData deserialized;
-	const bool result = extender->NotifyDeserializeBundles(content, deserialized, format);
+	const bool result = extender->NotifyPreDeserialize(content, deserialized, format);
 	TestTrue(TEXT("Deserialization should succeed"), result);
 
 	TestEqual(TEXT("Entry count should match"), deserialized.Bundles[0].Entries.Num(), 1);
@@ -317,10 +317,10 @@ bool FDefaultAssetBundleExtender_YamlRoundTrip_SingleBundle::RunTest(const FStri
 	const FSGDynamicTextAssetBundleData original = MakeSingleBundleData();
 
 	FString content = GetMinimalYamlContent();
-	extender->NotifySerializeBundles(original, content, format);
+	extender->NotifyPostSerialize(original, content, format);
 
 	FSGDynamicTextAssetBundleData deserialized;
-	const bool result = extender->NotifyDeserializeBundles(content, deserialized, format);
+	const bool result = extender->NotifyPreDeserialize(content, deserialized, format);
 	TestTrue(TEXT("Deserialization should succeed"), result);
 
 	VerifyBundleDataMatches(this, original, deserialized, TEXT("YAML SingleBundle"));
@@ -342,10 +342,10 @@ bool FDefaultAssetBundleExtender_YamlRoundTrip_MultipleBundles::RunTest(const FS
 	const FSGDynamicTextAssetBundleData original = MakeTestBundleData();
 
 	FString content = GetMinimalYamlContent();
-	extender->NotifySerializeBundles(original, content, format);
+	extender->NotifyPostSerialize(original, content, format);
 
 	FSGDynamicTextAssetBundleData deserialized;
-	const bool result = extender->NotifyDeserializeBundles(content, deserialized, format);
+	const bool result = extender->NotifyPreDeserialize(content, deserialized, format);
 	TestTrue(TEXT("Deserialization should succeed"), result);
 
 	VerifyBundleDataMatches(this, original, deserialized, TEXT("YAML MultipleBundles"));
@@ -366,8 +366,9 @@ bool FDefaultAssetBundleExtender_Deserialize_JsonNoBundlesReturnsFalse::RunTest(
 	FSGDynamicTextAssetBundleData outData;
 
 	// Valid JSON but no sgdtAssetBundles key
-	const bool result = extender->NotifyDeserializeBundles(
-		GetMinimalJsonContent(), outData, JsonFormat());
+	FString jsonContent = GetMinimalJsonContent();
+	const bool result = extender->NotifyPreDeserialize(
+		jsonContent, outData, JsonFormat());
 	TestFalse(TEXT("Should return false when no bundles key exists"), result);
 	TestFalse(TEXT("OutData should have no bundles"), outData.HasBundles());
 
@@ -386,8 +387,9 @@ bool FDefaultAssetBundleExtender_Deserialize_XmlNoBundlesReturnsFalse::RunTest(c
 	USGDTADefaultAssetBundleExtender* extender = CreateExtender();
 	FSGDynamicTextAssetBundleData outData;
 
-	const bool result = extender->NotifyDeserializeBundles(
-		GetMinimalXmlContent(), outData, XmlFormat());
+	FString xmlContent = GetMinimalXmlContent();
+	const bool result = extender->NotifyPreDeserialize(
+		xmlContent, outData, XmlFormat());
 	TestFalse(TEXT("Should return false when no bundles node exists"), result);
 
 	return true;
@@ -405,8 +407,9 @@ bool FDefaultAssetBundleExtender_Deserialize_YamlNoBundlesReturnsFalse::RunTest(
 	USGDTADefaultAssetBundleExtender* extender = CreateExtender();
 	FSGDynamicTextAssetBundleData outData;
 
-	const bool result = extender->NotifyDeserializeBundles(
-		GetMinimalYamlContent(), outData, YamlFormat());
+	FString yamlContent = GetMinimalYamlContent();
+	const bool result = extender->NotifyPreDeserialize(
+		yamlContent, outData, YamlFormat());
 	TestFalse(TEXT("Should return false when no bundles key exists"), result);
 
 	return true;
@@ -426,8 +429,8 @@ bool FDefaultAssetBundleExtender_Deserialize_InvalidJsonReturnsFalse::RunTest(co
 
 	AddExpectedError(TEXT("Failed to parse JSON content"), EAutomationExpectedErrorFlags::Contains, 1);
 
-	const FString malformedJson = TEXT("{this is not valid json!!!");
-	const bool result = extender->NotifyDeserializeBundles(malformedJson, outData, JsonFormat());
+	FString malformedJson = TEXT("{this is not valid json!!!");
+	const bool result = extender->NotifyPreDeserialize(malformedJson, outData, JsonFormat());
 	TestFalse(TEXT("Should return false for invalid JSON"), result);
 
 	return true;
@@ -447,7 +450,7 @@ bool FDefaultAssetBundleExtender_Serialize_EmptyBundlesNoOp::RunTest(const FStri
 
 	const FString originalContent = GetMinimalJsonContent();
 	FString content = originalContent;
-	extender->NotifySerializeBundles(emptyData, content, JsonFormat());
+	extender->NotifyPostSerialize(emptyData, content, JsonFormat());
 
 	TestEqual(TEXT("Content should be unchanged when no bundles exist"),
 		content, originalContent);
@@ -472,7 +475,7 @@ bool FDefaultAssetBundleExtender_Serialize_UnrecognizedFormatLogsWarning::RunTes
 
 	const FString originalContent = GetMinimalJsonContent();
 	FString content = originalContent;
-	extender->NotifySerializeBundles(bundleData, content, unknownFormat);
+	extender->NotifyPostSerialize(bundleData, content, unknownFormat);
 
 	TestEqual(TEXT("Content should be unchanged for unrecognized format"),
 		content, originalContent);
@@ -495,8 +498,9 @@ bool FDefaultAssetBundleExtender_Dispatch_UnrecognizedFormatDeserializeReturnsFa
 
 	AddExpectedError(TEXT("Unrecognized format"), EAutomationExpectedErrorFlags::Contains, 1);
 
-	const bool result = extender->NotifyDeserializeBundles(
-		GetMinimalJsonContent(), outData, unknownFormat);
+	FString unknownContent = GetMinimalJsonContent();
+	const bool result = extender->NotifyPreDeserialize(
+		unknownContent, outData, unknownFormat);
 	TestFalse(TEXT("Should return false for unrecognized format"), result);
 
 	return true;

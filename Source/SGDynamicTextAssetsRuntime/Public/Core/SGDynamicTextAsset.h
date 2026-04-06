@@ -77,9 +77,10 @@ public:
         const FSGDynamicTextAssetVersion& CurrentVersion,
         const TSharedPtr<FJsonObject>& OldData) override;
     virtual const FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData() const override;
-    virtual FSGDynamicTextAssetBundleData& GetMutableSGDTAssetBundleData() override;
+    virtual FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData_Mutable() override;
     virtual bool HasSGDTAssetBundles() const override;
-    virtual TSoftClassPtr<USGDTAAssetBundleExtender> GetAssetBundleExtenderOverride() const override;
+    virtual FSGDTAClassId GetAssetBundleExtenderOverride() const override;
+    virtual void SetAssetBundleExtenderOverride(const FSGDTAClassId& InOverride) override;
     // ~ISGDynamicTextAssetProvider interface
 
     /** Returns the version as a formatted string */
@@ -128,11 +129,11 @@ protected:
      * - Optional -
      * Per-DTA override for the asset bundle extender.
      *
-     * - Set: This extender is used instead of the settings-level mapping.
-     * - NULL: The system falls back to settings configuration.
+     * - Valid: This extender is used instead of the settings-level mapping.
+     * - Invalid: The system falls back to settings configuration.
      */
-    UPROPERTY(EditAnywhere, Category = "SGDTA|File Information")
-    TSoftClassPtr<USGDTAAssetBundleExtender> AssetBundleExtenderOverride = nullptr;
+    UPROPERTY(EditAnywhere, Category = "SGDTA|File Information", meta = (SGDTAClassType = "SGDTAAssetBundleExtender"))
+    FSGDTAClassId AssetBundleExtenderOverride;
 
 private:
 

@@ -11,6 +11,11 @@
  */
 namespace SGDynamicTextAssetScanPriorities
 {
+	// Extender discovery runs earliest. Scans for USGDTAAssetBundleExtender
+	// subclasses via GetDerivedClasses and registers any new ones in the manifest.
+	// Must complete before other phases that may need extender resolution.
+	static constexpr int32 EXTENDER_DISCOVERY = 5;
+
 	// Project info (format versions) runs first since it is lightweight
 	// (file-info-only extraction) and the major version upgrade check
 	// needs the result as early as possible.

@@ -37,10 +37,24 @@ public:
     virtual ~FSGDynamicTextAssetSerializerBase() = default;
 
     /**
-     * Reserved JSON key used to store the UClass name of an instanced sub-object.
+     * Reserved key used to store the UClass name of an instanced sub-object.
      * Single source of truth for all serialization formats (JSON, XML, YAML).
      */
     static const FString INSTANCED_OBJECT_CLASS_KEY;
+
+    /**
+     * Reserved key for the UScriptStruct type name of a regular struct property.
+     * Injected during serialization so the per-property asset bundle extender can
+     * identify struct context when recursing into nested properties.
+     */
+    static const FString STRUCT_TYPE_KEY;
+
+    /**
+     * Reserved key for the inner UScriptStruct type name inside an FInstancedStruct.
+     * Injected during serialization so the per-property asset bundle extender can
+     * identify the polymorphic struct type when recursing into FInstancedStruct values.
+     */
+    static const FString INSTANCED_STRUCT_TYPE_KEY;
 
     /**
      * Checks whether a property has the CPF_InstancedReference flag,
@@ -158,23 +172,50 @@ protected:
         UObject* Outer) const;
 
     /**
-     * Resolves the asset bundle extender for the given provider, extracts bundles,
-     * and serializes them into the content string.
-     * Call this after the main serialized content is built.
+     * Pre-serialization pipeline step. Called before property serialization.
+     * Resolves the extender and calls NotifyPreSerialize.
      *
-     * @param Provider The provider to extract and serialize bundles from
-     * @param InOutSerializedContent The serialized content to modify with bundle data
+     * @param Provider The provider for extender resolution
+     * @param InOutContent The content to pre-process
      */
-    void SerializeAssetBundles(const ISGDynamicTextAssetProvider* Provider,
-        FString& InOutSerializedContent) const;
+    void PreSerializeAssetBundles(const ISGDynamicTextAssetProvider* Provider,
+        FString& InOutContent) const;
 
     /**
-     * Resolves the asset bundle extender and deserializes bundles from the content string.
+     * Post-serialization pipeline step. Called after property serialization.
+     * Resolves the extender, extracts bundles, and calls NotifyPostSerialize.
      *
-     * @param SerializedContent The serialized content to extract bundles from
-     * @param OutBundleData The bundle data to populate
-     * @return True if bundle data was found and extracted
+     * @param Provider The provider to extract and serialize bundles from
+     * @param InOutContent The serialized content to modify with bundle data
      */
-    bool DeserializeAssetBundles(const FString& SerializedContent,
-        FSGDynamicTextAssetBundleData& OutBundleData) const;
+    void PostSerializeAssetBundles(const ISGDynamicTextAssetProvider* Provider,
+        FString& InOutContent) const;
+
+    /**
+     * Pre-deserialization pipeline step. Called before property deserialization.
+     * Resolves the extender and calls NotifyPreDeserialize. The extender may
+     * modify the content (e.g., unwrap per-property bundle wrappers) and
+     * extract bundle metadata.
+     *
+     * @param InOutContent The serialized content (mutable for unwrapping)
+     * @param OutBundleData The bundle data to populate
+     * @param Provider The provider used to resolve the asset bundle extender
+     * @return True if pre-deserialization completed. False only on system failure.
+     */
+    bool PreDeserializeAssetBundles(FString& InOutContent,
+        FSGDynamicTextAssetBundleData& OutBundleData,
+        const TScriptInterface<ISGDynamicTextAssetProvider>& Provider) const;
+
+    /**
+     * Post-deserialization pipeline step. Called after property deserialization.
+     * Resolves the extender and calls NotifyPostDeserialize.
+     *
+     * @param Content The serialized content (read-only)
+     * @param InOutBundleData The bundle data to post-process
+     * @param Provider The provider used to resolve the asset bundle extender
+     * @return True if post-deserialization completed. False only on system failure.
+     */
+    bool PostDeserializeAssetBundles(const FString& Content,
+        FSGDynamicTextAssetBundleData& InOutBundleData,
+        const TScriptInterface<ISGDynamicTextAssetProvider>& Provider) const;
 };

@@ -68,7 +68,7 @@ struct SGDYNAMICTEXTASSETSEDITOR_API FSGFormatVersionMigrationResult
  * Commandlet for validating and migrating DTA file format versions.
  *
  * This commandlet is the single source of truth for format version validation
- * and migration logic. The editor UI (T100.8) delegates to the static utility
+ * and migration logic. The editor UI delegates to the static utility
  * functions on this class rather than duplicating the logic.
  *
  * Two modes of operation:

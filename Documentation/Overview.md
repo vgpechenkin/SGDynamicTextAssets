@@ -105,6 +105,7 @@ Both use `FSGDynamicTextAssetVersion` (Major.Minor.Patch). If the `fileFormatVer
 | **GUID** | The raw `FGuid` inside an `FSGDynamicTextAssetId`. Assigned at creation, never changes. |
 | **FSGDynamicTextAssetRef** | A lightweight struct that references a dynamic text asset by `FSGDynamicTextAssetId`, resolved lazily at runtime |
 | **Asset Bundle** | A named group of soft references on a DTA, loaded selectively via `FStreamableManager`. Tagged with `meta=(AssetBundles="BundleName")`. |
+| **Serializer Extender** | A UObject-based extension that customizes serializer behavior (e.g., asset bundle storage strategy). Discovered automatically and identified by `FSGDTAClassId`. |
 | **Instanced Sub-object** | A polymorphic `UObject` owned by a DTA via `UPROPERTY(Instanced)`. Serialized inline with full class type information. |
 | **`.dta.json`** | The default JSON source file format |
 | **`.dta.xml`** | The XML source file format |

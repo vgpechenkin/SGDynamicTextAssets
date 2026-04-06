@@ -30,6 +30,7 @@ public class SGDynamicTextAssetsRuntime : ModuleRules
             "Engine",
             "Json",
             "JsonUtilities",
+            "StructUtils",
             "XmlParser",
         });
 

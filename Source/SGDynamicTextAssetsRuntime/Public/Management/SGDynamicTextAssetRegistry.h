@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Core/SGDynamicTextAssetTypeId.h"
+#include "Management/SGDTASerializerExtenderRegistry.h"
 #include "Subsystems/EngineSubsystem.h"
 #include "UObject/SoftObjectPtr.h"
 
@@ -215,17 +216,31 @@ public:
     FOnTypeManifestUpdated OnTypeManifestUpdated;
 
     /**
-     * Gets or creates a cached instance of the given asset bundle extender class.
-     * Loads the class from the soft pointer if needed, then caches the instance.
+     * Gets or creates a cached instance of the asset bundle extender identified by the given class ID.
+     * Resolves the ClassId to a soft class pointer via the asset bundle extender manifest,
+     * loads the class, then caches the instance.
      * Instances are owned by the registry and persist for its lifetime.
      *
-     * @param ExtenderClass Soft class pointer to the extender class
-     * @return The cached instance, or nullptr if the class is null or fails to load
+     * @param ExtenderClassId The ClassId identifying the extender in the manifest
+     * @return The cached instance, or nullptr if the ClassId is invalid or fails to resolve/load
      */
     USGDTAAssetBundleExtender* GetOrCreateAssetBundleExtender(
-        const TSoftClassPtr<USGDTAAssetBundleExtender>& ExtenderClass);
+        const FSGDTAClassId& ExtenderClassId);
+
+    /** Returns the serializer extender registry for managing extender manifests. */
+    FSGDTASerializerExtenderRegistry& GetExtenderRegistry();
+
+    /** Returns the serializer extender registry for managing extender manifests (const). */
+    const FSGDTASerializerExtenderRegistry& GetExtenderRegistry() const;
 
 private:
+
+    /**
+     * Loads extender manifests from disk, registers built-in extenders,
+     * and saves changes back to disk if any manifests were dirtied.
+     * Called during Initialize() in editor builds only.
+     */
+    void LoadAndPersistExtenderManifests();
 
     /** Rebuilds the cached class list from registered bases + reflection */
     void RebuildClassCache() const;
@@ -258,7 +273,10 @@ private:
     /** UClass -> TypeId reverse lookup, built during SyncManifests. */
     TMap<TWeakObjectPtr<const UClass>, FSGDynamicTextAssetTypeId> ClassToTypeIdMap;
 
-    /** Cached asset bundle extender instances, keyed by loaded class. One instance per class. */
+    /** Cached asset bundle extender instances, keyed by class ID. One instance per registered extender. */
     UPROPERTY(Transient)
-    TMap<TSoftClassPtr<USGDTAAssetBundleExtender>, TObjectPtr<USGDTAAssetBundleExtender>> CachedAssetBundleExtenders;
+    TMap<FSGDTAClassId, TObjectPtr<USGDTAAssetBundleExtender>> CachedAssetBundleExtenders;
+
+    /** Manages serializer extender manifests (one per extender framework). */
+    FSGDTASerializerExtenderRegistry ExtenderRegistry;
 };

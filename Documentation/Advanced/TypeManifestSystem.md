@@ -174,7 +174,7 @@ static FString GetRootClassManifestFilePath(const UClass* RootClass);
 
 ### LoadCookedManifests
 
-In packaged builds, source manifest files are unavailable. `LoadCookedManifests()` reads pre-cooked manifests from the `Content/SGDynamicTextAssetsCooked/_TypeManifests/` directory, resolves soft class references, and populates the TypeId/Class lookup maps.
+In packaged builds, source manifest files are unavailable. `LoadCookedManifests()` reads pre-cooked manifests from the `Content/SGDynamicTextAssetsCooked/_Generated/_TypeManifests/` directory, resolves soft class references, and populates the TypeId/Class lookup maps.
 
 ```cpp
 void LoadCookedManifests();

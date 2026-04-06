@@ -10,6 +10,7 @@
 #include "Core/SGDynamicTextAssetId.h"
 #include "Editor/SGDynamicTextAssetEditorToolkit.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "ReferenceViewer/SSGDynamicTextAssetReferenceViewer.h"
@@ -1197,7 +1198,7 @@ void SSGDynamicTextAssetBrowser::OnBuildContextMenuExtension(FMenuBuilder& MenuB
                 const FString extension = serializer->GetFileExtension();
 
                 // Exclude binary serializer (not a text format)
-                if (extension == FSGDynamicTextAssetFileManager::BINARY_EXTENSION)
+                if (extension == SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION)
                 {
                     continue;
                 }

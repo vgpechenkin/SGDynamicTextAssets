@@ -2,8 +2,6 @@
 
 #include "Core/SGDynamicTextAsset.h"
 
-#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
-
 USGDynamicTextAsset::USGDynamicTextAsset()
 {
     // DynamicTextAssetId will be set by the subsystem when loading
@@ -73,7 +71,7 @@ const FSGDynamicTextAssetBundleData& USGDynamicTextAsset::GetSGDTAssetBundleData
     return SGDTAssetBundleData;
 }
 
-FSGDynamicTextAssetBundleData& USGDynamicTextAsset::GetMutableSGDTAssetBundleData()
+FSGDynamicTextAssetBundleData& USGDynamicTextAsset::GetSGDTAssetBundleData_Mutable()
 {
     return SGDTAssetBundleData;
 }
@@ -83,9 +81,14 @@ bool USGDynamicTextAsset::HasSGDTAssetBundles() const
     return SGDTAssetBundleData.HasBundles();
 }
 
-TSoftClassPtr<USGDTAAssetBundleExtender> USGDynamicTextAsset::GetAssetBundleExtenderOverride() const
+FSGDTAClassId USGDynamicTextAsset::GetAssetBundleExtenderOverride() const
 {
     return AssetBundleExtenderOverride;
+}
+
+void USGDynamicTextAsset::SetAssetBundleExtenderOverride(const FSGDTAClassId& InOverride)
+{
+    AssetBundleExtenderOverride = InOverride;
 }
 
 bool USGDynamicTextAsset::Native_ValidateDynamicTextAsset(FSGDynamicTextAssetValidationResult& OutResult) const

@@ -521,8 +521,7 @@ const FSlateBrush* FSGDynamicTextAssetYamlSerializer::GetIconBrush() const
 
 FString FSGDynamicTextAssetYamlSerializer::GetFileExtension() const
 {
-    static const FString extension = ".dta.yaml";
-    return extension;
+    return SGDynamicTextAssetConstants::YAML_FILE_EXTENSION;
 }
 
 FText FSGDynamicTextAssetYamlSerializer::GetFormatName() const
@@ -623,6 +622,15 @@ bool FSGDynamicTextAssetYamlSerializer::SerializeProvider(const ISGDynamicTextAs
             fkyaml::node(FSGDynamicTextAssetYamlSerializerInternals::ToStdString(Provider->GetUserFacingId()));
         fileInfoNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_FORMAT_VERSION)] =
             fkyaml::node(FSGDynamicTextAssetYamlSerializerInternals::ToStdString(GetFileFormatVersion().ToString()));
+
+        // Write AssetBundleExtenderOverride only when set (optional field)
+        const FSGDTAClassId assetBundleExtenderOverride = Provider->GetAssetBundleExtenderOverride();
+        if (assetBundleExtenderOverride.IsValid())
+        {
+            fileInfoNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_ASSET_BUNDLE_EXTENDER)] =
+                fkyaml::node(FSGDynamicTextAssetYamlSerializerInternals::ToStdString(assetBundleExtenderOverride.ToString()));
+        }
+
         rootNode[FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_FILE_INFORMATION)] = fileInfoNode;
 
         // Data block
@@ -763,7 +771,7 @@ bool FSGDynamicTextAssetYamlSerializer::SerializeProvider(const ISGDynamicTextAs
         OutString = FSGDynamicTextAssetYamlSerializerInternals::ToFString(yamlStr);
 
         // Serialize asset bundles via the extender system
-        SerializeAssetBundles(Provider, OutString);
+        PostSerializeAssetBundles(Provider, OutString);
 
         return true;
     }
@@ -914,6 +922,18 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
             FSGDynamicTextAssetYamlSerializerInternals::ToFString(fileInfoNode[formatVersionKey].get_value<std::string>()));
     }
 
+    // Extract and apply AssetBundleExtenderOverride (optional, only present when set)
+    const std::string assetBundleExtenderKey = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(KEY_ASSET_BUNDLE_EXTENDER);
+    if (fileInfoNode.contains(assetBundleExtenderKey) && fileInfoNode[assetBundleExtenderKey].is_string())
+    {
+        const FSGDTAClassId extenderClassId = FSGDTAClassId::FromString(
+            FSGDynamicTextAssetYamlSerializerInternals::ToFString(fileInfoNode[assetBundleExtenderKey].get_value<std::string>()));
+        if (extenderClassId.IsValid())
+        {
+            OutProvider->SetAssetBundleExtenderOverride(extenderClassId);
+        }
+    }
+
     UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
         TEXT("FSGDynamicTextAssetYamlSerializer: File format version: %s (serializer current: %s)"),
         *fileFormatVersion.ToString(), *GetFileFormatVersion().ToString());
@@ -947,6 +967,27 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
         UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
             TEXT("FSGDynamicTextAssetYamlSerializer: Provider(%s) has file major version fileVersion Major(%d) which is newer than class currentVersion Major(%d). Loading with best-effort."),
             *OutProvider->GetDynamicTextAssetId().ToString(), fileVersion.Major, currentVersion.Major);
+    }
+
+    // Pre-deserialize: let the extender unwrap properties and extract bundle metadata
+    FSGDynamicTextAssetBundleData bundleData;
+    {
+        TScriptInterface<ISGDynamicTextAssetProvider> providerInterface(providerObject);
+        FString mutableContent = InString;
+        PreDeserializeAssetBundles(mutableContent, bundleData, providerInterface);
+
+        // If the extender modified the content, re-parse
+        if (mutableContent != InString)
+        {
+            const std::string reYamlStr = FSGDynamicTextAssetYamlSerializerInternals::ToStdString(mutableContent);
+            rootNode = fkyaml::node::deserialize(reYamlStr);
+            if (!rootNode.is_mapping())
+            {
+                UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
+                    TEXT("FSGDynamicTextAssetYamlSerializer: Failed to re-parse YAML after PreDeserialize"));
+                return false;
+            }
+        }
     }
 
     // Find data block
@@ -1136,6 +1177,13 @@ bool FSGDynamicTextAssetYamlSerializer::DeserializeProvider(const FString& InStr
             }
         }
     }
+
+    // Post-deserialize hook and set bundle data on the provider
+    {
+        TScriptInterface<ISGDynamicTextAssetProvider> providerInterface(providerObject);
+        PostDeserializeAssetBundles(InString, bundleData, providerInterface);
+    }
+    OutProvider->GetSGDTAssetBundleData_Mutable() = MoveTemp(bundleData);
 
     return true;
 }
@@ -1432,7 +1480,8 @@ FString FSGDynamicTextAssetYamlSerializer::GetDefaultFileContent(const UClass* D
     }
 }
 
-bool FSGDynamicTextAssetYamlSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData) const
+bool FSGDynamicTextAssetYamlSerializer::ExtractSGDTAssetBundles(const FString& InString, FSGDynamicTextAssetBundleData& OutBundleData,
+    const TScriptInterface<ISGDynamicTextAssetProvider>& Provider) const
 {
     OutBundleData.Reset();
 
@@ -1441,7 +1490,8 @@ bool FSGDynamicTextAssetYamlSerializer::ExtractSGDTAssetBundles(const FString& I
         return false;
     }
 
-    return DeserializeAssetBundles(InString, OutBundleData);
+    FString mutableContent = InString;
+    return PreDeserializeAssetBundles(mutableContent, OutBundleData, Provider);
 }
 
 bool FSGDynamicTextAssetYamlSerializer::UpdateFileFormatVersion(FString& InOutFileContents,

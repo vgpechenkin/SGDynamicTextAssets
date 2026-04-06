@@ -9,13 +9,15 @@
 #include "Engine/Blueprint.h"
 #include "Engine/Engine.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
+#include "Management/SGDynamicTextAssetRegistry.h"
+#include "Management/SGDTASerializerExtenderRegistry.h"
+#include "Serialization/AssetBundleExtenders/SGDTADefaultAssetBundleExtender.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
 #include "Serialization/SGDynamicTextAssetXmlSerializer.h"
 #include "Serialization/SGDynamicTextAssetYamlSerializer.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 #include "SGDynamicTextAssetLogs.h"
-#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
 #include "Settings/SGDynamicTextAssetSettings.h"
 #include "Subsystem/SGDynamicTextAssetSubsystem.h"
 #include "Engine/GameInstance.h"
@@ -381,7 +383,7 @@ FSGDTAClassId USGDynamicTextAssetStatics::GenerateDTAClassId()
 #endif
 }
 
-TSoftClassPtr<USGDTAAssetBundleExtender> USGDynamicTextAssetStatics::ResolveAssetBundleExtender(
+FSGDTAClassId USGDynamicTextAssetStatics::ResolveAssetBundleExtender(
 	const TScriptInterface<ISGDynamicTextAssetProvider>& Provider,
 	FSGDTASerializerFormat Format)
 {
@@ -389,35 +391,45 @@ TSoftClassPtr<USGDTAAssetBundleExtender> USGDynamicTextAssetStatics::ResolveAsse
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
 			TEXT("ResolveAssetBundleExtender: Inputted NULL Provider"));
-		return nullptr;
+		return FSGDTAClassId::INVALID_CLASS_ID;
 	}
 
-	// Check per-DTA override
-	const TSoftClassPtr<USGDTAAssetBundleExtender> perDtaOverride =
-		Provider->GetAssetBundleExtenderOverride();
-	if (!perDtaOverride.IsNull())
+	// Tier 1: Per-DTA override takes highest priority
+	const FSGDTAClassId perDtaOverride = Provider->GetAssetBundleExtenderOverride();
+	if (perDtaOverride.IsValid())
 	{
 		return perDtaOverride;
 	}
 
-	// Check settings mapping
+	// Tier 2: Settings overrides for specific formats
 	if (const USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings())
 	{
 		const uint32 formatBit = 1u << Format.GetTypeId();
-		for (const FSGAssetBundleExtenderMapping& mapping : settings->AssetBundleExtenderMappings)
+		for (const FSGAssetBundleExtenderMapping& mapping : settings->AssetBundleExtenderOverrides)
 		{
-			if ((mapping.AppliesTo.GetTypeId() & formatBit) != 0 && !mapping.ExtenderClass.IsNull())
+			if ((mapping.AppliesTo.GetTypeId() & formatBit) != 0 && mapping.ExtenderClassId.IsValid())
 			{
-				return mapping.ExtenderClass;
+				return mapping.ExtenderClassId;
 			}
 		}
 	}
 
-	UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-		TEXT("ResolveAssetBundleExtender: No asset bundle extender found for format '%s'"),
+	// Tier 3: Baseline default, use the default extender by class type
+	if (const USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
+	{
+		const FSGDTAClassId defaultId = registry->GetExtenderRegistry().FindExtenderIdByClass(
+			USGDTADefaultAssetBundleExtender::StaticClass());
+		if (defaultId.IsValid())
+		{
+			return defaultId;
+		}
+	}
+
+	UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
+		TEXT("ResolveAssetBundleExtender: No asset bundle extender resolved for format '%s'"),
 		*Format.GetFormatName().ToString());
 
-	return nullptr;
+	return FSGDTAClassId::INVALID_CLASS_ID;
 }
 
 bool USGDynamicTextAssetStatics::IsVersionValid(const FSGDynamicTextAssetVersion& Version)

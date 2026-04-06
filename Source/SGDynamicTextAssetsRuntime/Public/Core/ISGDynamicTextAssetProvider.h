@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 
+#include "Core/SGDTAClassId.h"
 #include "Core/SGDynamicTextAssetId.h"
 #include "Core/SGDynamicTextAssetVersion.h"
 #include "Core/SGDynamicTextAssetValidationResult.h"
@@ -15,8 +16,6 @@
 #include "ISGDynamicTextAssetProvider.generated.h"
 
 class FJsonObject;
-
-class USGDTAAssetBundleExtender;
 
 /**
  * UInterface boilerplate for the dynamic text asset provider interface.
@@ -145,17 +144,26 @@ public:
 	virtual const FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData() const = 0;
 
 	/** Returns a mutable reference to the asset bundle data. */
-	virtual FSGDynamicTextAssetBundleData& GetMutableSGDTAssetBundleData() = 0;
+	virtual FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData_Mutable() = 0;
 
 	/** Returns true if this provider has any asset bundles. */
 	virtual bool HasSGDTAssetBundles() const;
 
 	/**
-	 * Returns the per-DTA asset bundle extender override class.
-	 * When non-null, this extender takes priority over the settings mapping.
-	 * Default: returns a null soft class pointer (no override).
+	 * Returns the per-DTA asset bundle extender override class ID.
+	 * When valid, this extender takes priority over the settings mapping.
+	 * Default: returns FSGDTAClassId::INVALID_CLASS_ID (no override).
 	 */
-	virtual TSoftClassPtr<USGDTAAssetBundleExtender> GetAssetBundleExtenderOverride() const;
+	virtual FSGDTAClassId GetAssetBundleExtenderOverride() const;
+
+	/**
+	 * Sets the per-DTA asset bundle extender override class ID.
+	 * Called during deserialization when the file information block contains
+	 * an "assetBundleExtender" field. Default implementation is a no-op.
+	 *
+	 * @param InOverride The ClassId identifying the extender to use for this asset
+	 */
+	virtual void SetAssetBundleExtenderOverride(const FSGDTAClassId& InOverride);
 
 #if WITH_EDITOR
 	/** Notifies listeners that this dynamic text asset has changed */

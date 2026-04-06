@@ -3,6 +3,7 @@
 #include "Browser/SSGDynamicTextAssetCreateDialog.h"
 
 #include "Management/SGDynamicTextAssetFileManager.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "Management/SGDynamicTextAssetFileInfo.h"
 #include "SGDynamicTextAssetEditorLogs.h"
 #include "Utilities/SGDynamicTextAssetSourceControl.h"
@@ -219,7 +220,7 @@ void SSGDynamicTextAssetCreateDialog::BuildExtensionOptions()
     SelectedExtension = nullptr;
     for (const TSharedPtr<FSGDynamicTextAssetSerializerMetadata>& metadata : ExtensionOptions)
     {
-        if (metadata->FileExtension == FSGDynamicTextAssetFileManager::DEFAULT_TEXT_EXTENSION)
+        if (metadata->FileExtension == SGDynamicTextAssetConstants::JSON_FILE_EXTENSION)
         {
             SelectedExtension = metadata.ToWeakPtr();
             break;
@@ -292,7 +293,7 @@ FString SSGDynamicTextAssetCreateDialog::GetSelectedExtensionString() const
     {
         return SelectedExtension.Pin()->FileExtension;
     }
-    return FSGDynamicTextAssetFileManager::DEFAULT_TEXT_EXTENSION;
+    return SGDynamicTextAssetConstants::JSON_FILE_EXTENSION;
 }
 
 void SSGDynamicTextAssetCreateDialog::OnNameTextChanged(const FText& NewText)
