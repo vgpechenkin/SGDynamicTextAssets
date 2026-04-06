@@ -273,7 +273,7 @@ void USGDTADefaultAssetBundleExtender::SerializeBundlesXml(
 		*ISGDynamicTextAssetSerializer::KEY_SGDT_ASSET_BUNDLES);
 
 	// Insert before the closing root tag
-	const FString closingTag = TEXT("</sgDynamicTextAsset>");
+	const FString closingTag = FString::Printf(TEXT("</%s>"), *SGDynamicTextAssetConstants::XML_ROOT_TAG);
 	const int32 insertPos = InOutContent.Find(closingTag, ESearchCase::CaseSensitive);
 	if (insertPos != INDEX_NONE)
 	{

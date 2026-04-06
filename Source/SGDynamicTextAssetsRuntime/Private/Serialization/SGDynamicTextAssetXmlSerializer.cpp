@@ -20,9 +20,6 @@ const FSGDTASerializerFormat FSGDynamicTextAssetXmlSerializer::FORMAT(SGDynamicT
 
 namespace FSGDynamicTextAssetXmlSerializerInternals
 {
-    /** XML element name for the root wrapper element. */
-    static const FString XML_ROOT_TAG = TEXT("DynamicTextAsset");
-
     /** XML declaration line prepended to every serialized document. */
     static const FString XML_DECLARATION = TEXT("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
@@ -421,7 +418,7 @@ bool FSGDynamicTextAssetXmlSerializer::SerializeProvider(const ISGDynamicTextAss
 
     FString xml;
     xml += FSGDynamicTextAssetXmlSerializerInternals::XML_DECLARATION;
-    xml += FString::Printf(TEXT("<%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::XML_ROOT_TAG);
+    xml += FString::Printf(TEXT("<%s>\n"), *SGDynamicTextAssetConstants::XML_ROOT_TAG);
 
     // Write file information fields
     // Write Asset Type ID GUID to the type element, fall back to class name if unavailable
@@ -591,7 +588,7 @@ bool FSGDynamicTextAssetXmlSerializer::SerializeProvider(const ISGDynamicTextAss
 
     xml += FString::Printf(TEXT("%s</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_DATA);
 
-    xml += FString::Printf(TEXT("</%s>\n"), *FSGDynamicTextAssetXmlSerializerInternals::XML_ROOT_TAG);
+    xml += FString::Printf(TEXT("</%s>\n"), *SGDynamicTextAssetConstants::XML_ROOT_TAG);
 
     OutString = MoveTemp(xml);
 
@@ -1166,7 +1163,7 @@ FString FSGDynamicTextAssetXmlSerializer::GetDefaultFileContent(const UClass* Dy
     return FString::Printf(
         TEXT("%s<%s>\n%s<%s>\n%s<%s>%s</%s>\n%s<%s>1.0.0</%s>\n%s<%s>%s</%s>\n%s<%s>%s</%s>\n%s<%s>%s</%s>\n%s</%s>\n%s<%s/>\n</%s>\n"),
         *FSGDynamicTextAssetXmlSerializerInternals::XML_DECLARATION,
-        *FSGDynamicTextAssetXmlSerializerInternals::XML_ROOT_TAG,
+        *SGDynamicTextAssetConstants::XML_ROOT_TAG,
         *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_FILE_INFORMATION,
         *FSGDynamicTextAssetXmlSerializerInternals::Indent(2), *KEY_TYPE, *FSGDynamicTextAssetXmlSerializerInternals::XmlEscape(typeString), *KEY_TYPE,
         *FSGDynamicTextAssetXmlSerializerInternals::Indent(2), *KEY_VERSION, *KEY_VERSION,
@@ -1175,7 +1172,7 @@ FString FSGDynamicTextAssetXmlSerializer::GetDefaultFileContent(const UClass* Dy
         *FSGDynamicTextAssetXmlSerializerInternals::Indent(2), *KEY_FILE_FORMAT_VERSION, *GetFileFormatVersion().ToString(), *KEY_FILE_FORMAT_VERSION,
         *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_FILE_INFORMATION,
         *FSGDynamicTextAssetXmlSerializerInternals::Indent(1), *KEY_DATA,
-        *FSGDynamicTextAssetXmlSerializerInternals::XML_ROOT_TAG
+        *SGDynamicTextAssetConstants::XML_ROOT_TAG
     );
 }
 

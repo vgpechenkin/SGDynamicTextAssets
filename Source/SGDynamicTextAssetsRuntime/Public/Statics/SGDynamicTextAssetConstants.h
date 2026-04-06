@@ -39,6 +39,9 @@ namespace SGDynamicTextAssetConstants
 	/** File extension for XML dynamic text asset files (includes dot). */
 	inline const FString XML_FILE_EXTENSION = TEXT(".dta.xml");
 
+	/** XML root element tag name used for DTA documents. */
+	inline const FString XML_ROOT_TAG = TEXT("DynamicTextAsset");
+
 	/** Framework key for the asset bundle extender manifest. */
 	static const FName ASSET_BUNDLE_EXTENDER_FRAMEWORK_KEY = FName(TEXT("AssetBundles"));
 }
