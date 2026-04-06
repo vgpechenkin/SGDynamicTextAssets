@@ -207,6 +207,8 @@ public:
 	 * When enabled, deletes all files in the cooked directory before cooking.
 	 * Prevents stale .dta.bin files from deleted dynamic text assets persisting across cooks.
 	 * Disable for build machines that reuse cooked output for faster iterative builds.
+	 *
+	 * @see SGDynamicTextAssetsPostPackageCleanup.cs
 	 */
 	UPROPERTY(Config, EditAnywhere, Category = "Cooking")
 	uint8 bCleanCookedDirectoryBeforeCook : 1 = 1;
@@ -214,6 +216,8 @@ public:
 	/**
 	 * When enabled, deletes cooked .dta.bin files after the packaging process completes (success or failure).
 	 * Prevents generated binary files from cluttering the Content Browser between packaging runs.
+	 *
+	 * @see SGDynamicTextAssetsPostPackageCleanup.cs
 	 */
 	UPROPERTY(Config, EditAnywhere, Category = "Cooking")
 	uint8 bDeleteCookedAssetsAfterPackaging : 1 = 1;
