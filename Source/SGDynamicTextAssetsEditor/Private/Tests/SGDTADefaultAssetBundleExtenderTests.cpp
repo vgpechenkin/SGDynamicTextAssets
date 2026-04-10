@@ -81,7 +81,7 @@ namespace SGDTADefaultExtenderTestHelpers
 
 	FString GetMinimalXmlContent()
 	{
-		return TEXT("<sgDynamicTextAsset>\n    <sgdtFormatVersion>1.0.0</sgdtFormatVersion>\n</sgDynamicTextAsset>");
+		return TEXT("<DynamicTextAsset>\n    <sgdtFormatVersion>1.0.0</sgdtFormatVersion>\n</DynamicTextAsset>");
 	}
 
 	FString GetMinimalYamlContent()
@@ -294,6 +294,11 @@ bool FDefaultAssetBundleExtender_XmlRoundTrip_SpecialCharacterEscaping::RunTest(
 	FSGDynamicTextAssetBundleData deserialized;
 	const bool result = extender->NotifyPreDeserialize(content, deserialized, format);
 	TestTrue(TEXT("Deserialization should succeed"), result);
+
+	if (!TestTrue(TEXT("Should have at least one bundle"), deserialized.Bundles.Num() > 0))
+	{
+		return false;
+	}
 
 	TestEqual(TEXT("Entry count should match"), deserialized.Bundles[0].Entries.Num(), 1);
 	TestEqual(TEXT("Asset path should be unescaped on round-trip"),

@@ -32,6 +32,17 @@ namespace SGDTADefaultExtenderInternals
 		return result;
 	}
 
+	FString XmlUnescape(const FString& Value)
+	{
+		FString result = Value;
+		result.ReplaceInline(TEXT("&apos;"), TEXT("'"), ESearchCase::CaseSensitive);
+		result.ReplaceInline(TEXT("&quot;"), TEXT("\""), ESearchCase::CaseSensitive);
+		result.ReplaceInline(TEXT("&gt;"), TEXT(">"), ESearchCase::CaseSensitive);
+		result.ReplaceInline(TEXT("&lt;"), TEXT("<"), ESearchCase::CaseSensitive);
+		result.ReplaceInline(TEXT("&amp;"), TEXT("&"), ESearchCase::CaseSensitive);
+		return result;
+	}
+
 	std::string ToStdString(const FString& InString)
 	{
 		const auto utf8 = StringCast<UTF8CHAR>(*InString);
@@ -321,7 +332,7 @@ bool USGDTADefaultAssetBundleExtender::DeserializeBundlesXml(
 			continue;
 		}
 
-		const FString bundleNameStr = bundleNode->GetAttribute(TEXT("name"));
+		const FString bundleNameStr = SGDTADefaultExtenderInternals::XmlUnescape(bundleNode->GetAttribute(TEXT("name")));
 		if (bundleNameStr.IsEmpty())
 		{
 			continue;
@@ -337,8 +348,8 @@ bool USGDTADefaultAssetBundleExtender::DeserializeBundlesXml(
 				continue;
 			}
 
-			const FString propertyName = entryNode->GetAttribute(TEXT("property"));
-			const FString pathStr = entryNode->GetAttribute(TEXT("path"));
+			const FString propertyName = SGDTADefaultExtenderInternals::XmlUnescape(entryNode->GetAttribute(TEXT("property")));
+			const FString pathStr = SGDTADefaultExtenderInternals::XmlUnescape(entryNode->GetAttribute(TEXT("path")));
 
 			if (!propertyName.IsEmpty() && !pathStr.IsEmpty())
 			{
