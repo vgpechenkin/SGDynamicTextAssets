@@ -4,33 +4,37 @@
 
 #include "Browser/SSGDynamicTextAssetBrowser.h"
 #include "Core/SGDynamicTextAsset.h"
-#include "Editor/FSGDynamicTextAssetIdCustomization.h"
-#include "Editor/SGDynamicTextAssetIdentityCustomization.h"
-#include "Customization/SGAssetTypeIdCustomization.h"
+#include "Customization/SGDynamicTextAssetIdCustomization.h"
+#include "Editor/SGDTADetailCustomization.h"
+#include "Customization/SGDTAAssetTypeIdCustomization.h"
+#include "Customization/SGDTAClassIdCustomization.h"
+#include "Customization/SGDTASerializerFormatCustomization.h"
 #include "Browser/SGDynamicTextAssetBrowserCommands.h"
 #include "Editor/SGDynamicTextAssetEditorCommands.h"
-#include "Editor/SGDynamicTextAssetRefCustomization.h"
-#include "Editor/FSGDynamicTextAssetEditorToolkit.h"
-#include "ReferenceViewer/SGDynamicTextAssetReferenceSubsystem.h"
+#include "Customization/SGDynamicTextAssetRefCustomization.h"
+#include "Editor/SGDynamicTextAssetEditorToolkit.h"
+#include "SGDynamicTextAssetScanSubsystem.h"
 #include "ReferenceViewer/SSGDynamicTextAssetReferenceViewer.h"
 #include "AssetRegistry/AssetRegistryModule.h"
-#include "LevelEditor.h"
 #include "PropertyEditorModule.h"
-#include "WorkspaceMenuStructure.h"
-#include "WorkspaceMenuStructureModule.h"
 #include "Widgets/Docking/SDockTab.h"
 #include "Framework/Docking/TabManager.h"
+#include "Commandlets/SGDynamicTextAssetFormatVersionCommandlet.h"
+#include "Management/SGDTAProjectManifest.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "Utilities/SGDynamicTextAssetCookUtils.h"
 #include "Utilities/SGDynamicTextAssetSourceControl.h"
+#include "Misc/ScopedSlowTask.h"
+#include "Misc/MessageDialog.h"
 #include "ToolMenus.h"
 #include "Editor.h"
 #include "SGDynamicTextAssetEditorLogs.h"
 #include "UObject/ICookInfo.h"
 #include "Settings/ProjectPackagingSettings.h"
+#include "HAL/FileManager.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Widgets/Notifications/SNotificationList.h"
-#include "HAL/FileManager.h"
 
 #define LOCTEXT_NAMESPACE "FSGDynamicTextAssetsEditorModule"
 
@@ -59,7 +63,7 @@ public:
         // Register detail customizations
         RegisterDetailCustomizations();
 
-        // Start async reference scan after Asset Registry finishes loading
+        // Start async DTA scan after Asset Registry finishes loading
         // This runs in background without blocking the editor
         FAssetRegistryModule& assetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
         IAssetRegistry& assetRegistry = assetRegistryModule.Get();
@@ -71,10 +75,11 @@ public:
             {
                 if (GEditor)
                 {
-                    if (USGDynamicTextAssetReferenceSubsystem* refSubsystem = GEditor->GetEditorSubsystem<USGDynamicTextAssetReferenceSubsystem>())
+                    if (USGDynamicTextAssetScanSubsystem* scanSubsystem = GEditor->GetEditorSubsystem<USGDynamicTextAssetScanSubsystem>())
                     {
-                        refSubsystem->RebuildReferenceCacheAsync();
-                        UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Started async reference scan after Asset Registry ready"));
+                        scanSubsystem->OnFormatVersionScanComplete.AddStatic(&FSGDynamicTextAssetsEditorModule::CheckForMajorVersionUpgrade);
+                        scanSubsystem->StartScan();
+                        UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Started async DTA scan after Asset Registry ready"));
                     }
                 }
             });
@@ -90,10 +95,11 @@ public:
                     {
                         if (GEditor)
                         {
-                            if (USGDynamicTextAssetReferenceSubsystem* refSubsystem = GEditor->GetEditorSubsystem<USGDynamicTextAssetReferenceSubsystem>())
+                            if (USGDynamicTextAssetScanSubsystem* scanSubsystem = GEditor->GetEditorSubsystem<USGDynamicTextAssetScanSubsystem>())
                             {
-                                refSubsystem->RebuildReferenceCacheAsync();
-                                UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Started async reference scan on editor startup"));
+                                scanSubsystem->OnFormatVersionScanComplete.AddStatic(&FSGDynamicTextAssetsEditorModule::CheckForMajorVersionUpgrade);
+                                scanSubsystem->StartScan();
+                                UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Started async DTA scan on editor startup"));
                             }
                         }
                     });
@@ -259,7 +265,7 @@ private:
         // Class layout customization for USGDynamicTextAsset (identity section)
         propertyModule.RegisterCustomClassLayout(
             USGDynamicTextAsset::StaticClass()->GetFName(),
-            FOnGetDetailCustomizationInstance::CreateStatic(&FSGDynamicTextAssetIdentityCustomization::MakeInstance));
+            FOnGetDetailCustomizationInstance::CreateStatic(&FSGDTADetailCustomization::MakeInstance));
 
         // Property type customization for FSGDynamicTextAssetId (read-only ID display)
         propertyModule.RegisterCustomPropertyTypeLayout(
@@ -274,7 +280,17 @@ private:
         // Property type customization for FSGDynamicTextAssetTypeId (searchable type picker)
         propertyModule.RegisterCustomPropertyTypeLayout(
             TEXT("SGDynamicTextAssetTypeId"),
-            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGAssetTypeIdCustomization::MakeInstance));
+            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGDTAAssetTypeIdCustomization::MakeInstance));
+
+        // Property type customization for FSGDTASerializerFormat (serializer format dropdown)
+        propertyModule.RegisterCustomPropertyTypeLayout(
+            TEXT("SGDTASerializerFormat"),
+            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGDTASerializerFormatCustomization::MakeInstance));
+
+        // Property type customization for FSGDTAClassId (class picker with GUID controls)
+        propertyModule.RegisterCustomPropertyTypeLayout(
+            TEXT("SGDTAClassId"),
+            FOnGetPropertyTypeCustomizationInstance::CreateStatic(&FSGDTAClassIdCustomization::MakeInstance));
 
         UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Registered detail customizations"));
     }
@@ -289,6 +305,8 @@ private:
             propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDynamicTextAssetId"));
             propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDynamicTextAssetRef"));
             propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDynamicTextAssetTypeId"));
+            propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDTASerializerFormat"));
+            propertyModule.UnregisterCustomPropertyTypeLayout(TEXT("SGDTAClassId"));
         }
     }
 
@@ -345,6 +363,179 @@ private:
     }
 
     /**
+     * Checks whether any DTA files need a major format version migration.
+     * Called after the project info scan phase completes on editor startup.
+     * If outdated files are found, prompts the user and runs migration.
+     */
+    static void CheckForMajorVersionUpgrade()
+    {
+        if (!GEditor)
+        {
+            UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("CheckForMajorVersionUpgrade:: NULL GEditor!"));
+            return;
+        }
+
+        USGDynamicTextAssetScanSubsystem* scanSubsystem = GEditor->GetEditorSubsystem<USGDynamicTextAssetScanSubsystem>();
+        if (!scanSubsystem)
+        {
+            UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("CheckForMajorVersionUpgrade:: NULL USGDynamicTextAssetScanSubsystem!"));
+            return;
+        }
+
+        const FSGDTAProjectManifest& manifest = scanSubsystem->GetProjectManifest();
+        const TMap<FSGDTASerializerFormat, FSGDTASerializerFormatVersionInfo>& allVersions = manifest.GetAllFormatVersions();
+
+        // Collect serializers that need a major version upgrade
+        struct FUpgradeInfo
+        {
+            FString SerializerName;
+            FString FileExtension;
+            FSGDynamicTextAssetVersion CurrentVersion;
+            int32 OutdatedFileCount;
+        };
+        TArray<FUpgradeInfo> upgradesNeeded;
+
+        for (const TPair<FSGDTASerializerFormat, FSGDTASerializerFormatVersionInfo>& pair : allVersions)
+        {
+            const FSGDTASerializerFormatVersionInfo& info = pair.Value;
+            if (info.TotalFileCount > 0
+                && info.CurrentSerializerVersion.Major > info.LowestFound.Major)
+            {
+                // Count only files whose major version is outdated
+                int32 outdatedCount = 0;
+                for (const TPair<FString, int32>& versionEntry : info.CountByVersion)
+                {
+                    FSGDynamicTextAssetVersion fileVersion = FSGDynamicTextAssetVersion::ParseFromString(versionEntry.Key);
+                    if (fileVersion.Major < info.CurrentSerializerVersion.Major)
+                    {
+                        outdatedCount += versionEntry.Value;
+                    }
+                }
+
+                if (outdatedCount > 0)
+                {
+                    FUpgradeInfo upgrade;
+                    upgrade.SerializerName = info.SerializerName;
+                    upgrade.FileExtension = info.FileExtension;
+                    upgrade.CurrentVersion = info.CurrentSerializerVersion;
+                    upgrade.OutdatedFileCount = outdatedCount;
+                    upgradesNeeded.Add(MoveTemp(upgrade));
+                }
+            }
+        }
+
+        if (upgradesNeeded.IsEmpty())
+        {
+            return;
+        }
+
+        // Build the notification message:
+        //
+        // The following DTA file formats have been updated:
+        // -----------
+        //
+        // [List the Serializer types and files to migrate to current]
+        //
+        // -----------
+        // Migrate now?
+        // This will update file structure only. Asset data is preserved.
+        //
+        // WARNING: This is a blocking operation.
+        //
+        FString message = TEXT("The following DTA file formats have been updated:"
+            "\n-----------\n\n");
+        for (const FUpgradeInfo& upgrade : upgradesNeeded)
+        {
+            message += FString::Printf(
+                TEXT("%s (%s): %d %s need migration (current: %s)\n"),
+                *upgrade.SerializerName,
+                *upgrade.FileExtension,
+                upgrade.OutdatedFileCount,
+                upgrade.OutdatedFileCount == 1 ? TEXT("file") : TEXT("files"),
+                *upgrade.CurrentVersion.ToString());
+        }
+        message += TEXT("\n-----------\n"
+            "Migrate now?\n"
+            "This will update file structure only. Asset data is preserved.\n\n"
+            "WARNING: This is a blocking operation.");
+        // End of building notification message
+
+        UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Major format version upgrade detected. Prompting user."));
+
+        EAppReturnType::Type userChoice = FMessageDialog::Open(
+            EAppMsgType::YesNo,
+            FText::FromString(message),
+            INVTEXT("Migrate Dynamic Text Asset Format"));
+
+        if (userChoice != EAppReturnType::Yes)
+        {
+            UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("User skipped format version migration."));
+            return;
+        }
+
+        // Run migration using the commandlet's static API
+        TArray<FSGFormatVersionValidationResult> validationResults;
+        USGDynamicTextAssetFormatVersionCommandlet::ValidateAllFiles(validationResults);
+
+        // Filter to major mismatches only
+        TArray<const FSGFormatVersionValidationResult*> majorOnly;
+        for (const FSGFormatVersionValidationResult& result : validationResults)
+        {
+            if (result.bIsMajorMismatch)
+            {
+                majorOnly.Add(&result);
+            }
+        }
+
+        FScopedSlowTask slowTask(static_cast<float>(majorOnly.Num()),
+            INVTEXT("Migrating DTA file format versions..."));
+        slowTask.MakeDialog();
+
+        int32 successCount = 0;
+        int32 failCount = 0;
+
+        for (const FSGFormatVersionValidationResult* validation : majorOnly)
+        {
+            slowTask.EnterProgressFrame(1.0f,
+                FText::Format(INVTEXT("DTA Migrating: {0}"),
+                    FText::FromString(FPaths::GetCleanFilename(validation->FilePath))));
+
+            FString error;
+            if (USGDynamicTextAssetFormatVersionCommandlet::MigrateSingleFile(validation->FilePath, error))
+            {
+                successCount++;
+            }
+            else
+            {
+                failCount++;
+                UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("DTA Migration failed for %s: %s"), *validation->FilePath, *error);
+            }
+        }
+
+        UE_LOG(LogSGDynamicTextAssetsEditor, Log,
+            TEXT("Format version migration complete: %d succeeded, %d failed"), successCount, failCount);
+
+        // Rescan project info cache to reflect migrated state
+        scanSubsystem->StartScan(true);
+
+        // Show completion notification
+        FString resultMessage = FString::Printf(TEXT("Dynamic Text Asset format migration complete.\n%d files migrated successfully."), successCount);
+        if (failCount > 0)
+        {
+            resultMessage += FString::Printf(TEXT("\n%d files failed - check the log for details."), failCount);
+        }
+
+        FNotificationInfo notificationInfo(FText::FromString(resultMessage));
+        notificationInfo.bFireAndForget = true;
+        notificationInfo.ExpireDuration = 8.0f;
+        notificationInfo.bUseThrobber = false;
+        notificationInfo.Image = failCount > 0
+            ? FAppStyle::GetBrush(TEXT("Icons.WarningWithColor"))
+            : FAppStyle::GetBrush(TEXT("Icons.SuccessWithColor"));
+        FSlateNotificationManager::Get().AddNotification(notificationInfo);
+    }
+
+    /**
      * Checks if cooked binary files are tracked by source control and warns the user.
      * These are generated artifacts and should be excluded via .gitignore.
      */
@@ -366,7 +557,7 @@ private:
 
         // Scan for .dta.bin files
         TArray<FString> cookedFiles;
-        IFileManager::Get().FindFiles(cookedFiles, *FPaths::Combine(cookedRoot, TEXT("*") + FString(FSGDynamicTextAssetFileManager::BINARY_EXTENSION)), true, false);
+        IFileManager::Get().FindFiles(cookedFiles, *FPaths::Combine(cookedRoot, TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
 
         if (cookedFiles.IsEmpty())
         {
@@ -395,11 +586,11 @@ private:
             UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
                 TEXT("Cooked dynamic text asset binaries in '%s' are tracked by source control. "
                      "These are generated artifacts and should be excluded. "
-                     "Add 'Content/SGDynamicTextAssetsCooked/' to your source control's ignore file."),
+                     "Add 'Content/_SGDynamicTextAssetsCooked/' to your source control's ignore file."),
                 *cookedRoot);
 
             FNotificationInfo notificationInfo(INVTEXT("SGDynamicTextAssets: Cooked binary files are tracked by source control.\n"
-                "Add 'Content/SGDynamicTextAssetsCooked/' to your source control's ignore file."));
+                "Add 'Content/_SGDynamicTextAssetsCooked/' to your source control's ignore file."));
             notificationInfo.bFireAndForget = true;
             notificationInfo.ExpireDuration = 10.0f;
             notificationInfo.bUseThrobber = false;
@@ -410,12 +601,12 @@ private:
 
     /**
      * Registers the cooked dynamic text assets directory for staging into packaged builds.
-     * Ensures SGDynamicTextAssetsCooked is added to DirectoriesToAlwaysStageAsUFS
+     * Ensures _SGDynamicTextAssetsCooked is added to DirectoriesToAlwaysStageAsUFS
      * so that .dta.bin files and dta_manifest.bin are included in the pak file.
      */
     void RegisterCookedDirectoryForStaging()
     {
-        static const FString COOKED_DIRECTORY_NAME = TEXT("SGDynamicTextAssetsCooked");
+        static const FString COOKED_DIRECTORY_NAME = TEXT("_SGDynamicTextAssetsCooked");
 
         UProjectPackagingSettings* packagingSettings = GetMutableDefault<UProjectPackagingSettings>();
         if (!packagingSettings)

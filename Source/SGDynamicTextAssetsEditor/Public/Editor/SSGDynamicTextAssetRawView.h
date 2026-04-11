@@ -42,12 +42,18 @@ public:
         /** The raw payload text. */
         SLATE_ARGUMENT(FText, RawText)
 
+        /**
+         * The file format version (e.g., "2.0.0").
+         * When empty, the collapsible section is not shown.
+         */
+        SLATE_ARGUMENT(FText, FileFormatVersion)
+
         /** Called when the user clicks the Refresh button to reload file contents from disk. */
         SLATE_EVENT(FSimpleDelegate, OnRefreshRequested)
 
     SLATE_END_ARGS()
 
-    enum class ERawTextFormat
+    enum class ESGDTARawTextFormat
     {
         // Custom or raw text
         Raw,
@@ -67,7 +73,7 @@ public:
     void SetIdentityProperties(const FText& InDynamicTextAssetId, const FText& InUserFacingId, const FText& InVersion);
 
     /** Retrieves the text format type that this raw view uses. */
-    ERawTextFormat GetTextFormat() const { return TextFormat; }
+    ESGDTARawTextFormat GetTextFormat() const { return TextFormat; }
 
 private:
 
@@ -81,7 +87,7 @@ private:
     FReply OnRefreshButtonClicked();
 
     /** The text format type that this raw view uses. */
-    ERawTextFormat TextFormat = ERawTextFormat::Raw;
+    ESGDTARawTextFormat TextFormat = ESGDTARawTextFormat::Raw;
 
     /** Current full text, stored to allow copying. */
     FText CurrentText;

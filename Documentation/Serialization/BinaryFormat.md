@@ -20,7 +20,7 @@ The cooked root path is defined by `FSGDynamicTextAssetFileManager::GetCookedDyn
 
 ### Cooking Settings
 
-The following settings on `USGDynamicTextAssetSettingsAsset` control cooking behavior:
+The following settings on `USGDynamicTextAssetSettings` (Project Settings > Game > SG Dynamic Text Assets) control cooking behavior:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -103,7 +103,7 @@ The `Custom` value (255) allows projects to use any compression format registere
 
 1. Set `DefaultCompressionMethod` to `Custom` in your settings asset.
 2. Set `CustomCompressionName` to the FName of the compression format (e.g., `"Oodle"`).
-3. The binary serializer resolves the format name via `USGDynamicTextAssetSettingsAsset::GetCustomCompressionName()`, which is virtual and can be overridden in a settings asset subclass for dynamic resolution.
+3. The binary serializer resolves the format name via `USGDynamicTextAssetSettings::Get()->GetCustomCompressionName()`.
 
 See [Settings](../Configuration/Settings.md) for configuration details.
 
@@ -125,7 +125,7 @@ The mapping is:
 | `Zlib` | `"ZLIB"` |
 | `Gzip` | `"GZIP"` |
 | `LZ4` | `"LZ4"` |
-| `Custom` | Value from `USGDynamicTextAssetSettingsAsset::GetCustomCompressionName()` |
+| `Custom` | Value from `USGDynamicTextAssetSettings::Get()->GetCustomCompressionName()` |
 
 ## FSGDynamicTextAssetBinarySerializer
 

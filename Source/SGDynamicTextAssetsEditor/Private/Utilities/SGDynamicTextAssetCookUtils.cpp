@@ -6,10 +6,12 @@
 #include "UObject/Package.h"
 #include "Management/SGDynamicTextAssetCookManifest.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
-#include "Management/SGDynamicTextAssetFileMetadata.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
+#include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
+#include "Management/SGDTASerializerExtenderRegistry.h"
 #include "Management/SGDynamicTextAssetTypeManifest.h"
-#include "Serialization/SGBinaryEncodeParams.h"
+#include "Serialization/SGDTABinaryEncodeParams.h"
 #include "Serialization/SGDynamicTextAssetBinarySerializer.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Settings/SGDynamicTextAssetSettings.h"
@@ -18,6 +20,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Core/SGDynamicTextAsset.h"
+#include "Core/SGDynamicTextAssetBundleData.h"
 
 bool FSGDynamicTextAssetCookUtils::CleanCookedDirectory()
 {
@@ -31,17 +34,13 @@ bool FSGDynamicTextAssetCookUtils::CleanCookedDirectory()
 		return true;
 	}
 
-	// Collect .dta.bin files
+	// Collect .dta.bin files from root (individual cooked DTAs)
 	TArray<FString> binFiles;
-	fileManager.FindFiles(binFiles, *FPaths::Combine(cookedDir, TEXT("*") + FSGDynamicTextAssetFileManager::BINARY_EXTENSION), true, false);
-
-	// Check for manifest file
-	FString manifestPath = FPaths::Combine(cookedDir, FSGDynamicTextAssetCookManifest::MANIFEST_FILENAME);
-	uint8 bManifestExists = fileManager.FileExists(*manifestPath) ? 1 : 0;
+	fileManager.FindFiles(binFiles, *FPaths::Combine(cookedDir, TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
 
 	int32 deletedCount = 0;
 
-	// Delete .dta.bin files
+	// Delete .dta.bin files from root
 	for (const FString& binFile : binFiles)
 	{
 		FString fullPath = FPaths::Combine(cookedDir, binFile);
@@ -56,38 +55,18 @@ bool FSGDynamicTextAssetCookUtils::CleanCookedDirectory()
 		}
 	}
 
-	// Delete manifest
-	if (bManifestExists)
+	// Delete _Generated/ subdirectory (manifest, extenders, type manifests)
+	FString generatedDir = FPaths::Combine(cookedDir, TEXT("_Generated"));
+	if (fileManager.DirectoryExists(*generatedDir))
 	{
-		if (fileManager.Delete(*manifestPath))
+		if (fileManager.DeleteDirectory(*generatedDir, false, true))
 		{
-			UE_LOG(LogSGDynamicTextAssetsEditor, Verbose, TEXT("  Deleted manifest file: %s"), FSGDynamicTextAssetCookManifest::MANIFEST_FILENAME);
-			deletedCount++;
+			UE_LOG(LogSGDynamicTextAssetsEditor, Verbose, TEXT("  Deleted _Generated/ directory and contents"));
 		}
 		else
 		{
-			UE_LOG(LogSGDynamicTextAssetsEditor, Warning, TEXT("FSGDynamicTextAssetCookUtils: Failed to delete manifest: %s"), *manifestPath);
+			UE_LOG(LogSGDynamicTextAssetsEditor, Warning, TEXT("FSGDynamicTextAssetCookUtils: Failed to delete _Generated/ directory"));
 		}
-	}
-
-	// Delete _TypeManifests/ subdirectory if it exists
-	FString typeManifestsDir = FPaths::Combine(cookedDir, TEXT("_TypeManifests"));
-	if (fileManager.DirectoryExists(*typeManifestsDir))
-	{
-		TArray<FString> typeManifestFiles;
-		fileManager.FindFiles(typeManifestFiles, *FPaths::Combine(typeManifestsDir, TEXT("*.json")), true, false);
-
-		for (const FString& typeManifestFile : typeManifestFiles)
-		{
-			FString fullPath = FPaths::Combine(typeManifestsDir, typeManifestFile);
-			if (fileManager.Delete(*fullPath))
-			{
-				UE_LOG(LogSGDynamicTextAssetsEditor, Verbose, TEXT("  Deleted type manifest: %s"), *typeManifestFile);
-				deletedCount++;
-			}
-		}
-
-		fileManager.DeleteDirectory(*typeManifestsDir);
 	}
 
 	fileManager.DeleteDirectory(*cookedDir);
@@ -124,27 +103,23 @@ bool FSGDynamicTextAssetCookUtils::ValidateDynamicTextAssetFile(const FString& F
 		return false;
 	}
 
-	// Extract metadata
-	FSGDynamicTextAssetId id;
-	FString className;
-	FString userFacingId;
-	FString versionString;
-	FSGDynamicTextAssetTypeId unusedTypeId;
-	if (!serializer->ExtractMetadata(fileContents, id, className, userFacingId, versionString, unusedTypeId))
+	// Extract file information
+	FSGDynamicTextAssetFileInfo fileInfo;
+	if (!serializer->ExtractFileInfo(fileContents, fileInfo))
 	{
-		OutErrors.Add(TEXT("Failed to extract metadata"));
+		OutErrors.Add(TEXT("Failed to extract file information"));
 	}
 	else
 	{
-		if (!id.IsValid())
+		if (!fileInfo.Id.IsValid())
 		{
 			OutErrors.Add(TEXT("ID is not valid"));
 		}
-		if (className.IsEmpty())
+		if (fileInfo.ClassName.IsEmpty())
 		{
 			OutErrors.Add(FString::Printf(TEXT("Empty %s field"), *ISGDynamicTextAssetSerializer::KEY_TYPE));
 		}
-		if (versionString.IsEmpty())
+		if (!fileInfo.Version.IsValid())
 		{
 			OutErrors.Add(FString::Printf(TEXT("Empty %s field"), *ISGDynamicTextAssetSerializer::KEY_VERSION));
 		}
@@ -153,17 +128,17 @@ bool FSGDynamicTextAssetCookUtils::ValidateDynamicTextAssetFile(const FString& F
     // Attempt to instantiate and deep validate if basic structure holds
     if (OutErrors.IsEmpty())
     {
-        UClass* actualClass = FindFirstObject<UClass>(*className, EFindFirstObjectOptions::EnsureIfAmbiguous);
+        UClass* actualClass = FindFirstObject<UClass>(*fileInfo.ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
         if (!actualClass)
         {
-            OutErrors.Add(FString::Printf(TEXT("Failed to find UClass for type: %s"), *className));
+            OutErrors.Add(FString::Printf(TEXT("Failed to find UClass for type: %s"), *fileInfo.ClassName));
         }
         else
         {
             TScriptInterface<ISGDynamicTextAssetProvider> tempObject = NewObject<UObject>(GetTransientPackage(), actualClass);
             if (!tempObject)
             {
-                OutErrors.Add(FString::Printf(TEXT("Failed to instantiate UClass: %s"), *className));
+                OutErrors.Add(FString::Printf(TEXT("Failed to instantiate UClass: %s"), *fileInfo.ClassName));
             }
             else
             {
@@ -208,33 +183,29 @@ bool FSGDynamicTextAssetCookUtils::CookDynamicTextAssetFile(
 		return false;
 	}
 
-	// Extract metadata
-	FSGDynamicTextAssetId id;
-	FString className;
-	FString userFacingId;
-	FString versionString;
-	FSGDynamicTextAssetTypeId assetTypeId;
-	if (!serializer->ExtractMetadata(fileContents, id, className, userFacingId, versionString, assetTypeId) || !id.IsValid())
+	// Extract file information
+	FSGDynamicTextAssetFileInfo cookFileInfo;
+	if (!serializer->ExtractFileInfo(fileContents, cookFileInfo) || !cookFileInfo.Id.IsValid())
 	{
-		UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("FSGDynamicTextAssetCookUtils: Failed to extract metadata or ID from: %s"), *JsonFilePath);
+		UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("FSGDynamicTextAssetCookUtils: Failed to extract file info or ID from: %s"), *JsonFilePath);
 		return false;
 	}
 
-	if (className.IsEmpty())
+	if (cookFileInfo.ClassName.IsEmpty())
 	{
 		UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("FSGDynamicTextAssetCookUtils: Failed to extract ClassName from: %s"), *JsonFilePath);
 		return false;
 	}
 
-	if (userFacingId.IsEmpty())
+	if (cookFileInfo.UserFacingId.IsEmpty())
 	{
-		userFacingId = FSGDynamicTextAssetFileManager::ExtractUserFacingIdFromPath(JsonFilePath);
+		cookFileInfo.UserFacingId = FSGDynamicTextAssetFileManager::ExtractUserFacingIdFromPath(JsonFilePath);
 	}
 
 	// Build flat ID-named output path: {OutputDirectory}/{Id}.dta.bin
 	FString binaryFilePath = FPaths::Combine(
 		OutputDirectory,
-		id.ToString() + FSGDynamicTextAssetFileManager::BINARY_EXTENSION);
+		cookFileInfo.Id.ToString() + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION);
 
 	// Ensure output directory exists
 	IPlatformFile& platformFile = FPlatformFileManager::Get().GetPlatformFile();
@@ -248,10 +219,10 @@ bool FSGDynamicTextAssetCookUtils::CookDynamicTextAssetFile(
 	}
 
 	// Convert string to binary, storing the serializer's type ID and asset type ID for routing on load
-	FSGBinaryEncodeParams encodeParams;
-	encodeParams.Id = id;
-	encodeParams.SerializerTypeId = serializer->GetSerializerTypeId();
-	encodeParams.AssetTypeId = assetTypeId;
+	FSGDTABinaryEncodeParams encodeParams;
+	encodeParams.Id = cookFileInfo.Id;
+	encodeParams.SerializerFormat = serializer->GetSerializerFormat();
+	encodeParams.AssetTypeId = cookFileInfo.AssetTypeId;
 	encodeParams.CompressionMethod = CompressionMethod;
 
 	TArray<uint8> binaryData;
@@ -269,15 +240,12 @@ bool FSGDynamicTextAssetCookUtils::CookDynamicTextAssetFile(
 	}
 
 	// Add entry to manifest (strip UserFacingId if setting is enabled)
-	FString manifestUserFacingId = userFacingId;
-	if (USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings())
+	FString manifestUserFacingId = cookFileInfo.UserFacingId;
+	if (USGDynamicTextAssetSettings::Get()->ShouldStripUserFacingIdFromCookedManifest())
 	{
-		if (settings->ShouldStripUserFacingIdFromCookedManifest())
-		{
-			manifestUserFacingId.Empty();
-		}
+		manifestUserFacingId.Empty();
 	}
-	OutManifest.AddEntry(id, className, manifestUserFacingId, assetTypeId);
+	OutManifest.AddEntry(cookFileInfo.Id, cookFileInfo.ClassName, manifestUserFacingId, cookFileInfo.AssetTypeId);
 
 	FString relativeOutput = binaryFilePath;
 	FPaths::MakePathRelativeTo(relativeOutput, *FPaths::ProjectDir());
@@ -297,13 +265,7 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 	// Pre-cook clean: delete stale cooked files unless explicitly skipped
 	if (!bSkipPreClean)
 	{
-		bool bShouldClean = true;
-		if (USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings())
-		{
-			bShouldClean = settings->ShouldCleanCookedDirectoryBeforeCook();
-		}
-
-		if (bShouldClean)
+		if (USGDynamicTextAssetSettings::Get()->ShouldCleanCookedDirectoryBeforeCook())
 		{
 			UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("FSGDynamicTextAssetCookUtils: Pre-cook clean enabled, cleaning cooked directory..."));
 			CleanCookedDirectory();
@@ -330,26 +292,26 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 		// Apply class filter if specified
 		if (!ClassFilter.IsEmpty())
 		{
-			FSGDynamicTextAssetFileMetadata metadata = FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(filePath);
-			if (!metadata.bIsValid)
+			FSGDynamicTextAssetFileInfo fileInfo = FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(filePath);
+			if (!fileInfo.bIsValid)
 			{
 				continue;
 			}
 
 			// Normalize: strip leading 'U' for comparison if present
 			FString filterName = ClassFilter;
-			FString metadataClassName = metadata.ClassName;
+			FString fileInfoClassName = fileInfo.ClassName;
 
 			if (filterName.Len() > 1 && filterName[0] == TEXT('U') && FChar::IsUpper(filterName[1]))
 			{
 				filterName = filterName.RightChop(1);
 			}
-			if (metadataClassName.Len() > 1 && metadataClassName[0] == TEXT('U') && FChar::IsUpper(metadataClassName[1]))
+			if (fileInfoClassName.Len() > 1 && fileInfoClassName[0] == TEXT('U') && FChar::IsUpper(fileInfoClassName[1]))
 			{
-				metadataClassName = metadataClassName.RightChop(1);
+				fileInfoClassName = fileInfoClassName.RightChop(1);
 			}
 
-			if (!metadataClassName.Equals(filterName, ESearchCase::IgnoreCase))
+			if (!fileInfoClassName.Equals(filterName, ESearchCase::IgnoreCase))
 			{
 				continue;
 			}
@@ -393,10 +355,7 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 
 	// Get compression method from settings
 	ESGDynamicTextAssetCompressionMethod compressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
-	if (USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings())
-	{
-		compressionMethod = settings->GetDefaultCompressionMethod();
-	}
+	compressionMethod = USGDynamicTextAssetSettings::Get()->GetDefaultCompressionMethod();
 
 	// Cook pass
 	FSGDynamicTextAssetCookManifest manifest;
@@ -420,17 +379,40 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 		}
 	}
 
-	// Save manifest to output directory
+	// Save manifest and metadata to _Generated/ subdirectory
+	FString generatedDir = FPaths::Combine(OutputDirectory, TEXT("_Generated"));
+
 	if (filesCooked > 0)
 	{
-		if (!manifest.SaveToFileBinary(OutputDirectory))
+		if (!manifest.SaveToFileBinary(generatedDir))
 		{
-			UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("FSGDynamicTextAssetCookUtils: Failed to save cook manifest to: %s"), *OutputDirectory);
+			UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("FSGDynamicTextAssetCookUtils: Failed to save cook manifest to: %s"), *generatedDir);
 			OutErrors.Add(TEXT("Failed to save cook manifest"));
 			return false;
 		}
 
 		UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("FSGDynamicTextAssetCookUtils: Manifest saved with %d entries"), manifest.Num());
+	}
+
+	// Bake extender manifests to binary
+	if (USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
+	{
+		FSGDTASerializerExtenderRegistry& extenderRegistry = registry->GetExtenderRegistry();
+		if (!extenderRegistry.IsEmptyManfiests())
+		{
+			if (!extenderRegistry.BakeAllManifests(generatedDir))
+			{
+				UE_LOG(LogSGDynamicTextAssetsEditor, Error,
+					TEXT("FSGDynamicTextAssetCookUtils: Failed to bake extender manifests"));
+				OutErrors.Add(TEXT("Failed to bake extender manifests"));
+			}
+			else
+			{
+				UE_LOG(LogSGDynamicTextAssetsEditor, Log,
+					TEXT("FSGDynamicTextAssetCookUtils: Baked %d extender manifest(s)"),
+					extenderRegistry.NumManifests());
+			}
+		}
 	}
 
 	// Copy _TypeManifest.json files to _TypeManifests/ subdirectory in cooked output
@@ -441,7 +423,7 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 
 		if (rootClasses.Num() > 0)
 		{
-			FString typeManifestsDir = FPaths::Combine(OutputDirectory, TEXT("_TypeManifests"));
+			FString typeManifestsDir = FPaths::Combine(generatedDir, TEXT("_TypeManifests"));
 			IPlatformFile& platformFileRef = FPlatformFileManager::Get().GetPlatformFile();
 			platformFileRef.CreateDirectoryTree(*typeManifestsDir);
 
@@ -495,7 +477,7 @@ bool FSGDynamicTextAssetCookUtils::CookAllDynamicTextAssets(
 			if (manifestsCopied > 0)
 			{
 				UE_LOG(LogSGDynamicTextAssetsEditor, Log,
-					TEXT("FSGDynamicTextAssetCookUtils: Copied %d type manifest(s) to _TypeManifests/"), manifestsCopied);
+					TEXT("FSGDynamicTextAssetCookUtils: Copied %d type manifest(s) to _Generated/_TypeManifests/"), manifestsCopied);
 			}
 		}
 	}
@@ -607,12 +589,149 @@ void FSGDynamicTextAssetCookUtils::GatherSoftReferencesFromProperty(const FPrope
 		const void* mapPtr = mapProp->ContainerPtrToValuePtr<void>(ContainerPtr);
 		FScriptMapHelper mapHelper(mapProp, mapPtr);
 
-		for (FScriptMapHelper::FIterator it = mapHelper.CreateIterator(); it; ++it)
+		for (FScriptMapHelper::FIterator itr = mapHelper.CreateIterator(); itr; ++itr)
 		{
-			GatherSoftReferencesFromProperty(mapProp->KeyProp, mapHelper.GetKeyPtr(it.GetInternalIndex()), OutPackageNames);
-			GatherSoftReferencesFromProperty(mapProp->ValueProp, mapHelper.GetValuePtr(it.GetInternalIndex()), OutPackageNames);
+			GatherSoftReferencesFromProperty(mapProp->KeyProp, mapHelper.GetKeyPtr(itr.GetInternalIndex()), OutPackageNames);
+			GatherSoftReferencesFromProperty(mapProp->ValueProp, mapHelper.GetValuePtr(itr.GetInternalIndex()), OutPackageNames);
+		}
+		return;
+	}
+
+	if (const FSetProperty* setProp = CastField<FSetProperty>(Property))
+	{
+		const void* setPtr = setProp->ContainerPtrToValuePtr<void>(ContainerPtr);
+		FScriptSetHelper setHelper(setProp, setPtr);
+
+		for (FScriptSetHelper::FIterator itr = setHelper.CreateIterator(); itr; ++itr)
+		{
+			GatherSoftReferencesFromProperty(setProp->ElementProp, setHelper.GetElementPtr(itr.GetInternalIndex()), OutPackageNames);
 		}
 	}
+}
+
+int32 FSGDynamicTextAssetCookUtils::GatherSoftReferencesBySGDTBundle(TMap<FName, TArray<FName>>& OutBundlePackages)
+{
+	OutBundlePackages.Reset();
+
+	TArray<FString> allFiles;
+	FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles(allFiles);
+
+	if (allFiles.IsEmpty())
+	{
+		return 0;
+	}
+
+	// Track unique packages per bundle to avoid duplicates
+	TMap<FName, TSet<FName>> bundlePackageSets;
+	TSet<FName> allUniquePackages;
+	int32 filesProcessed = 0;
+
+	for (const FString& filePath : allFiles)
+	{
+		FSGDynamicTextAssetFileInfo fileInfo = FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(filePath);
+		if (!fileInfo.bIsValid || fileInfo.ClassName.IsEmpty())
+		{
+			continue;
+		}
+
+		UClass* resolvedClass = FindFirstObject<UClass>(*fileInfo.ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
+		if (!resolvedClass)
+		{
+			continue;
+		}
+
+		UObject* tempObject = NewObject<UObject>(GetTransientPackage(), resolvedClass);
+		if (!tempObject)
+		{
+			continue;
+		}
+
+		TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FSGDynamicTextAssetFileManager::FindSerializerForFile(filePath);
+		if (!serializer.IsValid())
+		{
+			continue;
+		}
+
+		FString fileContents;
+		if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, fileContents))
+		{
+			continue;
+		}
+
+		TScriptInterface<ISGDynamicTextAssetProvider> provider(tempObject);
+		if (!provider.GetInterface())
+		{
+			continue;
+		}
+
+		bool bMigrated = false;
+		if (!serializer->DeserializeProvider(fileContents, provider.GetInterface(), bMigrated))
+		{
+			continue;
+		}
+
+		// Extract bundle data from the deserialized object
+		FSGDynamicTextAssetBundleData bundleData;
+		bundleData.ExtractFromObject(tempObject);
+
+		// Collect bundled soft references by bundle name
+		TSet<FName> bundledPackages;
+		for (const FSGDynamicTextAssetBundle& bundle : bundleData.Bundles)
+		{
+			TSet<FName>& packageSet = bundlePackageSets.FindOrAdd(bundle.BundleName);
+			for (const FSGDynamicTextAssetBundleEntry& entry : bundle.Entries)
+			{
+				if (entry.AssetPath.IsValid() && !entry.AssetPath.IsNull())
+				{
+					FName packageName = entry.AssetPath.GetLongPackageFName();
+					if (!packageName.IsNone())
+					{
+						FString packageStr = packageName.ToString();
+						if (!packageStr.StartsWith(TEXT("/Script/")))
+						{
+							packageSet.Add(packageName);
+							bundledPackages.Add(packageName);
+							allUniquePackages.Add(packageName);
+						}
+					}
+				}
+			}
+		}
+
+		// Gather all soft references and put unbundled ones under NAME_None
+		TSet<FName> allFilePackages;
+		for (TFieldIterator<FProperty> propertyIt(resolvedClass); propertyIt; ++propertyIt)
+		{
+			GatherSoftReferencesFromProperty(*propertyIt, tempObject, allFilePackages);
+		}
+
+		TSet<FName>& unbundledSet = bundlePackageSets.FindOrAdd(NAME_None);
+		for (const FName& packageName : allFilePackages)
+		{
+			if (!bundledPackages.Contains(packageName))
+			{
+				unbundledSet.Add(packageName);
+				allUniquePackages.Add(packageName);
+			}
+		}
+
+		filesProcessed++;
+	}
+
+	// Convert sets to output arrays
+	for (const TPair<FName, TSet<FName>>& pair : bundlePackageSets)
+	{
+		if (!pair.Value.IsEmpty())
+		{
+			OutBundlePackages.Add(pair.Key, pair.Value.Array());
+		}
+	}
+
+	UE_LOG(LogSGDynamicTextAssetsEditor, Log,
+		TEXT("FSGDynamicTextAssetCookUtils: Gathered %d unique soft reference(s) across %d bundle(s) from %d/%d DTA file(s)"),
+		allUniquePackages.Num(), OutBundlePackages.Num(), filesProcessed, allFiles.Num());
+
+	return allUniquePackages.Num();
 }
 
 int32 FSGDynamicTextAssetCookUtils::GatherSoftReferencesFromAllFiles(TArray<FName>& OutPackageNames)
@@ -632,15 +751,15 @@ int32 FSGDynamicTextAssetCookUtils::GatherSoftReferencesFromAllFiles(TArray<FNam
 
 	for (const FString& filePath : allFiles)
 	{
-		// Extract metadata to get class name
-		FSGDynamicTextAssetFileMetadata metadata = FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(filePath);
-		if (!metadata.bIsValid || metadata.ClassName.IsEmpty())
+		// Extract file info to get class name
+		FSGDynamicTextAssetFileInfo fileInfo = FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(filePath);
+		if (!fileInfo.bIsValid || fileInfo.ClassName.IsEmpty())
 		{
 			continue;
 		}
 
 		// Resolve class
-		UClass* resolvedClass = FindFirstObject<UClass>(*metadata.ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
+		UClass* resolvedClass = FindFirstObject<UClass>(*fileInfo.ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
 		if (!resolvedClass)
 		{
 			continue;

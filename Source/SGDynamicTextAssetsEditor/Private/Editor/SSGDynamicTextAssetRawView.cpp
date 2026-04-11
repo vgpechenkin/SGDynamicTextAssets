@@ -22,12 +22,12 @@ void SSGDynamicTextAssetRawView::Construct(const FArguments& InArgs)
     if (!InArgs._JsonText.IsEmpty())
     {
         CurrentText = InArgs._JsonText;
-        TextFormat = ERawTextFormat::JSON;
+        TextFormat = ESGDTARawTextFormat::JSON;
     }
     else
     {
         CurrentText = InArgs._RawText;
-        TextFormat = ERawTextFormat::Raw;
+        TextFormat = ESGDTARawTextFormat::Raw;
     }
 
     ChildSlot
@@ -54,6 +54,7 @@ void SSGDynamicTextAssetRawView::Construct(const FArguments& InArgs)
                     .DynamicTextAssetId(InArgs._DynamicTextAssetId)
                     .UserFacingId(InArgs._UserFacingId)
                     .Version(InArgs._Version)
+                    .FileFormatVersion(InArgs._FileFormatVersion)
                 ]
             ]
 
@@ -147,7 +148,7 @@ FText SSGDynamicTextAssetRawView::GetFormatText() const
 {
     switch (TextFormat)
     {
-    case ERawTextFormat::JSON:
+    case ESGDTARawTextFormat::JSON:
         {
             return INVTEXT("JSON");
         }

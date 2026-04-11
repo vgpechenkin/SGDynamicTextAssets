@@ -21,11 +21,9 @@ A `UDataAsset` containing runtime configuration for the plugin. Using a Data Ass
 | `bDeleteLocalOnServerMismatch` | `uint8 : 1` | `false` | Delete local files when server reports object as deleted                                         |
 | `ServerRequestTimeoutSeconds` | `float` | `5.0` | Timeout for server requests (clamped 1-60 seconds)                                               |
 | `ServerCacheFilename` | `FString` | `"SGDynamicTextAssetServerCache"` | SaveGame slot name for the server cache                                                          |
-| `DefaultCompressionMethod` | `ESGDynamicTextAssetCompressionMethod` | `Zlib` | Compression method for binary cooking                                                            |
-| `CustomCompressionName` | `FName` | `NAME_None` | FName of a custom compression format. Only editable when `DefaultCompressionMethod` is `Custom`. |
-| `bStripUserFacingIdFromCookedManifest` | `uint8 : 1` | `false` | When enabled, UserFacingId is omitted from the cook manifest. Reduces manifest size by removing debug IDs. |
-| `bCleanCookedDirectoryBeforeCook` | `uint8 : 1` | `true` | Deletes all files in the cooked directory before cooking. Prevents stale `.dta.bin` files from deleted assets. |
-| `bDeleteCookedAssetsAfterPackaging` | `uint8 : 1` | `true` | Deletes cooked `.dta.bin` files after packaging completes. Prevents generated files from cluttering the Content Browser. |
+| `AssetBundleExtenderOverrides` | `TSet<FSGAssetBundleExtenderMapping>` | Empty | Per-format [asset bundle extender](../Serialization/AssetBundleExtenders.md) overrides. Each mapping ties a serializer format bitmask to an extender class via `FSGDTAClassId`. |
+
+> **Note:** Cooking settings (`DefaultCompressionMethod`, `CustomCompressionName`, `bStripUserFacingIdFromCookedManifest`, `bCleanCookedDirectoryBeforeCook`, `bDeleteCookedAssetsAfterPackaging`) have been moved to `USGDynamicTextAssetSettings` (Project Settings > Game > SG Dynamic Text Assets) for INI backing. See the Cooking Settings section below.
 
 ### Compression Methods
 
@@ -47,37 +45,36 @@ UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cooking",
 FName CustomCompressionName = NAME_None;
 ```
 
-The settings asset provides a virtual method for resolving the custom compression name:
-
-```cpp
-virtual FName GetCustomCompressionName() const;
-```
-
-Override this in a `USGDynamicTextAssetSettingsAsset` subclass for dynamic resolution (e.g., selecting compression based on platform or build configuration).
-
 ## USGDynamicTextAssetSettings
 
-A `UDeveloperSettings` subclass that appears in Project Settings > Game > SG Dynamic Text Assets. It holds a soft reference to the `USGDynamicTextAssetSettingsAsset`.
+A `UDeveloperSettings` subclass (`Config = "Game"`) that appears in Project Settings > Game > SG Dynamic Text Assets. It holds a soft reference to the `USGDynamicTextAssetSettingsAsset` and all cooking/packaging settings. Because cooking settings are `Config` properties on this class, they serialize to `DefaultGame.ini` and can be overridden per-platform or via INI without the editor.
+
+### Cooking Settings
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `DefaultCompressionMethod` | `ESGDynamicTextAssetCompressionMethod` | `Zlib` | Compression method for binary cooking |
+| `CustomCompressionName` | `FName` | `NAME_None` | FName of a custom compression format. Only editable when `DefaultCompressionMethod` is `Custom`. |
+| `bStripUserFacingIdFromCookedManifest` | `uint8 : 1` | `false` | When enabled, UserFacingId is omitted from the cook manifest. Reduces manifest size by removing debug IDs. |
+| `bCleanCookedDirectoryBeforeCook` | `uint8 : 1` | `true` | Deletes all files in the cooked directory before cooking. Prevents stale `.dta.bin` files from deleted assets. |
+| `bDeleteCookedAssetsAfterPackaging` | `uint8 : 1` | `true` | Deletes cooked `.dta.bin` files after packaging completes. Prevents generated files from cluttering the Content Browser. |
 
 ### Accessing Settings
 
 ```cpp
-// Get the settings asset (loads it if necessary, returns nullptr if not configured)
-USGDynamicTextAssetSettingsAsset* settings = USGDynamicTextAssetSettings::GetSettings();
+// Cooking settings are on USGDynamicTextAssetSettings (always valid, never null)
+USGDynamicTextAssetSettings* settings = USGDynamicTextAssetSettings::Get();
+ESGDynamicTextAssetCompressionMethod compression = settings->GetDefaultCompressionMethod();
+bool bStripIds = settings->ShouldStripUserFacingIdFromCookedManifest();
 
-if (settings)
+// Server/runtime settings are on the data asset (may be nullptr)
+USGDynamicTextAssetSettingsAsset* asset = USGDynamicTextAssetSettings::GetSettings();
+if (asset)
 {
-    float timeout = settings->GetServerRequestTimeoutSeconds();
-    bool bServerEnabled = settings->IsServerOverrideEnabled();
-    FString cacheFilename = settings->GetServerCacheFilename();
-    bool bDeleteLocal = settings->ShouldDeleteLocalOnServerMismatch();
-    ESGDynamicTextAssetCompressionMethod compression = settings->GetDefaultCompressionMethod();
-    FName customCompression = settings->GetCustomCompressionName();
-    bool bStripIds = settings->ShouldStripUserFacingIdFromCookedManifest();
+    float timeout = asset->GetServerRequestTimeoutSeconds();
+    bool bServerEnabled = asset->IsServerOverrideEnabled();
 }
 ```
-
-`GetSettings()` returns `nullptr` if no settings asset has been assigned. Call sites should null check before accessing properties. Property defaults on the asset itself ensure sensible values when configured.
 
 ## USGDynamicTextAssetEditorSettings
 
@@ -107,8 +104,8 @@ The `bDeleteCookedAssetsAfterPackaging` setting controls whether cooked binary f
 
 ```ini
 ; DefaultGame.ini
-[SGDynamicTextAssets]
-bDeleteCookedAssetsAfterPackaging=true
+[/Script/SGDynamicTextAssetsRuntime.SGDynamicTextAssetSettings]
+bDeleteCookedAssetsAfterPackaging=True
 ```
 
 When enabled (default), the UAT handler `SGDynamicTextAssetsPostPackageCleanup` deletes `.dta.bin` files, `dta_manifest.bin`, and `_TypeManifests/` contents after they have been staged into the pak. See [Cook Pipeline](../Serialization/CookPipeline.md) for details.

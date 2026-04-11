@@ -8,8 +8,11 @@
 #include "Core/SGDynamicTextAssetRef.h"
 #include "Core/SGDynamicTextAssetId.h"
 #include "Core/SGDynamicTextAssetTypeId.h"
+#include "Core/SGDTAClassId.h"
 #include "Core/ISGDynamicTextAssetProvider.h"
+#include "Core/SGDynamicTextAssetBundleData.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "SGDynamicTextAssetDelegates.h"
 
 #include "SGDynamicTextAssetStatics.generated.h"
@@ -84,7 +87,7 @@ public:
 	static FSGDynamicTextAssetId GetDynamicTextAssetRefId(const FSGDynamicTextAssetRef& Ref);
 
 	/**
-	 * Returns the user-facing ID for the referenced dynamic text asset by resolving its file metadata.
+	 * Returns the user-facing ID for the referenced dynamic text asset by resolving its file information.
 	 * Works in any context editor, runtime, without a world or game instance.
 	 * Returns an empty string if the ID is invalid or no matching file is found.
 	 *
@@ -98,7 +101,7 @@ public:
 	 * Gets the loaded dynamic text asset from the reference.
 	 * Returns an empty TScriptInterface if not loaded or ID is invalid.
 	 * 
-	 * @param WorldContextObject Object used to get the game instance
+	 * @param WorldContextObject Object used to get the game instance (allowed to be null in editor).
 	 * @param Ref The reference to resolve
 	 * @return The loaded provider, or empty TScriptInterface
 	 */
@@ -108,15 +111,30 @@ public:
 	/**
 	 * Loads the dynamic text asset asynchronously.
 	 * The callback will be called when loading completes (or fails).
-	 * 
+	 *
+	 * When BundleNames is non-empty, the referenced assets for those bundles
+	 * are also async-loaded before the callback fires. The callback is only
+	 * invoked once both the DTA and all requested bundle assets are ready.
+	 *
 	 * @param WorldContextObject Object used to get the game instance
 	 * @param Ref The reference to load
 	 * @param OnLoaded Callback when loading completes
+	 * @param BundleNames [Optional] Bundle names to async-load after the DTA is cached. Empty loads no bundles.
 	 * @param FilePath [Optional] The file path to load from. If empty, the system will search for the file using the ID.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Reference", meta = (WorldContext = "WorldContextObject", AutoCreateRefTerm = "FilePath", AdvancedDisplay = "FilePath"))
+	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Reference", meta = (WorldContext = "WorldContextObject",
+		AutoCreateRefTerm = "BundleNames, FilePath", AdvancedDisplay = "BundleNames, FilePath"))
 	static void LoadDynamicTextAssetRefAsync(const UObject* WorldContextObject,
-		const FSGDynamicTextAssetRef& Ref, FOnDynamicTextAssetRefLoaded OnLoaded, const FString& FilePath = TEXT(""));
+		const FSGDynamicTextAssetRef& Ref, FOnDynamicTextAssetRefLoaded OnLoaded,
+		const TArray<FName>& BundleNames, const FString& FilePath = TEXT(""));
+
+	/** Shorthand version of ::LoadDynamicTextAssetRefAsync with empty BundleNames and FilePath. */
+	static void LoadDynamicTextAssetRefAsync(const UObject* WorldContextObject,
+		const FSGDynamicTextAssetRef& Ref, FOnDynamicTextAssetRefLoaded OnLoaded)
+	{
+		LoadDynamicTextAssetRefAsync(WorldContextObject, Ref, MoveTemp(OnLoaded),
+			TArray<FName>(), FString());
+	}
 
 	/**
 	 * Removes the referenced dynamic text asset from the cache (unloads it).
@@ -284,6 +302,75 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Asset Type ID", meta = (DevelopmentOnly))
 	static FSGDynamicTextAssetTypeId GenerateDynamicAssetTypeId();
 
+	/** Returns true if the DTA class ID has a valid (non-zero) GUID. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "Is Valid (DTA Class Id)"))
+	static bool IsValid_DTA_ClassId(const FSGDTAClassId& ClassId);
+
+	/** Returns true if the two DTA class IDs are equal (A == B). */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "Equal (DTA Class Id)",
+		CompactNodeTitle = "==", Keywords = "== equal"))
+	static bool EqualEqual_DTA_ClassId(const FSGDTAClassId& A, const FSGDTAClassId& B);
+
+	/** Returns true if the two DTA class IDs are not equal (A != B). */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "Not Equal (DTA Class Id)",
+		CompactNodeTitle = "!=", Keywords = "!= not equal"))
+	static bool NotEqual_DTA_ClassId(const FSGDTAClassId& A, const FSGDTAClassId& B);
+
+	/**
+	 * Converts a DTA class ID to its string representation.
+	 *
+	 * @param ClassId The class ID to convert
+	 * @return The ID as a hyphenated GUID string
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "To String (DTA Class Id)"))
+	static FString ToString_DTA_ClassId(const FSGDTAClassId& ClassId);
+
+	/**
+	 * Parses a string to a DTA class ID.
+	 *
+	 * @param ClassIdString The string to parse (hyphenated GUID format)
+	 * @param OutClassId The parsed class ID
+	 * @return True if parsing succeeded
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "From String (DTA Class Id)"))
+	static bool FromString_DTA_ClassId(const FString& ClassIdString, FSGDTAClassId& OutClassId);
+
+	/** Creates a DTA class ID from the inputted GUID. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "From GUID (DTA Class Id)"))
+	static FSGDTAClassId FromGuid_DTA_ClassId(const FGuid& Guid);
+
+	/** Returns a copy of the DTA class ID's GUID. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DisplayName = "Get GUID (DTA Class Id)"))
+	static FGuid GetGuid_DTA_ClassId(const FSGDTAClassId& ClassId);
+
+	/**
+	 * Creates a new randomly generated DTA class ID.
+	 * Primarily for editor/tooling use.
+	 *
+	 * @return A new unique class ID
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Class Id", meta = (DevelopmentOnly))
+	static FSGDTAClassId GenerateDTAClassId();
+
+	/**
+	 * Resolves which asset bundle extender class to use for a given provider and serializer format.
+	 *
+	 * Resolution order:
+	 * 1. Per-DTA override on the provider (if non-null)
+	 * 2. Settings mapping by serializer format bitmask
+	 *
+	 * Returns the soft class pointer for the resolved extender. Use
+	 * USGDynamicTextAssetRegistry::GetOrCreateAssetBundleExtender() to get an instance.
+	 *
+	 * @param Provider The DTA provider to resolve an extender for
+	 * @param Format The serializer format to match against settings mappings
+	 * @return The resolved extender class ID, or FSGDTAClassId::INVALID_CLASS_ID if none found
+	 */
+	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Asset Bundles")
+	static FSGDTAClassId ResolveAssetBundleExtender(
+		const TScriptInterface<ISGDynamicTextAssetProvider>& Provider,
+		FSGDTASerializerFormat Format);
+
 	/** Returns true if version fields represent a usable version (Major >= 1) */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Version")
 	static bool IsVersionValid(const FSGDynamicTextAssetVersion& Version);
@@ -301,6 +388,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Version", meta = (DisplayName = "Not Equal (Dynamic Text Asset Version)",
 		CompactNodeTitle = "!=", Keywords = "!= not equal"))
 	static bool NotEqual_DynamicTextAssetVersionDynamicTextAssetVersion(const FSGDynamicTextAssetVersion& A, const FSGDynamicTextAssetVersion& B);
+
+	/**
+	 * Returns true if Version falls within the range [Min, Max] (inclusive).
+	 * Compares Major, Minor, and Patch components using standard ordering.
+	 *
+	 * Min <= Version <= Max
+	 *
+	 * @param Version The version to evaluate.
+	 * @param Min The minimum version (inclusive).
+	 * @param Max The maximum version (inclusive).
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Version", meta = (DisplayName = "Is Version In Range"))
+	static bool IsVersionInRange(const FSGDynamicTextAssetVersion& Version, const FSGDynamicTextAssetVersion& Min, const FSGDynamicTextAssetVersion& Max);
 
 	/** Returns the unique dynamic text asset ID for this provider. */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Provider", meta = (DisplayName = "Get Dynamic Text Asset ID (DTA Provider)"))
@@ -419,6 +519,99 @@ public:
 	static FString ValidationResultToString(const FSGDynamicTextAssetValidationResult& Result);
 
 	/**
+	 * Retrieves the asset bundle data for the dynamic text asset referenced by the given ref.
+	 * Resolves through the subsystem when available, falls back to the editor cache
+	 * outside of PIE so this works in editor tools and utilities.
+	 * Returns false if the ref is invalid or the asset is not loaded.
+	 *
+	 * @param WorldContextObject Object used to resolve the game instance subsystem (allowed to be null in editor).
+	 * @param Ref The dynamic text asset reference to look up.
+	 * @param OutBundleData Populated with the bundle data if found.
+	 * @return True if the asset was found and bundle data was copied.
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle", meta = (WorldContext = "WorldContextObject"))
+	static bool GetBundleDataFromRef(const UObject* WorldContextObject, const FSGDynamicTextAssetRef& Ref, FSGDynamicTextAssetBundleData& OutBundleData);
+
+	/**
+	 * Retrieves the asset bundle data directly from a dynamic text asset provider.
+	 * Returns false if the provider is null or has no bundle data.
+	 *
+	 * @param Provider The provider to extract bundle data from.
+	 * @param OutBundleData Populated with the provider's bundle data.
+	 * @return True if the provider was valid and had bundle data.
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static bool GetBundleDataFromProvider(const TScriptInterface<ISGDynamicTextAssetProvider>& Provider, FSGDynamicTextAssetBundleData& OutBundleData);
+
+	/** Returns true if the bundle data contains any bundles. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static bool HasBundles(const FSGDynamicTextAssetBundleData& BundleData);
+
+	/**
+	 * Returns the number of bundles in the bundle data.
+	 *
+	 * @param BundleData The bundle data to query
+	 * @return The number of bundles
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static int32 GetBundleCount(const FSGDynamicTextAssetBundleData& BundleData);
+
+	/**
+	 * Populates the output array with all bundle names.
+	 *
+	 * @param BundleData The bundle data to query
+	 * @param OutBundleNames Array populated with bundle names
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static void GetBundleNames(const FSGDynamicTextAssetBundleData& BundleData, TArray<FName>& OutBundleNames);
+
+	/**
+	 * Collects all soft object paths for a specific bundle.
+	 * Appends to OutPaths without clearing it first.
+	 *
+	 * @param BundleData The bundle data to query
+	 * @param BundleName The bundle to get paths for
+	 * @param OutPaths Array to append soft object paths to
+	 * @return True if the bundle was found and had entries
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static bool GetPathsForBundle(const FSGDynamicTextAssetBundleData& BundleData, FName BundleName, TArray<FSoftObjectPath>& OutPaths);
+
+	/**
+	 * Returns all entries for a specific bundle.
+	 *
+	 * @param BundleData The bundle data to query
+	 * @param BundleName The bundle to get entries for
+	 * @param OutEntries Array populated with bundle entries
+	 * @return True if the bundle was found
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Bundle")
+	static bool GetBundleEntries(const FSGDynamicTextAssetBundleData& BundleData, FName BundleName, TArray<FSGDynamicTextAssetBundleEntry>& OutEntries);
+
+	/**
+	 * Extracts bundle metadata from a UObject by walking its UClass properties.
+	 *
+	 * Iterates all UPROPERTY fields using TFieldIterator. For each
+	 * FSoftObjectProperty or FSoftClassProperty that has
+	 * meta=(AssetBundles="..."), parses the comma-separated bundle
+	 * names and collects the current FSoftObjectPath value into
+	 * the corresponding bundles.
+	 *
+	 * Recursively handles FStructProperty, FArrayProperty,
+	 * FMapProperty, FSetProperty, and instanced sub-objects
+	 * (CPF_InstancedReference).
+	 *
+	 * @param Object The UObject to extract bundle data from.
+	 * @param BundleData The extracted bundle data.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Bundle")
+	static void ExtractBundleDataFromObject(UObject* Object, UPARAM(ref) FSGDynamicTextAssetBundleData& BundleData);
+
+	/** Resets the bundle data by clearing all bundle data in it. */
+	UFUNCTION(BlueprintCallable, Category = "SG Dynamic Text Assets|Bundle")
+	static void ResetBundleData(UPARAM(ref) FSGDynamicTextAssetBundleData& BundleData);
+
+	/**
 	 * Logs all registered serializer types and their IDs to the runtime log.
 	 * Useful for diagnosing registration issues or verifying plugin serializer load order.
 	 * Output appears in the Output Log under the SGDynamicTextAssetsRuntime log category.
@@ -439,13 +632,96 @@ public:
 	static void GetRegisteredSerializerDescriptions(TArray<FString>& OutDescriptions);
 
 	/**
-	 * Finds a registered serializer by its integer type ID.
-	 * C++ only — not Blueprint exposed (serializer instances are not UObjects).
-	 * Use this to get the serializer for a payload extracted from a binary file.
+	 * Creates a serializer format from an integer type ID.
 	 *
-	 * @param TypeId The serializer type ID to look up
+	 * @param TypeId The serializer type ID (int32 for Blueprint compatibility)
+	 * @return The constructed serializer format
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static FSGDTASerializerFormat MakeSerializerFormat(int32 TypeId);
+
+	/**
+	 * Creates a serializer format by looking up a file extension.
+	 * Returns an invalid format if no serializer is registered for the extension.
+	 *
+	 * @param Extension The file extension to look up (e.g., ".dta.json")
+	 * @return The resolved serializer format
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static FSGDTASerializerFormat MakeSerializerFormatFromExtension(const FString& Extension);
+
+	/** Returns true if the serializer format has a valid (non-zero) type ID. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static bool IsValidSerializerFormat(const FSGDTASerializerFormat& Format);
+
+	/**
+	 * Returns the integer type ID from a serializer format.
+	 *
+	 * @param Format The serializer format to query
+	 * @return The type ID (int32 for Blueprint compatibility)
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static int32 GetSerializerFormatTypeId(FSGDTASerializerFormat Format);
+
+	/**
+	 * Returns the human-readable name of the serializer format.
+	 *
+	 * @param Format The serializer format to query
+	 * @return The format name, or "Invalid" if not registered
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static FText GetSerializerFormatName(const FSGDTASerializerFormat& Format);
+
+	/**
+	 * Returns the file extension for the serializer format.
+	 *
+	 * @param Format The serializer format to query
+	 * @return The file extension, or empty string if not registered
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static FString GetSerializerFormatExtension(const FSGDTASerializerFormat& Format);
+
+	/** Returns the serializer format for JSON (.dta.json). */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static FSGDTASerializerFormat GetJsonSerializerFormat();
+
+	/** Returns the serializer format for XML (.dta.xml). */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static FSGDTASerializerFormat GetXmlSerializerFormat();
+
+	/** Returns the serializer format for YAML (.dta.yaml). */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static FSGDTASerializerFormat GetYamlSerializerFormat();
+
+	/** Returns true if the two serializer formats are equal (A == B). */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format", meta = (DisplayName = "Equal (Serializer Format)",
+		CompactNodeTitle = "==", Keywords = "== equal"))
+	static bool EqualEqual_SerializerFormat(const FSGDTASerializerFormat& A, const FSGDTASerializerFormat& B);
+
+	/** Returns true if the two serializer formats are not equal (A != B). */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format", meta = (DisplayName = "Not Equal (Serializer Format)",
+		CompactNodeTitle = "!=", Keywords = "!= not equal"))
+	static bool NotEqual_SerializerFormat(const FSGDTASerializerFormat& A, const FSGDTASerializerFormat& B);
+
+	/**
+	 * Returns all currently registered serializer formats.
+	 *
+	 * @param OutFormats Array populated with one entry per registered serializer
+	 */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Serializer Format")
+	static void GetAllRegisteredSerializerFormats(TArray<FSGDTASerializerFormat>& OutFormats);
+
+	/**
+	 * Finds a registered serializer by its format.
+	 * C++ only - not Blueprint exposed (serializer instances are not UObjects).
+	 *
+	 * @param Format The serializer format to look up
 	 * @return The serializer, or nullptr if not found
 	 */
+	static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForFormat(FSGDTASerializerFormat Format);
+
+	/** @deprecated Use FindSerializerForFormat instead. Will be removed in UE 5.7. */
+	UE_DEPRECATED(5.6, "Use FindSerializerForFormat instead. Will be removed in UE 5.7.")
 	static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForTypeId(uint32 TypeId);
 
 	/**
@@ -461,11 +737,24 @@ public:
 	static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForDynamicTextAssetId(const FSGDynamicTextAssetId& Id);
 
 	/**
-	 * Returns the integer TypeId for the serializer registered under the given file extension.
-	 * Returns 0 if no serializer is registered for that extension.
-	 * C++ only — use FindSerializerForTypeId to go the other direction.
+	 * Returns the serializer format registered under the given file extension.
+	 * Returns an invalid format if no serializer is registered for that extension.
+	 * C++ only - use FindSerializerForFormat to resolve the serializer instance.
 	 *
 	 * @param Extension File extension without leading dot (e.g., "dta.json")
 	 */
+	static FSGDTASerializerFormat GetFormatForExtension(const FString& Extension);
+
+	/** @deprecated Use GetFormatForExtension instead. Will be removed in UE 5.7. */
+	UE_DEPRECATED(5.6, "Use GetFormatForExtension instead. Will be removed in UE 5.7.")
 	static uint32 GetTypeIdForExtension(const FString& Extension);
+
+	/**
+	 * Handles validating soft paths (soft objects and soft classes) properties on this dynamic text asset
+	 * with the goal of confirming if they are pointing to a real asset and the path isn't invalid.
+	 */
+	static void ValidateSoftPathsInProperty(const FProperty* Property,
+		const void* ContainerPtr,
+		const FString& PropertyPath,
+		FSGDynamicTextAssetValidationResult& OutResult);
 };

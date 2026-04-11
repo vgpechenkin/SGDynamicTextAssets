@@ -14,7 +14,7 @@
  * EditInlineNew allows it to be created inline as a sub-object of a DTA.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, EditInlineNew, ClassGroup = "Start Games")
-class USGTestInstancedBase : public UObject
+class USGDTATestInstancedBase : public UObject
 {
 	GENERATED_BODY()
 public:
@@ -30,10 +30,10 @@ public:
 
 /**
  * Derived instanced UObject for testing polymorphic instanced serialization.
- * Extends USGTestInstancedBase with an additional property.
+ * Extends USGDTATestInstancedBase with an additional property.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, EditInlineNew, ClassGroup = "Start Games")
-class USGTestInstancedDerived : public USGTestInstancedBase
+class USGDTATestInstancedDerived : public USGDTATestInstancedBase
 {
 	GENERATED_BODY()
 public:
@@ -48,7 +48,7 @@ public:
  * Used to verify recursive validation detects hard refs inside instanced objects.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, EditInlineNew, ClassGroup = "Start Games")
-class USGTestInstancedWithHardRef : public UObject
+class USGDTATestInstancedWithHardRef : public UObject
 {
 	GENERATED_BODY()
 public:
@@ -94,26 +94,26 @@ struct FTestInstancedStructDerived : public FTestInstancedStructBase
  * are allowed by the validation system.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, ClassGroup = "Start Games")
-class USGTestInstancedOwnerDTA : public USGDynamicTextAsset
+class USGDTATestInstancedOwnerDTA : public USGDynamicTextAsset
 {
 	GENERATED_BODY()
 public:
 
 	/** Single instanced sub-object property. */
 	UPROPERTY(Instanced)
-	TObjectPtr<USGTestInstancedBase> SingleInstanced = nullptr;
+	TObjectPtr<USGDTATestInstancedBase> SingleInstanced = nullptr;
 
 	/** Array of instanced sub-objects (supports polymorphic entries). */
 	UPROPERTY(Instanced)
-	TArray<TObjectPtr<USGTestInstancedBase>> InstancedArray;
+	TArray<TObjectPtr<USGDTATestInstancedBase>> InstancedArray;
 
 	/** Set of instanced sub-objects. */
 	UPROPERTY(Instanced)
-	TSet<TObjectPtr<USGTestInstancedBase>> InstancedSet;
+	TSet<TObjectPtr<USGDTATestInstancedBase>> InstancedSet;
 
 	/** Map with instanced sub-object values (string keys). */
 	UPROPERTY(Instanced)
-	TMap<FString, TObjectPtr<USGTestInstancedBase>> InstancedMap;
+	TMap<FString, TObjectPtr<USGDTATestInstancedBase>> InstancedMap;
 
 	/** Plain string property to verify mixed property types serialize correctly. */
 	UPROPERTY()
@@ -125,7 +125,7 @@ public:
  * Tests round-trip serialization of instanced structs through the pipeline.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, ClassGroup = "Start Games")
-class USGTestInstancedStructDTA : public USGDynamicTextAsset
+class USGDTATestInstancedStructDTA : public USGDynamicTextAsset
 {
 	GENERATED_BODY()
 public:
@@ -144,7 +144,7 @@ public:
  * Used to verify recursive validation catches hard refs inside instanced sub-objects.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, ClassGroup = "Start Games")
-class USGTestInstancedHardRefOwnerDTA : public USGDynamicTextAsset
+class USGDTATestInstancedHardRefOwnerDTA : public USGDynamicTextAsset
 {
 	GENERATED_BODY()
 public:
@@ -152,5 +152,5 @@ public:
 	/** Instanced object containing a hard reference and should fail validation. */
 	//UPROPERTY(Instanced) // UNCOMMENT THIS TO TEST NESTED INSTANCED OBJECT VALIDATION
 	UPROPERTY(Instanced, meta = (SGSkipHardRefValidation)) // COMMENT THIS TO TEST NESTED INSTANCED OBJECT VALIDATION
-	TObjectPtr<USGTestInstancedWithHardRef> BadInstanced = nullptr;
+	TObjectPtr<USGDTATestInstancedWithHardRef> BadInstanced = nullptr;
 };

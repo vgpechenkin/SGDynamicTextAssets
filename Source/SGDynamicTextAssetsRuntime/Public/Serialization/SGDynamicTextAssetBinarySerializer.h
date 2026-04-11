@@ -4,10 +4,11 @@
 
 #include "CoreMinimal.h"
 
+#include "Core/SGDTASerializerFormat.h"
 #include "Settings/SGDynamicTextAssetSettings.h"
-#include "SGBinaryDynamicTextAssetHeader.h"
+#include "SGDTABinaryHeader.h"
 
-struct FSGBinaryEncodeParams;
+struct FSGDTABinaryEncodeParams;
 struct FSGDynamicTextAssetId;
 
 /**
@@ -27,7 +28,7 @@ struct FSGDynamicTextAssetId;
  * ├── GUID (16 bytes): asset instance identity
  * ├── AssetTypeGuid (16 bytes): asset type (class) identity
  * ├── Content Hash (20 bytes): SHA-1 of compressed payload
- * [Compressed Data — always begins at byte offset HEADER_SIZE (80)]
+ * [Compressed Data  - always begins at byte offset HEADER_SIZE (80)]
  * └── Compressed payload bytes (format determined by SerializerTypeId)
  *
  * @see FSGDynamicTextAssetJsonSerializer
@@ -46,21 +47,21 @@ public:
 	 */
 	static bool StringToBinary(
 		const FString& PayloadString,
-		const FSGBinaryEncodeParams& Params,
+		const FSGDTABinaryEncodeParams& Params,
 		TArray<uint8>& OutBinaryData);
 
 	/**
-	 * Extracts payload string and serializer type ID from compressed binary data.
+	 * Extracts payload string and serializer format from compressed binary data.
 	 *
 	 * @param BinaryData The binary data to decompress
 	 * @param OutPayloadString Output string containing the decompressed payload
-	 * @param OutSerializerTypeId The serializer type ID stored in the header — pass to FSGDynamicTextAssetFileManager::FindSerializerForTypeId() to get the deserializer
+	 * @param OutSerializerFormat The serializer format stored in the header - pass to FSGDynamicTextAssetFileManager::FindSerializerForFormat() to get the deserializer
 	 * @return True if extraction succeeded
 	 */
 	static bool BinaryToString(
 		const TArray<uint8>& BinaryData,
 		FString& OutPayloadString,
-		uint32& OutSerializerTypeId);
+		FSGDTASerializerFormat& OutSerializerFormat);
 
 	/**
 	 * Reads the header from binary data without decompressing the payload.
@@ -72,7 +73,7 @@ public:
 	 */
 	static bool ReadHeader(
 		const TArray<uint8>& BinaryData,
-		FSGBinaryDynamicTextAssetHeader& OutHeader);
+		FSGDTABinaryHeader& OutHeader);
 
 	/**
 	 * Reads binary data from a file.
@@ -110,14 +111,20 @@ public:
 		ESGDynamicTextAssetCompressionMethod CompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib);
 
 	/**
-	 * Reads the serializer type ID from binary data without decompressing the payload.
+	 * Reads the serializer format from binary data without decompressing the payload.
 	 * Use this when you only need to identify the format without fully loading the file.
-	 * Pass the returned ID to FSGDynamicTextAssetFileManager::FindSerializerForTypeId() to resolve the serializer.
+	 * Pass the returned format to FSGDynamicTextAssetFileManager::FindSerializerForFormat() to resolve the serializer.
 	 *
 	 * @param BinaryData The binary data to read
-	 * @param OutSerializerTypeId The serializer type ID stored in the header
+	 * @param OutSerializerFormat The serializer format stored in the header
 	 * @return True if the header was valid and the read succeeded
 	 */
+	static bool BinaryReadSerializerFormat(
+		const TArray<uint8>& BinaryData,
+		FSGDTASerializerFormat& OutSerializerFormat);
+
+	/** @deprecated Use BinaryReadSerializerFormat instead. Will be removed in UE 5.7. */
+	UE_DEPRECATED(5.6, "Use BinaryReadSerializerFormat instead. Will be removed in UE 5.7.")
 	static bool BinaryReadSerializerTypeId(
 		const TArray<uint8>& BinaryData,
 		uint32& OutSerializerTypeId);
@@ -149,7 +156,7 @@ public:
 	static FString GetFileExtension();
 
 	/** Maximum allowed uncompressed payload size (64 MB). Prevents OOM from crafted headers. */
-	static constexpr uint32 MAX_UNCOMPRESSED_SIZE = FSGBinaryDynamicTextAssetHeader::HEADER_SIZE * 1024 * 1024;
+	static constexpr uint32 MAX_UNCOMPRESSED_SIZE = FSGDTABinaryHeader::HEADER_SIZE * 1024 * 1024;
 
 private:
 

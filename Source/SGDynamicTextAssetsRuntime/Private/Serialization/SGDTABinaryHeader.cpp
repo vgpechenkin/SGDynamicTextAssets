@@ -1,24 +1,24 @@
 ﻿// Copyright Start Games, Inc. All Rights Reserved.
 
-#include "Serialization/SGBinaryDynamicTextAssetHeader.h"
+#include "Serialization/SGDTABinaryHeader.h"
 
 // Validate the struct is properly defined.
-static_assert(sizeof(FSGBinaryDynamicTextAssetHeader::MAGIC_NUMBER) == 5,
+static_assert(sizeof(FSGDTABinaryHeader::MAGIC_NUMBER) == 5,
 	"Magic number must be exactly 5 bytes");
-static_assert(sizeof(FSGBinaryDynamicTextAssetHeader) == FSGBinaryDynamicTextAssetHeader::HEADER_SIZE,
-	"FSGBinaryDynamicTextAssetHeader size mismatch - check member alignment");
+static_assert(sizeof(FSGDTABinaryHeader) == FSGDTABinaryHeader::HEADER_SIZE,
+	"FSGDTABinaryHeader size mismatch - check member alignment");
 
-FSGBinaryDynamicTextAssetHeader::FSGBinaryDynamicTextAssetHeader()
+FSGDTABinaryHeader::FSGDTABinaryHeader()
 {
 	FMemory::Memcpy(MagicNumber, MAGIC_NUMBER, sizeof(MagicNumber));
 }
 
-bool FSGBinaryDynamicTextAssetHeader::IsValid() const
+bool FSGDTABinaryHeader::IsValid() const
 {
 	return FMemory::Memcmp(MagicNumber, MAGIC_NUMBER, sizeof(MagicNumber)) == 0;
 }
 
-bool FSGBinaryDynamicTextAssetHeader::HasContentHash() const
+bool FSGDTABinaryHeader::HasContentHash() const
 {
 	for (uint32 index = 0; index < CONTENT_HASH_SIZE; ++index)
 	{
@@ -30,12 +30,12 @@ bool FSGBinaryDynamicTextAssetHeader::HasContentHash() const
 	return false;
 }
 
-bool FSGBinaryDynamicTextAssetHeader::HasAssetTypeGuid() const
+bool FSGDTABinaryHeader::HasAssetTypeGuid() const
 {
 	return AssetTypeGuid.IsValid();
 }
 
-FString FSGBinaryDynamicTextAssetHeader::GetMagicNumberString() const
+FString FSGDTABinaryHeader::GetMagicNumberString() const
 {
 	FString result = TEXT("0x");
 	for (int32 index = 0; index < sizeof(MagicNumber); ++index)
@@ -45,7 +45,7 @@ FString FSGBinaryDynamicTextAssetHeader::GetMagicNumberString() const
 	return result;
 }
 
-FString FSGBinaryDynamicTextAssetHeader::GetExpectedMagicNumberString()
+FString FSGDTABinaryHeader::GetExpectedMagicNumberString()
 {
 	FString result = TEXT("0x");
 	static constexpr uint8 size = sizeof(MAGIC_NUMBER);
@@ -56,7 +56,7 @@ FString FSGBinaryDynamicTextAssetHeader::GetExpectedMagicNumberString()
 	return result;
 }
 
-void FSGBinaryDynamicTextAssetHeader::Serialize(FArchive& Ar)
+void FSGDTABinaryHeader::Serialize(FArchive& Ar)
 {
 	Ar.Serialize(MagicNumber, sizeof(MagicNumber));
 	Ar.Serialize(MagicNumberPadding, sizeof(MagicNumberPadding));

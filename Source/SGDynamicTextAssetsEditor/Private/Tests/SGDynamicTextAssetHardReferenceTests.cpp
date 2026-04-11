@@ -200,12 +200,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FHardRef_CustomProvider_DetectsHardRef::RunTest(const FString& Parameters)
 {
-	// USGTestCustomProvider implements ISGDynamicTextAssetProvider directly
+	// USGDTATestCustomProvider implements ISGDynamicTextAssetProvider directly
 	// (does NOT inherit from USGDynamicTextAsset). The runtime utility should
 	// still detect hard references on it.
 	TArray<FString> violations;
 	bool hasViolations = FSGDynamicTextAssetValidationUtils::DetectHardReferenceProperties(
-		USGTestCustomProvider::StaticClass(), violations);
+		USGDTATestCustomProvider::StaticClass(), violations);
 
 	TestFalse(TEXT("Custom provider with TObjectPtr should have violations if they don't have `SGSkipHardRefValidation` as a meta UPROPERTY"), hasViolations);
 	TestTrue(TEXT("Should have at least one violation if `HardObjectRef` does not have `SGSkipHardRefValidation` as a meta UPROPERTY"), violations.IsEmpty());
@@ -231,12 +231,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FHardRef_CustomProviderChild_DetectsHardRef::RunTest(const FString& Parameters)
 {
-	// USGTestCustomProviderChild inherits from USGTestCustomProvider which implements
+	// USGDTATestCustomProviderChild inherits from USGDTATestCustomProvider which implements
 	// ISGDynamicTextAssetProvider. This tests that inherited interface detection works
 	// for subclasses of custom providers.
 	TArray<FString> violations;
 	bool bHasViolations = FSGDynamicTextAssetValidationUtils::DetectHardReferenceProperties(
-		USGTestCustomProviderChild::StaticClass(), violations);
+		USGDTATestCustomProviderChild::StaticClass(), violations);
 
 	TestTrue(TEXT("Custom provider child with TObjectPtr should have violations"), bHasViolations);
 	TestTrue(TEXT("Should have at least one violation"), violations.Num() >= 1);

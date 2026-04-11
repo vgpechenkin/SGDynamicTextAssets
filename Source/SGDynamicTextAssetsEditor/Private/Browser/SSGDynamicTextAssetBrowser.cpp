@@ -8,9 +8,10 @@
 #include "Browser/SSGDynamicTextAssetTileView.h"
 #include "Browser/SSGDynamicTextAssetTypeTree.h"
 #include "Core/SGDynamicTextAssetId.h"
-#include "Editor/FSGDynamicTextAssetEditorToolkit.h"
+#include "Editor/SGDynamicTextAssetEditorToolkit.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
-#include "Management/SGDynamicTextAssetFileMetadata.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
+#include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "ReferenceViewer/SSGDynamicTextAssetReferenceViewer.h"
 #include "SGDynamicTextAssetEditorLogs.h"
@@ -419,15 +420,15 @@ TSharedRef<SWidget> SSGDynamicTextAssetBrowser::CreateAssetGridPanel()
                 .OnSelectionChanged(this, &SSGDynamicTextAssetBrowser::OnTileViewSelectionChanged)
                 .ExternalCommandList(CommandList)
                 .OnContextMenuExtension(this, &SSGDynamicTextAssetBrowser::OnBuildContextMenuExtension)
-                .OnOpenRequested_Lambda([this](const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& Items)
+                .OnOpenRequested_Lambda([this](const TArray<TSharedPtr<FSGDTAAssetListItem>>& Items)
                 {
                     OpenSelectedDynamicTextAssets();
                 })
-                .OnDeleteRequested_Lambda([this](const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& Items)
+                .OnDeleteRequested_Lambda([this](const TArray<TSharedPtr<FSGDTAAssetListItem>>& Items)
                 {
                     DeleteSelectedDynamicTextAssets();
                 })
-                .OnValidateRequested_Lambda([this](const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& Items)
+                .OnValidateRequested_Lambda([this](const TArray<TSharedPtr<FSGDTAAssetListItem>>& Items)
                 {
                     ValidateSelectedDynamicTextAssets();
                 })
@@ -450,7 +451,7 @@ TSharedRef<SWidget> SSGDynamicTextAssetBrowser::CreateAssetGridPanel()
         ];
 }
 
-void SSGDynamicTextAssetBrowser::OnItemSelected(TSharedPtr<FSGDynamicTextAssetListItem> Item)
+void SSGDynamicTextAssetBrowser::OnItemSelected(TSharedPtr<FSGDTAAssetListItem> Item)
 {
     if (Item.IsValid())
     {
@@ -462,7 +463,7 @@ void SSGDynamicTextAssetBrowser::OnItemSelected(TSharedPtr<FSGDynamicTextAssetLi
     }
 }
 
-void SSGDynamicTextAssetBrowser::OnItemDoubleClicked(TSharedPtr<FSGDynamicTextAssetListItem> Item)
+void SSGDynamicTextAssetBrowser::OnItemDoubleClicked(TSharedPtr<FSGDTAAssetListItem> Item)
 {
     if (Item.IsValid())
     {
@@ -479,7 +480,7 @@ void SSGDynamicTextAssetBrowser::RefreshTileViewForSelectedType()
         return;
     }
 
-    TArray<TSharedPtr<FSGDynamicTextAssetListItem>> items;
+    TArray<TSharedPtr<FSGDTAAssetListItem>> items;
 
     // Get files for the selected class (or all if none selected)
     TArray<FString> filePaths;
@@ -492,35 +493,35 @@ void SSGDynamicTextAssetBrowser::RefreshTileViewForSelectedType()
         FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles(filePaths);
     }
 
-    // Extract metadata from each file and build list items
+    // Extract file info from each file and build list items
     for (const FString& filePath : filePaths)
     {
-        FSGDynamicTextAssetFileMetadata metadata =
-            FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(filePath);
+        FSGDynamicTextAssetFileInfo fileInfo =
+            FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(filePath);
 
-        if (metadata.bIsValid)
+        if (fileInfo.bIsValid)
         {
             // Resolve class via Asset Type ID (O(1) map lookup)
             UClass* itemClass = nullptr;
             if (USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
             {
-                itemClass = registry->ResolveClassForTypeId(metadata.AssetTypeId);
+                itemClass = registry->ResolveClassForTypeId(fileInfo.AssetTypeId);
             }
 
-            TSharedPtr<FSGDynamicTextAssetListItem> item = MakeShared<FSGDynamicTextAssetListItem>(
-                metadata.Id,
-                metadata.UserFacingId,
+            TSharedPtr<FSGDTAAssetListItem> item = MakeShared<FSGDTAAssetListItem>(
+                fileInfo.Id,
+                fileInfo.UserFacingId,
                 filePath,
                 itemClass ? itemClass : SelectedTypeClass.Get(),
-                metadata.AssetTypeId,
-                metadata.SerializerTypeId
+                fileInfo.AssetTypeId,
+                fileInfo.SerializerFormat
             );
             items.Add(item);
         }
     }
 
     // Sort items by UserFacingId
-    items.Sort([](const TSharedPtr<FSGDynamicTextAssetListItem>& A, const TSharedPtr<FSGDynamicTextAssetListItem>& B)
+    items.Sort([](const TSharedPtr<FSGDTAAssetListItem>& A, const TSharedPtr<FSGDTAAssetListItem>& B)
     {
         return A->UserFacingId < B->UserFacingId;
     });
@@ -580,7 +581,7 @@ bool SSGDynamicTextAssetBrowser::IsReferenceViewerButtonEnabled() const
 {
     if (TileView.IsValid())
     {
-        TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
+        TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
         if (selectedItems.Num() == 1)
         {
             return selectedItems[0].IsValid() && selectedItems[0]->Id.IsValid();
@@ -593,7 +594,7 @@ FReply SSGDynamicTextAssetBrowser::OnReferenceViewerButtonClicked()
 {
     if (TileView.IsValid())
     {
-        TSharedPtr<FSGDynamicTextAssetListItem> selectedItem = TileView->GetSelectedItem();
+        TSharedPtr<FSGDTAAssetListItem> selectedItem = TileView->GetSelectedItem();
         if (selectedItem.IsValid() && selectedItem->Id.IsValid())
         {
             SSGDynamicTextAssetReferenceViewer::OpenViewer(selectedItem->Id, selectedItem->UserFacingId);
@@ -606,7 +607,7 @@ bool SSGDynamicTextAssetBrowser::IsShowInExplorerButtonEnabled() const
 {
     if (TileView.IsValid())
     {
-        TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
+        TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
         if (selectedItems.Num() == 1)
         {
             return selectedItems[0].IsValid() && !selectedItems[0]->FilePath.IsEmpty();
@@ -619,7 +620,7 @@ FReply SSGDynamicTextAssetBrowser::OnShowInExplorerButtonClicked()
 {
     if (TileView.IsValid())
     {
-        TSharedPtr<FSGDynamicTextAssetListItem> selectedItem = TileView->GetSelectedItem();
+        TSharedPtr<FSGDTAAssetListItem> selectedItem = TileView->GetSelectedItem();
         if (selectedItem.IsValid() && !selectedItem->FilePath.IsEmpty())
         {
             // Pass full file path to select the file in Explorer
@@ -633,7 +634,7 @@ bool SSGDynamicTextAssetBrowser::IsRenameButtonEnabled() const
 {
     if (TileView.IsValid())
     {
-        TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
+        TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
         if (!selectedItems.IsEmpty())
         {
             return selectedItems[0].IsValid() && !selectedItems[0]->FilePath.IsEmpty();
@@ -655,7 +656,7 @@ void SSGDynamicTextAssetBrowser::RenameSelectedDynamicTextAsset()
         return;
     }
 
-    TSharedPtr<FSGDynamicTextAssetListItem> selectedItem = TileView->GetSelectedItem();
+    TSharedPtr<FSGDTAAssetListItem> selectedItem = TileView->GetSelectedItem();
     if (!selectedItem.IsValid() || selectedItem->FilePath.IsEmpty())
     {
         return;
@@ -679,8 +680,8 @@ bool SSGDynamicTextAssetBrowser::IsDeleteButtonEnabled() const
 {
     if (TileView.IsValid())
     {
-        TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
-        for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : selectedItems)
+        TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
+        for (const TSharedPtr<FSGDTAAssetListItem>& item : selectedItems)
         {
             if (item.IsValid() && !item->FilePath.IsEmpty())
             {
@@ -704,7 +705,7 @@ void SSGDynamicTextAssetBrowser::DeleteSelectedDynamicTextAssets()
         return;
     }
 
-    TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
+    TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
     if (selectedItems.IsEmpty())
     {
         return;
@@ -745,7 +746,7 @@ void SSGDynamicTextAssetBrowser::DeleteSelectedDynamicTextAssets()
     int32 successCount = 0;
     int32 failCount = 0;
 
-    for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : selectedItems)
+    for (const TSharedPtr<FSGDTAAssetListItem>& item : selectedItems)
     {
         if (!item.IsValid() || item->FilePath.IsEmpty())
         {
@@ -798,7 +799,7 @@ bool SSGDynamicTextAssetBrowser::IsDuplicateButtonEnabled() const
 {
     if (TileView.IsValid())
     {
-        TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
+        TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
         if (!selectedItems.IsEmpty())
         {
             return selectedItems[0].IsValid() && !selectedItems[0]->FilePath.IsEmpty();
@@ -820,7 +821,7 @@ void SSGDynamicTextAssetBrowser::DuplicateSelectedDynamicTextAsset()
         return;
     }
 
-    TSharedPtr<FSGDynamicTextAssetListItem> selectedItem = TileView->GetSelectedItem();
+    TSharedPtr<FSGDTAAssetListItem> selectedItem = TileView->GetSelectedItem();
     if (!selectedItem.IsValid() || selectedItem->FilePath.IsEmpty())
     {
         return;
@@ -847,14 +848,14 @@ void SSGDynamicTextAssetBrowser::ValidateSelectedDynamicTextAssets()
     {
         return;
     }
-    TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
+    TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
     if (selectedItems.IsEmpty())
     {
         return;
     }
 
     TArray<FString> filePaths;
-    for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : selectedItems)
+    for (const TSharedPtr<FSGDTAAssetListItem>& item : selectedItems)
     {
         if (item.IsValid() && !item->FilePath.IsEmpty())
         {
@@ -947,7 +948,7 @@ void SSGDynamicTextAssetBrowser::OpenSelectedDynamicTextAssets()
         return;
     }
 
-    TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
+    TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
     if (selectedItems.IsEmpty())
     {
         return;
@@ -970,7 +971,7 @@ void SSGDynamicTextAssetBrowser::OpenSelectedDynamicTextAssets()
         }
     }
 
-    for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : selectedItems)
+    for (const TSharedPtr<FSGDTAAssetListItem>& item : selectedItems)
     {
         if (!item.IsValid() || item->FilePath.IsEmpty())
         {
@@ -990,8 +991,8 @@ bool SSGDynamicTextAssetBrowser::IsOpenButtonEnabled() const
         return false;
     }
 
-    const TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
-    for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : selectedItems)
+    const TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
+    for (const TSharedPtr<FSGDTAAssetListItem>& item : selectedItems)
     {
         if (item.IsValid() && !item->FilePath.IsEmpty())
         {
@@ -1002,7 +1003,7 @@ bool SSGDynamicTextAssetBrowser::IsOpenButtonEnabled() const
     return false;
 }
 
-void SSGDynamicTextAssetBrowser::OnTileViewSelectionChanged(const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& SelectedItems)
+void SSGDynamicTextAssetBrowser::OnTileViewSelectionChanged(const TArray<TSharedPtr<FSGDTAAssetListItem>>& SelectedItems)
 {
     RefreshStatusBar();
     RefreshToolbarButtonStates();
@@ -1121,7 +1122,7 @@ void SSGDynamicTextAssetBrowser::CopySelectedItemGuid()
         return;
     }
 
-    TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = TileView->GetSelectedItems();
+    TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = TileView->GetSelectedItems();
     if (selectedItems.Num() == 1 && selectedItems[0].IsValid())
     {
         FPlatformApplicationMisc::ClipboardCopy(*selectedItems[0]->Id.ToString());
@@ -1138,12 +1139,12 @@ bool SSGDynamicTextAssetBrowser::HasExactlyOneItemSelected() const
     return false;
 }
 
-void SSGDynamicTextAssetBrowser::OnBuildContextMenuExtension(FMenuBuilder& MenuBuilder, const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& SelectedItems)
+void SSGDynamicTextAssetBrowser::OnBuildContextMenuExtension(FMenuBuilder& MenuBuilder, const TArray<TSharedPtr<FSGDTAAssetListItem>>& SelectedItems)
 {
     // Check that all selected items have the same file extension
     FString uniformExtension;
     bool bAllSameExtension = true;
-    for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : SelectedItems)
+    for (const TSharedPtr<FSGDTAAssetListItem>& item : SelectedItems)
     {
         if (!item.IsValid() || item->FilePath.IsEmpty())
         {
@@ -1197,7 +1198,7 @@ void SSGDynamicTextAssetBrowser::OnBuildContextMenuExtension(FMenuBuilder& MenuB
                 const FString extension = serializer->GetFileExtension();
 
                 // Exclude binary serializer (not a text format)
-                if (extension == FSGDynamicTextAssetFileManager::BINARY_EXTENSION)
+                if (extension == SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION)
                 {
                     continue;
                 }
@@ -1244,7 +1245,7 @@ void SSGDynamicTextAssetBrowser::OnBuildContextMenuExtension(FMenuBuilder& MenuB
     );
 }
 
-void SSGDynamicTextAssetBrowser::ConvertSelectedItems(const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& Items, const FString& TargetExtension)
+void SSGDynamicTextAssetBrowser::ConvertSelectedItems(const TArray<TSharedPtr<FSGDTAAssetListItem>>& Items, const FString& TargetExtension)
 {
     if (Items.IsEmpty())
     {
@@ -1261,7 +1262,7 @@ void SSGDynamicTextAssetBrowser::ConvertSelectedItems(const TArray<TSharedPtr<FS
 
     // Count how many selected items have open editors with unsaved changes
     int32 unsavedCount = 0;
-    for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : Items)
+    for (const TSharedPtr<FSGDTAAssetListItem>& item : Items)
     {
         if (item.IsValid() && !item->FilePath.IsEmpty()
             && FSGDynamicTextAssetEditorToolkit::HasOpenEditorWithUnsavedChanges(item->FilePath))
@@ -1315,7 +1316,7 @@ void SSGDynamicTextAssetBrowser::ConvertSelectedItems(const TArray<TSharedPtr<FS
     int32 successCount = 0;
     int32 failCount = 0;
 
-    for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : Items)
+    for (const TSharedPtr<FSGDTAAssetListItem>& item : Items)
     {
         if (!item.IsValid() || item->FilePath.IsEmpty())
         {

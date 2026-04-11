@@ -4,13 +4,13 @@
 
 #include "Browser/SSGDynamicTextAssetDuplicateDialog.h"
 #include "Browser/SSGDynamicTextAssetRenameDialog.h"
-#include "Editor/FSGDynamicTextAssetEditorToolkit.h"
+#include "Editor/SGDynamicTextAssetEditorToolkit.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
-#include "Management/SGDynamicTextAssetFileMetadata.h"
+#include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "ReferenceViewer/SSGDynamicTextAssetReferenceViewer.h"
 #include "SGDynamicTextAssetEditorLogs.h"
-#include "Editor/SGDynamicTextAssetIdentityCustomization.h"
+#include "Editor/SGDTADetailCustomization.h"
 #include "Editor/SSGDynamicTextAssetIcon.h"
 #include "Framework/Commands/GenericCommands.h"
 #include "HAL/PlatformApplicationMisc.h"
@@ -22,7 +22,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SSpacer.h"
 
-FText FSGDynamicTextAssetListItem::GetDisplayName() const
+FText FSGDTAAssetListItem::GetDisplayName() const
 {
     return FText::FromString(UserFacingId.IsEmpty() ? ("ID: " + Id.ToString()) : UserFacingId);
 }
@@ -78,7 +78,7 @@ void SSGDynamicTextAssetTileView::Construct(const FArguments& InArgs)
             // Index 1: List view
             + SWidgetSwitcher::Slot()
             [
-                SAssignNew(ListView, SListView<TSharedPtr<FSGDynamicTextAssetListItem>>)
+                SAssignNew(ListView, SListView<TSharedPtr<FSGDTAAssetListItem>>)
                 .ListItemsSource(&FilteredItems)
                 .OnGenerateRow(this, &SSGDynamicTextAssetTileView::GenerateRow)
                 .OnSelectionChanged(this, &SSGDynamicTextAssetTileView::OnSelectionChanged)
@@ -90,7 +90,7 @@ void SSGDynamicTextAssetTileView::Construct(const FArguments& InArgs)
     ];
 }
 
-void SSGDynamicTextAssetTileView::SetItems(const TArray<TSharedPtr<FSGDynamicTextAssetListItem>>& InItems)
+void SSGDynamicTextAssetTileView::SetItems(const TArray<TSharedPtr<FSGDTAAssetListItem>>& InItems)
 {
     AllItems = InItems;
     ApplyInstanceFilter();
@@ -100,7 +100,8 @@ void SSGDynamicTextAssetTileView::SetItems(const TArray<TSharedPtr<FSGDynamicTex
         ListView->RequestListRefresh();
     }
 
-    UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Tile view updated with %d items (%d filtered)"), AllItems.Num(), FilteredItems.Num());
+    // Using verbose to avoid log spam
+    UE_LOG(LogSGDynamicTextAssetsEditor, Verbose, TEXT("Tile view updated with %d items (%d filtered)"), AllItems.Num(), FilteredItems.Num());
 }
 
 void SSGDynamicTextAssetTileView::ClearItems()
@@ -121,11 +122,11 @@ void SSGDynamicTextAssetTileView::ClearItems()
     }
 }
 
-TSharedPtr<FSGDynamicTextAssetListItem> SSGDynamicTextAssetTileView::GetSelectedItem() const
+TSharedPtr<FSGDTAAssetListItem> SSGDynamicTextAssetTileView::GetSelectedItem() const
 {
     if (ListView.IsValid())
     {
-        TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selected = ListView->GetSelectedItems();
+        TArray<TSharedPtr<FSGDTAAssetListItem>> selected = ListView->GetSelectedItems();
         if (selected.Num() > 0)
         {
             return selected[0];
@@ -134,7 +135,7 @@ TSharedPtr<FSGDynamicTextAssetListItem> SSGDynamicTextAssetTileView::GetSelected
     return nullptr;
 }
 
-TArray<TSharedPtr<FSGDynamicTextAssetListItem>> SSGDynamicTextAssetTileView::GetSelectedItems() const
+TArray<TSharedPtr<FSGDTAAssetListItem>> SSGDynamicTextAssetTileView::GetSelectedItems() const
 {
     if (ListView.IsValid())
     {
@@ -171,7 +172,7 @@ void SSGDynamicTextAssetTileView::SelectById(const FSGDynamicTextAssetId& Id)
         return;
     }
 
-    for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : FilteredItems)
+    for (const TSharedPtr<FSGDTAAssetListItem>& item : FilteredItems)
     {
         if (item.IsValid() && item->Id == Id)
         {
@@ -181,20 +182,20 @@ void SSGDynamicTextAssetTileView::SelectById(const FSGDynamicTextAssetId& Id)
     }
 }
 
-TSharedRef<ITableRow> SSGDynamicTextAssetTileView::GenerateRow(TSharedPtr<FSGDynamicTextAssetListItem> Item, const TSharedRef<STableViewBase>& OwnerTable)
+TSharedRef<ITableRow> SSGDynamicTextAssetTileView::GenerateRow(TSharedPtr<FSGDTAAssetListItem> Item, const TSharedRef<STableViewBase>& OwnerTable)
 {
     const FString className = Item->DynamicTextAssetClass.IsValid() ? Item->DynamicTextAssetClass->GetName() : TEXT("Unknown");
 
     TSharedPtr<ISGDynamicTextAssetSerializer> serializer = nullptr;
-    if (Item->SerializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
+    if (Item->SerializerFormat.IsValid())
     {
-        serializer = FSGDynamicTextAssetFileManager::FindSerializerForTypeId(Item->SerializerTypeId);
+        serializer = FSGDynamicTextAssetFileManager::FindSerializerForFormat(Item->SerializerFormat);
     }
     // Account for if we failed to get the serializer for it
     // We NEED this information for readability
     if (!serializer.IsValid())
     {
-        return SNew(STableRow<TSharedPtr<FSGDynamicTextAssetListItem>>, OwnerTable)
+        return SNew(STableRow<TSharedPtr<FSGDTAAssetListItem>>, OwnerTable)
             .Padding(FMargin(4.0f, 2.0f))
             [
                 SNew(SHorizontalBox)
@@ -226,7 +227,7 @@ TSharedRef<ITableRow> SSGDynamicTextAssetTileView::GenerateRow(TSharedPtr<FSGDyn
     // For lambda's
     TWeakPtr<ISGDynamicTextAssetSerializer> weakSerializer(serializer);
 
-    return SNew(STableRow<TSharedPtr<FSGDynamicTextAssetListItem>>, OwnerTable)
+    return SNew(STableRow<TSharedPtr<FSGDTAAssetListItem>>, OwnerTable)
         .Padding(FMargin(4.0f, 2.0f))
         .ToolTipText_Lambda([Item, weakSerializer]() -> FText
         {
@@ -315,7 +316,7 @@ TSharedRef<ITableRow> SSGDynamicTextAssetTileView::GenerateRow(TSharedPtr<FSGDyn
                 .AutoWidth()
                 .Padding(4.0f, 0.0f, 0.0f, 0.0f)
                 [
-                    FSGDynamicTextAssetIdentityCustomization::CreateCopyButton(
+                    FSGDTADetailCustomization::CreateCopyButton(
                         FOnClicked::CreateLambda([Item]() -> FReply
                         {
                             if (Item.IsValid())
@@ -331,24 +332,24 @@ TSharedRef<ITableRow> SSGDynamicTextAssetTileView::GenerateRow(TSharedPtr<FSGDyn
         ];
 }
 
-void SSGDynamicTextAssetTileView::OnSelectionChanged(TSharedPtr<FSGDynamicTextAssetListItem> Item, ESelectInfo::Type SelectInfo)
+void SSGDynamicTextAssetTileView::OnSelectionChanged(TSharedPtr<FSGDTAAssetListItem> Item, ESelectInfo::Type SelectInfo)
 {
     // Fire single-item delegate (backwards compatibility) with first selected item
     if (OnItemSelected.IsBound())
     {
-        TSharedPtr<FSGDynamicTextAssetListItem> firstSelected = GetSelectedItem();
+        TSharedPtr<FSGDTAAssetListItem> firstSelected = GetSelectedItem();
         OnItemSelected.Execute(firstSelected);
     }
 
     // Fire multi-select delegate with all selected items
     if (OnSelectionChangedDelegate.IsBound())
     {
-        TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = GetSelectedItems();
+        TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = GetSelectedItems();
         OnSelectionChangedDelegate.Execute(selectedItems);
     }
 }
 
-void SSGDynamicTextAssetTileView::OnDoubleClick(TSharedPtr<FSGDynamicTextAssetListItem> Item)
+void SSGDynamicTextAssetTileView::OnDoubleClick(TSharedPtr<FSGDTAAssetListItem> Item)
 {
     if (OnItemDoubleClicked.IsBound())
     {
@@ -358,7 +359,7 @@ void SSGDynamicTextAssetTileView::OnDoubleClick(TSharedPtr<FSGDynamicTextAssetLi
 
 TSharedPtr<SWidget> SSGDynamicTextAssetTileView::GenerateContextMenu()
 {
-    TArray<TSharedPtr<FSGDynamicTextAssetListItem>> selectedItems = GetSelectedItems();
+    TArray<TSharedPtr<FSGDTAAssetListItem>> selectedItems = GetSelectedItems();
     if (selectedItems.Num() == 0)
     {
         return nullptr;
@@ -480,7 +481,7 @@ TSharedPtr<SWidget> SSGDynamicTextAssetTileView::GenerateContextMenu()
     }
 
     // Single-item context menu: full menu
-    TSharedPtr<FSGDynamicTextAssetListItem> selectedItem = selectedItems[0];
+    TSharedPtr<FSGDTAAssetListItem> selectedItem = selectedItems[0];
 
     // Open action (Enter)
     menuBuilder.AddMenuEntry(
@@ -522,16 +523,16 @@ TSharedPtr<SWidget> SSGDynamicTextAssetTileView::GenerateContextMenu()
                 // Notify any open editor about the rename so it updates its file path and title
                 FSGDynamicTextAssetEditorToolkit::NotifyFileRenamed(oldFilePath, newFilePath);
 
-                // Extract metadata from the new file to update the list item
-                FSGDynamicTextAssetFileMetadata metadata = FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(newFilePath);
-                if (metadata.bIsValid)
+                // Extract file info from the new file to update the list item
+                FSGDynamicTextAssetFileInfo fileInfo = FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(newFilePath);
+                if (fileInfo.bIsValid)
                 {
                     // Update the selected item in-place
-                    selectedItem->UserFacingId = metadata.UserFacingId;
+                    selectedItem->UserFacingId = fileInfo.UserFacingId;
                     selectedItem->FilePath = newFilePath;
 
                     // Re-sort AllItems by UserFacingId
-                    AllItems.Sort([](const TSharedPtr<FSGDynamicTextAssetListItem>& A, const TSharedPtr<FSGDynamicTextAssetListItem>& B)
+                    AllItems.Sort([](const TSharedPtr<FSGDTAAssetListItem>& A, const TSharedPtr<FSGDTAAssetListItem>& B)
                     {
                         return A->UserFacingId < B->UserFacingId;
                     });
@@ -579,30 +580,30 @@ TSharedPtr<SWidget> SSGDynamicTextAssetTileView::GenerateContextMenu()
             {
                 UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Duplicated dynamic text asset via context menu: %s"), *createdFilePath);
 
-                // Extract metadata to create the new list item
-                FSGDynamicTextAssetFileMetadata metadata = FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(createdFilePath);
-                if (metadata.bIsValid)
+                // Extract file info to create the new list item
+                FSGDynamicTextAssetFileInfo fileInfo = FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(createdFilePath);
+                if (fileInfo.bIsValid)
                 {
                     // Resolve class via Asset Type ID (O(1) map lookup)
                     UClass* itemClass = nullptr;
                     if (USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
                     {
-                        itemClass = registry->ResolveClassForTypeId(metadata.AssetTypeId);
+                        itemClass = registry->ResolveClassForTypeId(fileInfo.AssetTypeId);
                     }
 
                     // Add the new item to AllItems
-                    TSharedPtr<FSGDynamicTextAssetListItem> newItem = MakeShared<FSGDynamicTextAssetListItem>(
+                    TSharedPtr<FSGDTAAssetListItem> newItem = MakeShared<FSGDTAAssetListItem>(
                         createdId,
-                        metadata.UserFacingId,
+                        fileInfo.UserFacingId,
                         createdFilePath,
                         itemClass ? itemClass : selectedItem->DynamicTextAssetClass.Get(),
-                        metadata.AssetTypeId,
-                        metadata.SerializerTypeId
+                        fileInfo.AssetTypeId,
+                        fileInfo.SerializerFormat
                     );
                     AllItems.Add(newItem);
 
                     // Sort AllItems by UserFacingId
-                    AllItems.Sort([](const TSharedPtr<FSGDynamicTextAssetListItem>& A, const TSharedPtr<FSGDynamicTextAssetListItem>& B)
+                    AllItems.Sort([](const TSharedPtr<FSGDTAAssetListItem>& A, const TSharedPtr<FSGDTAAssetListItem>& B)
                     {
                         return A->UserFacingId < B->UserFacingId;
                     });
@@ -736,7 +737,7 @@ void SSGDynamicTextAssetTileView::ApplyInstanceFilter()
     }
 
     // Filter AllItems by UserFacingId or GUID substring match
-    for (const TSharedPtr<FSGDynamicTextAssetListItem>& item : AllItems)
+    for (const TSharedPtr<FSGDTAAssetListItem>& item : AllItems)
     {
         if (!item.IsValid())
         {

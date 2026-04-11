@@ -29,7 +29,7 @@ class SSGDynamicTextAssetClassPicker;
  * - Copy button copies Asset Type ID to clipboard
  * - Paste button reads clipboard and resolves by Asset Type ID
  */
-class FSGAssetTypeIdCustomization : public IPropertyTypeCustomization
+class FSGDTAAssetTypeIdCustomization : public IPropertyTypeCustomization
 {
 public:
 

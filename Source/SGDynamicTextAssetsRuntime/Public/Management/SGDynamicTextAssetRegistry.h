@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "Core/SGDynamicTextAssetTypeId.h"
+#include "Management/SGDTASerializerExtenderRegistry.h"
 #include "Subsystems/EngineSubsystem.h"
 #include "UObject/SoftObjectPtr.h"
 
@@ -12,6 +13,8 @@
 
 class FJsonObject;
 class FSGDynamicTextAssetTypeManifest;
+
+class USGDTAAssetBundleExtender;
 
 /** Delegate broadcast when the registry changes (class registered/unregistered). */
 DECLARE_MULTICAST_DELEGATE(FOnDynamicTextAssetRegistryChanged);
@@ -212,7 +215,32 @@ public:
     /** Delegate broadcast when type manifests are synced or updated. */
     FOnTypeManifestUpdated OnTypeManifestUpdated;
 
+    /**
+     * Gets or creates a cached instance of the asset bundle extender identified by the given class ID.
+     * Resolves the ClassId to a soft class pointer via the asset bundle extender manifest,
+     * loads the class, then caches the instance.
+     * Instances are owned by the registry and persist for its lifetime.
+     *
+     * @param ExtenderClassId The ClassId identifying the extender in the manifest
+     * @return The cached instance, or nullptr if the ClassId is invalid or fails to resolve/load
+     */
+    USGDTAAssetBundleExtender* GetOrCreateAssetBundleExtender(
+        const FSGDTAClassId& ExtenderClassId);
+
+    /** Returns the serializer extender registry for managing extender manifests. */
+    FSGDTASerializerExtenderRegistry& GetExtenderRegistry();
+
+    /** Returns the serializer extender registry for managing extender manifests (const). */
+    const FSGDTASerializerExtenderRegistry& GetExtenderRegistry() const;
+
 private:
+
+    /**
+     * Loads extender manifests from disk, registers built-in extenders,
+     * and saves changes back to disk if any manifests were dirtied.
+     * Called during Initialize() in editor builds only.
+     */
+    void LoadAndPersistExtenderManifests();
 
     /** Rebuilds the cached class list from registered bases + reflection */
     void RebuildClassCache() const;
@@ -244,4 +272,11 @@ private:
 
     /** UClass -> TypeId reverse lookup, built during SyncManifests. */
     TMap<TWeakObjectPtr<const UClass>, FSGDynamicTextAssetTypeId> ClassToTypeIdMap;
+
+    /** Cached asset bundle extender instances, keyed by class ID. One instance per registered extender. */
+    UPROPERTY(Transient)
+    TMap<FSGDTAClassId, TObjectPtr<USGDTAAssetBundleExtender>> CachedAssetBundleExtenders;
+
+    /** Manages serializer extender manifests (one per extender framework). */
+    FSGDTASerializerExtenderRegistry ExtenderRegistry;
 };

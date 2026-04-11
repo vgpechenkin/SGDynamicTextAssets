@@ -1,6 +1,6 @@
 // Copyright Start Games, Inc. All Rights Reserved.
 
-#include "Customization/SGAssetTypeIdCustomization.h"
+#include "Customization/SGDTAAssetTypeIdCustomization.h"
 
 #include "DetailWidgetRow.h"
 #include "Framework/Notifications/NotificationManager.h"
@@ -15,14 +15,14 @@
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Widgets/Text/STextBlock.h"
 
-#define LOCTEXT_NAMESPACE "SGAssetTypeIdCustomization"
+#define LOCTEXT_NAMESPACE "SGDTAAssetTypeIdCustomization"
 
-TSharedRef<IPropertyTypeCustomization> FSGAssetTypeIdCustomization::MakeInstance()
+TSharedRef<IPropertyTypeCustomization> FSGDTAAssetTypeIdCustomization::MakeInstance()
 {
-	return MakeShareable(new FSGAssetTypeIdCustomization());
+	return MakeShareable(new FSGDTAAssetTypeIdCustomization());
 }
 
-void FSGAssetTypeIdCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> PropertyHandle,
+void FSGDTAAssetTypeIdCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> PropertyHandle,
 	FDetailWidgetRow& HeaderRow,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
@@ -60,7 +60,7 @@ void FSGAssetTypeIdCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> Pr
 				SAssignNew(ClassPicker, SSGDynamicTextAssetClassPicker)
 				.InitialClass(initialClass)
 				.bShowNoneOption(true)
-				.OnClassSelected(this, &FSGAssetTypeIdCustomization::OnClassPicked)
+				.OnClassSelected(this, &FSGDTAAssetTypeIdCustomization::OnClassPicked)
 			]
 
 			// Copy ID button
@@ -72,7 +72,7 @@ void FSGAssetTypeIdCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> Pr
 				SAssignNew(CopyIdButton, SButton)
 				.ButtonStyle(FAppStyle::Get(), "SimpleButton")
 				.ToolTipText(INVTEXT("Copy Asset Type ID to clipboard"))
-				.OnClicked(this, &FSGAssetTypeIdCustomization::OnCopyIdClicked)
+				.OnClicked(this, &FSGDTAAssetTypeIdCustomization::OnCopyIdClicked)
 				.IsEnabled(CurrentTypeId.IsValid())
 				[
 					SNew(SImage)
@@ -90,7 +90,7 @@ void FSGAssetTypeIdCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> Pr
 				SNew(SButton)
 				.ButtonStyle(FAppStyle::Get(), "SimpleButton")
 				.ToolTipText(INVTEXT("Paste Asset Type ID from clipboard"))
-				.OnClicked(this, &FSGAssetTypeIdCustomization::OnPasteClicked)
+				.OnClicked(this, &FSGDTAAssetTypeIdCustomization::OnPasteClicked)
 				[
 					SNew(SImage)
 					.Image(FAppStyle::GetBrush("GenericCommands.Paste"))
@@ -107,7 +107,7 @@ void FSGAssetTypeIdCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> Pr
 				SAssignNew(ClearButton, SButton)
 				.ButtonStyle(FAppStyle::Get(), "SimpleButton")
 				.ToolTipText(INVTEXT("Clear type selection"))
-				.OnClicked(this, &FSGAssetTypeIdCustomization::OnClearClicked)
+				.OnClicked(this, &FSGDTAAssetTypeIdCustomization::OnClearClicked)
 				.IsEnabled(CurrentTypeId.IsValid())
 				[
 					SNew(SImage)
@@ -118,14 +118,14 @@ void FSGAssetTypeIdCustomization::CustomizeHeader(TSharedRef<IPropertyHandle> Pr
 		];
 }
 
-void FSGAssetTypeIdCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> PropertyHandle,
+void FSGDTAAssetTypeIdCustomization::CustomizeChildren(TSharedRef<IPropertyHandle> PropertyHandle,
 	IDetailChildrenBuilder& ChildBuilder,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
 	// Hide all children - the header handles everything
 }
 
-void FSGAssetTypeIdCustomization::OnClassPicked(UClass* NewClass)
+void FSGDTAAssetTypeIdCustomization::OnClassPicked(UClass* NewClass)
 {
 	FSGDynamicTextAssetTypeId newTypeId = FSGDynamicTextAssetTypeId::INVALID_TYPE_ID;
 
@@ -144,7 +144,7 @@ void FSGAssetTypeIdCustomization::OnClassPicked(UClass* NewClass)
 		*newTypeId.ToString());
 }
 
-FText FSGAssetTypeIdCustomization::GetCurrentDisplayText() const
+FText FSGDTAAssetTypeIdCustomization::GetCurrentDisplayText() const
 {
 	if (!CurrentTypeId.IsValid())
 	{
@@ -163,7 +163,7 @@ FText FSGAssetTypeIdCustomization::GetCurrentDisplayText() const
 	return FText::FromString(CurrentTypeId.ToString());
 }
 
-FText FSGAssetTypeIdCustomization::GetCurrentTooltipText() const
+FText FSGDTAAssetTypeIdCustomization::GetCurrentTooltipText() const
 {
 	if (!CurrentTypeId.IsValid())
 	{
@@ -187,7 +187,7 @@ FText FSGAssetTypeIdCustomization::GetCurrentTooltipText() const
 		FText::FromString(CurrentTypeId.ToString()));
 }
 
-FReply FSGAssetTypeIdCustomization::OnClearClicked()
+FReply FSGDTAAssetTypeIdCustomization::OnClearClicked()
 {
 	WriteValue(FSGDynamicTextAssetTypeId::INVALID_TYPE_ID);
 
@@ -201,7 +201,7 @@ FReply FSGAssetTypeIdCustomization::OnClearClicked()
 	return FReply::Handled();
 }
 
-FReply FSGAssetTypeIdCustomization::OnCopyIdClicked()
+FReply FSGDTAAssetTypeIdCustomization::OnCopyIdClicked()
 {
 	if (CurrentTypeId.IsValid())
 	{
@@ -211,7 +211,7 @@ FReply FSGAssetTypeIdCustomization::OnCopyIdClicked()
 	return FReply::Handled();
 }
 
-FReply FSGAssetTypeIdCustomization::OnPasteClicked()
+FReply FSGDTAAssetTypeIdCustomization::OnPasteClicked()
 {
 	// Read text from system clipboard
 	FString clipboardText;
@@ -274,7 +274,7 @@ FReply FSGAssetTypeIdCustomization::OnPasteClicked()
 	return FReply::Handled();
 }
 
-void FSGAssetTypeIdCustomization::ReadCurrentValue()
+void FSGDTAAssetTypeIdCustomization::ReadCurrentValue()
 {
 	CurrentTypeId = FSGDynamicTextAssetTypeId::INVALID_TYPE_ID;
 
@@ -295,7 +295,7 @@ void FSGAssetTypeIdCustomization::ReadCurrentValue()
 	RefreshButtonStates();
 }
 
-void FSGAssetTypeIdCustomization::WriteValue(const FSGDynamicTextAssetTypeId& NewTypeId)
+void FSGDTAAssetTypeIdCustomization::WriteValue(const FSGDynamicTextAssetTypeId& NewTypeId)
 {
 	if (!StructPropertyHandle.IsValid())
 	{
@@ -318,7 +318,7 @@ void FSGAssetTypeIdCustomization::WriteValue(const FSGDynamicTextAssetTypeId& Ne
 	RefreshButtonStates();
 }
 
-void FSGAssetTypeIdCustomization::RefreshButtonStates()
+void FSGDTAAssetTypeIdCustomization::RefreshButtonStates()
 {
 	const bool bHasValidId = CurrentTypeId.IsValid();
 

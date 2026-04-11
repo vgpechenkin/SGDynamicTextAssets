@@ -10,6 +10,7 @@
 - [Dynamic Text Assets](Core/DynamicTextAssets.md): USGDynamicTextAsset base class, GUIDs, UserFacingId, versioning
 - [Dynamic Text Asset References](Core/DynamicTextAssetReferences.md): FSGDynamicTextAssetRef, resolving, type filters
 - [Versioning and Migration](Core/VersioningAndMigration.md): Semantic versioning, MigrateFromVersion, compatibility
+- [Asset Bundles](Core/AssetBundles.md): Named bundle groups, property tagging, extraction, runtime loading
 - [Validation](Core/Validation.md): FSGDynamicTextAssetValidationResult, custom validation hooks, severity levels
 - [UHT Plugin](Core/UhtPlugin.md): Compile-time validation plugin setup, file structure, distribution
 
@@ -32,6 +33,8 @@
 - [XML Format](Serialization/XmlFormat.md): .dta.xml schema, FXmlFile integration
 - [YAML Format](Serialization/YamlFormat.md): .dta.yaml schema, fkYAML integration
 - [Binary Format](Serialization/BinaryFormat.md): .dta.bin header, compression, content hashes
+- [Serializer Extenders](Serialization/SerializerExtenders.md): Extender framework, registry, manifests, automatic discovery
+- [Asset Bundle Extenders](Serialization/AssetBundleExtenders.md): Custom bundle storage strategies, built-in extenders, resolution order
 - [Cook Pipeline](Serialization/CookPipeline.md): Cook commandlet, cook delegate, flat GUID output, manifest
 - [Cook Manifest](Serialization/CookManifest.md): Manifest format, integrity hash, runtime lookups
 

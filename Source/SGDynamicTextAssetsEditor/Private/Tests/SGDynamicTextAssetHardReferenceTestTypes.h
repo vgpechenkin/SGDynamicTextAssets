@@ -95,7 +95,7 @@ public:
  * by interface implementation, not by class hierarchy.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, ClassGroup = "Start Games")
-class USGTestCustomProvider : public UObject, public ISGDynamicTextAssetProvider
+class USGDTATestCustomProvider : public UObject, public ISGDynamicTextAssetProvider
 {
 	GENERATED_BODY()
 public:
@@ -114,6 +114,8 @@ public:
 		const FSGDynamicTextAssetVersion& OldVersion,
 		const FSGDynamicTextAssetVersion& CurrentVersion,
 		const TSharedPtr<FJsonObject>& OldData) override { return true; }
+	virtual const FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData() const override { return BundleData; }
+	virtual FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData_Mutable() override { return BundleData; }
 	// ~ISGDynamicTextAssetProvider interface
 
 	/** Hard reference - should be detected as violation if SGSkipHardRefValidation is removed. */
@@ -129,6 +131,7 @@ private:
 	FSGDynamicTextAssetId Id;
 	FString UserFacingId;
 	FSGDynamicTextAssetVersion Version;
+	FSGDynamicTextAssetBundleData BundleData;
 };
 
 /**
@@ -136,7 +139,7 @@ private:
  * Validates that inherited interface detection works for subclasses of custom providers.
  */
 UCLASS(NotBlueprintable, NotBlueprintType, MinimalAPI, Hidden, ClassGroup = "Start Games")
-class USGTestCustomProviderChild : public USGTestCustomProvider
+class USGDTATestCustomProviderChild : public USGDTATestCustomProvider
 {
 	GENERATED_BODY()
 public:

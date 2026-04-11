@@ -35,7 +35,8 @@ public class SGDynamicTextAssetsEditor : ModuleRules
             "JsonUtilities",
             "LevelEditor",
             "WorkspaceMenuStructure",
-            "ToolWidgets"
+            "ToolWidgets",
+            "ClassViewer"
         });
     }
 }

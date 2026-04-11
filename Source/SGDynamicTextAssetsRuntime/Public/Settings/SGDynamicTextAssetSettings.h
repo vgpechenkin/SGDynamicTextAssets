@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 
+#include "Core/SGDTAClassId.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Engine/DataAsset.h"
 #include "Engine/DeveloperSettings.h"
 
@@ -32,6 +34,40 @@ enum class ESGDynamicTextAssetCompressionMethod : uint8
 };
 
 /**
+ * Maps one or more serializer formats (as a bitmask) to an asset bundle extender class.
+ * Used in USGDynamicTextAssetSettingsAsset to configure which extender handles
+ * each serializer format's asset bundle processing.
+ */
+USTRUCT(BlueprintType)
+struct SGDYNAMICTEXTASSETSRUNTIME_API FSGAssetBundleExtenderMapping
+{
+	GENERATED_BODY()
+
+	/** Bitmask of serializer formats this extender handles. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (SGDTABitmask))
+	FSGDTASerializerFormat AppliesTo;
+
+	/** The extender class ID to use for the matched formats, resolved via the asset bundle extender manifest. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (SGDTAClassType = "USGDTAAssetBundleExtender"))
+	FSGDTAClassId ExtenderClassId;
+
+	bool operator==(const FSGAssetBundleExtenderMapping& Other) const
+	{
+		return AppliesTo == Other.AppliesTo && ExtenderClassId == Other.ExtenderClassId;
+	}
+
+	bool operator!=(const FSGAssetBundleExtenderMapping& Other) const
+	{
+		return !(*this == Other);
+	}
+
+	friend uint32 GetTypeHash(const FSGAssetBundleExtenderMapping& Mapping)
+	{
+		return HashCombine(GetTypeHash(Mapping.AppliesTo), GetTypeHash(Mapping.ExtenderClassId));
+	}
+};
+
+/**
  * Data Asset containing SGDynamicTextAssets plugin configuration.
  *
  * Using a Data Asset instead of INI files prevents players from
@@ -46,12 +82,11 @@ class SGDYNAMICTEXTASSETSRUNTIME_API USGDynamicTextAssetSettingsAsset : public U
 	GENERATED_BODY()
 public:
 
-	/**
-	 * Returns the FName of the custom compression format to use.
-	 * Override in settings asset subclasses for dynamic resolution.
-	 * Default implementation returns the CustomCompressionName property.
-	 */
-	virtual FName GetCustomCompressionName() const;
+#if WITH_EDITOR
+	// UObject overrides
+	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
+	// ~UObject overrides
+#endif
 
 	/** Returns the server request timeout in seconds. */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
@@ -69,22 +104,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
 	bool ShouldDeleteLocalOnServerMismatch() const { return bDeleteLocalOnServerMismatch; }
 
-	/** Returns the default compression method for cooking. */
-	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
-	ESGDynamicTextAssetCompressionMethod GetDefaultCompressionMethod() const { return DefaultCompressionMethod; }
-
-	/** Returns whether UserFacingId should be stripped from the cook manifest. */
-	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
-	bool ShouldStripUserFacingIdFromCookedManifest() const { return bStripUserFacingIdFromCookedManifest; }
-
-	/** Returns whether the cooked directory should be cleaned before cooking. */
-	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
-	bool ShouldCleanCookedDirectoryBeforeCook() const { return bCleanCookedDirectoryBeforeCook; }
-
-	/** Returns whether cooked assets should be deleted after packaging completes. */
-	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
-	bool ShouldDeleteCookedAssetsAfterPackaging() const { return bDeleteCookedAssetsAfterPackaging; }
-
 	/** Whether to enable server-side data override for live games. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Server")
 	uint8 bEnableServerOverride : 1 = 0;
@@ -101,36 +120,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Server")
 	FString ServerCacheFilename = "SGDynamicTextAssetServerCache";
 
-	/** Compression method used when cooking dynamic text assets to binary format. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cooking")
-	ESGDynamicTextAssetCompressionMethod DefaultCompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
-
-	/** The FName of a custom compression format registered with Unreal's compression system. Only used when DefaultCompressionMethod is Custom. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cooking",
-		meta = (EditCondition = "DefaultCompressionMethod == ESGDynamicTextAssetCompressionMethod::Custom"))
-	FName CustomCompressionName = NAME_None;
-
 	/**
-	 * When enabled, UserFacingId is omitted from the cook manifest.
-	 * Useful for removing debug ID's from the manifest which reduces the manifest size.
+	 * Asset bundle extender overrides.
+	 * Each entry maps one or more serializer formats (as a bitmask) to an extender class,
+	 * overriding the baseline default (USGDTADefaultAssetBundleExtender).
+	 * Only add entries when you want a specific format to use a different extender.
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cooking")
-	uint8 bStripUserFacingIdFromCookedManifest : 1 = 0;
-
-	/**
-	 * When enabled, deletes all files in the cooked directory before cooking.
-	 * Prevents stale .dta.bin files from deleted dynamic text assets persisting across cooks.
-	 * Disable for build machines that reuse cooked output for faster iterative builds.
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cooking")
-	uint8 bCleanCookedDirectoryBeforeCook : 1 = 1;
-
-	/**
-	 * When enabled, deletes cooked .dta.bin files after the packaging process completes (success or failure).
-	 * Prevents generated binary files from cluttering the Content Browser between packaging runs.
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cooking")
-	uint8 bDeleteCookedAssetsAfterPackaging : 1 = 1;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset Bundles")
+	TSet<FSGAssetBundleExtenderMapping> AssetBundleExtenderOverrides;
 };
 
 /**
@@ -169,6 +166,61 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
 	USGDynamicTextAssetSettingsAsset* GetSettingsAsset() const;
+
+	/** Returns the default compression method for cooking. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
+	ESGDynamicTextAssetCompressionMethod GetDefaultCompressionMethod() const { return DefaultCompressionMethod; }
+
+	/** Returns the FName of the custom compression format to use. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
+	FName GetCustomCompressionName() const { return CustomCompressionName; }
+
+	/** Returns whether UserFacingId should be stripped from the cook manifest. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
+	bool ShouldStripUserFacingIdFromCookedManifest() const { return bStripUserFacingIdFromCookedManifest; }
+
+	/** Returns whether the cooked directory should be cleaned before cooking. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
+	bool ShouldCleanCookedDirectoryBeforeCook() const { return bCleanCookedDirectoryBeforeCook; }
+
+	/** Returns whether cooked assets should be deleted after packaging completes. */
+	UFUNCTION(BlueprintPure, Category = "SG Dynamic Text Assets|Settings")
+	bool ShouldDeleteCookedAssetsAfterPackaging() const { return bDeleteCookedAssetsAfterPackaging; }
+
+	/** Compression method used when cooking dynamic text assets to binary format. */
+	UPROPERTY(Config, EditAnywhere, Category = "Cooking")
+	ESGDynamicTextAssetCompressionMethod DefaultCompressionMethod = ESGDynamicTextAssetCompressionMethod::Zlib;
+
+	/** The FName of a custom compression format registered with Unreal's compression system. Only used when DefaultCompressionMethod is Custom. */
+	UPROPERTY(Config, EditAnywhere, Category = "Cooking",
+		meta = (EditCondition = "DefaultCompressionMethod == ESGDynamicTextAssetCompressionMethod::Custom"))
+	FName CustomCompressionName = NAME_None;
+
+	/**
+	 * When enabled, UserFacingId is omitted from the cook manifest.
+	 * Useful for removing debug ID's from the manifest which reduces the manifest size.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category = "Cooking")
+	uint8 bStripUserFacingIdFromCookedManifest : 1 = 0;
+
+	/**
+	 * When enabled, deletes all files in the cooked directory before cooking.
+	 * Prevents stale .dta.bin files from deleted dynamic text assets persisting across cooks.
+	 * Disable for build machines that reuse cooked output for faster iterative builds.
+	 *
+	 * @see SGDynamicTextAssetsPostPackageCleanup.cs
+	 */
+	UPROPERTY(Config, EditAnywhere, Category = "Cooking")
+	uint8 bCleanCookedDirectoryBeforeCook : 1 = 1;
+
+	/**
+	 * When enabled, deletes cooked .dta.bin files after the packaging process completes (success or failure).
+	 * Prevents generated binary files from cluttering the Content Browser between packaging runs.
+	 *
+	 * @see SGDynamicTextAssetsPostPackageCleanup.cs
+	 */
+	UPROPERTY(Config, EditAnywhere, Category = "Cooking")
+	uint8 bDeleteCookedAssetsAfterPackaging : 1 = 1;
 
 protected:
 

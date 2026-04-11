@@ -6,7 +6,7 @@
 #include "Core/SGDynamicTextAsset.h"
 #include "Core/SGDynamicTextAssetRef.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
-#include "Management/SGDynamicTextAssetFileMetadata.h"
+#include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "AssetRegistry/AssetData.h"
 #include "AssetRegistry/IAssetRegistry.h"
@@ -58,8 +58,8 @@ int32 USGDynamicTextAssetValidationCommandlet::Main(const FString& Params)
 	}
 
 	// Step 2: Scan all assets for FSGDynamicTextAssetRef properties and validate
-	TArray<FBrokenReference> brokenRefs;
-	TArray<FValidationWarning> warnings;
+	TArray<FSGDTABrokenReference> brokenRefs;
+	TArray<FSGDTAValidationWarning> warnings;
 
 	ValidateBlueprintAssets(knownIds, brokenRefs, warnings, bVerbose);
 	ValidateDynamicTextAssetFiles(knownIds, brokenRefs, warnings, bVerbose);
@@ -68,7 +68,7 @@ int32 USGDynamicTextAssetValidationCommandlet::Main(const FString& Params)
 	if (!warnings.IsEmpty())
 	{
 		UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("--- Warnings (%d) ---"), warnings.Num());
-		for (const FValidationWarning& warning : warnings)
+		for (const FSGDTAValidationWarning& warning : warnings)
 		{
 			UE_LOG(LogSGDynamicTextAssetsEditor, Warning, TEXT("  [%s] %s :: %s"),
 				*warning.SourceAsset, *warning.PropertyPath, *warning.Message);
@@ -78,7 +78,7 @@ int32 USGDynamicTextAssetValidationCommandlet::Main(const FString& Params)
 	if (!brokenRefs.IsEmpty())
 	{
 		UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("--- Broken References (%d) ---"), brokenRefs.Num());
-		for (const FBrokenReference& broken : brokenRefs)
+		for (const FSGDTABrokenReference& broken : brokenRefs)
 		{
 			UE_LOG(LogSGDynamicTextAssetsEditor, Error,
 				TEXT("  BROKEN REF in '%s' at '%s': ID %s does not exist on disk"),
@@ -126,18 +126,18 @@ void USGDynamicTextAssetValidationCommandlet::CollectKnownIds(TSet<FSGDynamicTex
 			continue;
 		}
 
-		const FSGDynamicTextAssetFileMetadata metadata = FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(filePath);
-		if (metadata.bIsValid && metadata.Id.IsValid())
+		const FSGDynamicTextAssetFileInfo fileInfo = FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(filePath);
+		if (fileInfo.bIsValid && fileInfo.Id.IsValid())
 		{
-			OutKnownIds.Add(metadata.Id);
+			OutKnownIds.Add(fileInfo.Id);
 		}
 	}
 }
 
 void USGDynamicTextAssetValidationCommandlet::ValidateBlueprintAssets(
 	const TSet<FSGDynamicTextAssetId>& KnownIds,
-	TArray<FBrokenReference>& OutBrokenRefs,
-	TArray<FValidationWarning>& OutWarnings,
+	TArray<FSGDTABrokenReference>& OutBrokenRefs,
+	TArray<FSGDTAValidationWarning>& OutWarnings,
 	bool bVerbose) const
 {
 	IAssetRegistry* assetRegistry = IAssetRegistry::Get();
@@ -193,8 +193,8 @@ void USGDynamicTextAssetValidationCommandlet::ValidateBlueprintAssets(
 
 void USGDynamicTextAssetValidationCommandlet::ValidateDynamicTextAssetFiles(
 	const TSet<FSGDynamicTextAssetId>& KnownIds,
-	TArray<FBrokenReference>& OutBrokenRefs,
-	TArray<FValidationWarning>& OutWarnings,
+	TArray<FSGDTABrokenReference>& OutBrokenRefs,
+	TArray<FSGDTAValidationWarning>& OutWarnings,
 	bool bVerbose) const
 {
 	TArray<FString> allFiles;
@@ -215,9 +215,9 @@ void USGDynamicTextAssetValidationCommandlet::ValidateDynamicTextAssetFiles(
 			continue;
 		}
 
-		// Extract metadata for display
-		const FSGDynamicTextAssetFileMetadata metadata = FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(filePath);
-		if (!metadata.bIsValid)
+		// Extract file information for display
+		const FSGDynamicTextAssetFileInfo fileInfo = FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(filePath);
+		if (!fileInfo.bIsValid)
 		{
 			continue;
 		}
@@ -231,7 +231,7 @@ void USGDynamicTextAssetValidationCommandlet::ValidateDynamicTextAssetFiles(
 		UClass* dataObjectClass = nullptr;
 		for (TObjectIterator<UClass> classIt; classIt; ++classIt)
 		{
-			if (classIt->GetName() == metadata.ClassName && classIt->ImplementsInterface(USGDynamicTextAssetProvider::StaticClass()))
+			if (classIt->GetName() == fileInfo.ClassName && classIt->ImplementsInterface(USGDynamicTextAssetProvider::StaticClass()))
 			{
 				dataObjectClass = *classIt;
 				break;
@@ -256,14 +256,14 @@ void USGDynamicTextAssetValidationCommandlet::ValidateDynamicTextAssetFiles(
 			continue;
 		}
 
-		const FString displayName = metadata.UserFacingId.IsEmpty()
+		const FString displayName = fileInfo.UserFacingId.IsEmpty()
 			? FSGDynamicTextAssetFileManager::ExtractUserFacingIdFromPath(filePath)
-			: metadata.UserFacingId;
+			: fileInfo.UserFacingId;
 		filesScanned++;
 
 		if (bVerbose)
 		{
-			UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("  Scanning DynamicTextAsset: %s (%s)"), *displayName, *metadata.ClassName);
+			UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("  Scanning DynamicTextAsset: %s (%s)"), *displayName, *fileInfo.ClassName);
 		}
 
 		for (TFieldIterator<FProperty> propIt(dataObjectClass); propIt; ++propIt)
@@ -284,8 +284,8 @@ void USGDynamicTextAssetValidationCommandlet::ValidateRefsInProperty(
 	const TSet<FSGDynamicTextAssetId>& KnownIds,
 	const FString& SourceAsset,
 	const FString& SourceDisplayName,
-	TArray<FBrokenReference>& OutBrokenRefs,
-	TArray<FValidationWarning>& OutWarnings) const
+	TArray<FSGDTABrokenReference>& OutBrokenRefs,
+	TArray<FSGDTAValidationWarning>& OutWarnings) const
 {
 	if (!Property || !ContainerPtr)
 	{
@@ -306,7 +306,7 @@ void USGDynamicTextAssetValidationCommandlet::ValidateRefsInProperty(
 					// Valid ID - check if it exists on disk
 					if (!KnownIds.Contains(ref->GetId()))
 					{
-						FBrokenReference broken;
+						FSGDTABrokenReference broken;
 						broken.ReferencedId = ref->GetId();
 						broken.SourceAsset = SourceAsset;
 						broken.PropertyPath = PropertyPath;
@@ -351,7 +351,7 @@ void USGDynamicTextAssetValidationCommandlet::ValidateRefsInProperty(
 					{
 						if (!KnownIds.Contains(ref->GetId()))
 						{
-							FBrokenReference broken;
+							FSGDTABrokenReference broken;
 							broken.ReferencedId = ref->GetId();
 							broken.SourceAsset = SourceAsset;
 							broken.PropertyPath = elementPath;
@@ -382,9 +382,9 @@ void USGDynamicTextAssetValidationCommandlet::ValidateRefsInProperty(
 		const void* mapPtr = mapProp->ContainerPtrToValuePtr<void>(ContainerPtr);
 		FScriptMapHelper mapHelper(mapProp, mapPtr);
 
-		for (FScriptMapHelper::FIterator it = mapHelper.CreateIterator(); it; ++it)
+		for (FScriptMapHelper::FIterator itr = mapHelper.CreateIterator(); itr; ++itr)
 		{
-			const void* valuePtr = mapHelper.GetValuePtr(it.GetInternalIndex());
+			const void* valuePtr = mapHelper.GetValuePtr(itr.GetInternalIndex());
 			FString valuePath = FString::Printf(TEXT("%s[Value]"), *PropertyPath);
 
 			if (const FStructProperty* valueStruct = CastField<FStructProperty>(mapProp->ValueProp))
@@ -396,7 +396,7 @@ void USGDynamicTextAssetValidationCommandlet::ValidateRefsInProperty(
 					{
 						if (!KnownIds.Contains(ref->GetId()))
 						{
-							FBrokenReference broken;
+							FSGDTABrokenReference broken;
 							broken.ReferencedId = ref->GetId();
 							broken.SourceAsset = SourceAsset;
 							broken.PropertyPath = valuePath;

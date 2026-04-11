@@ -14,17 +14,17 @@ void SSGDynamicTextAssetIcon::Construct(const FArguments& InArgs)
 {
 	switch (InArgs._ReferenceType)
 	{
-	case ESGReferenceType::Blueprint:
+	case ESGDTAReferenceType::Blueprint:
 		{
 			ConstructAssetIcon(InArgs);
 			break;
 		}
-	case ESGReferenceType::Level:
+	case ESGDTAReferenceType::Level:
 		{
 			ConstructLevelIcon(InArgs);
 			break;
 		}
-	case ESGReferenceType::DynamicTextAsset:
+	case ESGDTAReferenceType::DynamicTextAsset:
 		{
 			ConstructDynamicTextAssetIcon(InArgs);
 			break;

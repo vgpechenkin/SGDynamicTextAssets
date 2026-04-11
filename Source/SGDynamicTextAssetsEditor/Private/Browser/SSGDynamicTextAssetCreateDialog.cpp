@@ -3,7 +3,8 @@
 #include "Browser/SSGDynamicTextAssetCreateDialog.h"
 
 #include "Management/SGDynamicTextAssetFileManager.h"
-#include "Management/SGDynamicTextAssetFileMetadata.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
+#include "Management/SGDynamicTextAssetFileInfo.h"
 #include "SGDynamicTextAssetEditorLogs.h"
 #include "Utilities/SGDynamicTextAssetSourceControl.h"
 #include "Widgets/SSGDynamicTextAssetClassPicker.h"
@@ -209,7 +210,7 @@ void SSGDynamicTextAssetCreateDialog::BuildExtensionOptions()
     for (const TSharedPtr<ISGDynamicTextAssetSerializer>& serializer : serializers)
     {
         TSharedPtr<FSGDynamicTextAssetSerializerMetadata> metadata = MakeShared<FSGDynamicTextAssetSerializerMetadata>();
-        metadata->SerializerTypeId = serializer->GetSerializerTypeId();
+        metadata->SerializerFormat = serializer->GetSerializerFormat();
         metadata->FileExtension = serializer->GetFileExtension();
         metadata->FormatName = serializer->GetFormatName();
         ExtensionOptions.Add(metadata);
@@ -219,7 +220,7 @@ void SSGDynamicTextAssetCreateDialog::BuildExtensionOptions()
     SelectedExtension = nullptr;
     for (const TSharedPtr<FSGDynamicTextAssetSerializerMetadata>& metadata : ExtensionOptions)
     {
-        if (metadata->FileExtension == FSGDynamicTextAssetFileManager::DEFAULT_TEXT_EXTENSION)
+        if (metadata->FileExtension == SGDynamicTextAssetConstants::JSON_FILE_EXTENSION)
         {
             SelectedExtension = metadata.ToWeakPtr();
             break;
@@ -292,7 +293,7 @@ FString SSGDynamicTextAssetCreateDialog::GetSelectedExtensionString() const
     {
         return SelectedExtension.Pin()->FileExtension;
     }
-    return FSGDynamicTextAssetFileManager::DEFAULT_TEXT_EXTENSION;
+    return SGDynamicTextAssetConstants::JSON_FILE_EXTENSION;
 }
 
 void SSGDynamicTextAssetCreateDialog::OnNameTextChanged(const FText& NewText)
@@ -414,8 +415,8 @@ bool SSGDynamicTextAssetCreateDialog::IsNameAlreadyUsed(const FString& Name) con
 
     for (const FString& filePath : allFilePaths)
     {
-        FSGDynamicTextAssetFileMetadata metadata = FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(filePath);
-        if (metadata.bIsValid && metadata.UserFacingId.Equals(Name, ESearchCase::IgnoreCase))
+        FSGDynamicTextAssetFileInfo fileInfo = FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(filePath);
+        if (fileInfo.bIsValid && fileInfo.UserFacingId.Equals(Name, ESearchCase::IgnoreCase))
         {
             return true;
         }

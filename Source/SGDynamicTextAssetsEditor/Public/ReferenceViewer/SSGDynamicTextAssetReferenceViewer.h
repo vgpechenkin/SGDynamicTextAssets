@@ -16,7 +16,7 @@ class USGDynamicTextAssetReferenceSubsystem;
 struct FSGDynamicTextAssetReferenceEntry;
 struct FSGDynamicTextAssetDependencyEntry;
 
-enum class ESGReferenceType : uint8;
+enum class ESGDTAReferenceType : uint8;
 
 /**
  * Reference viewer window for displaying what references a dynamic text asset and what it depends on.
@@ -79,11 +79,11 @@ public:
 	 */
 	static void OpenViewer(const FSGDynamicTextAssetId& Id, const FString& UserFacingId);
 
-	static const FSlateBrush* GetReferencerAssetTypeIcon(const ESGReferenceType& Type);
+	static const FSlateBrush* GetReferencerAssetTypeIcon(const ESGDTAReferenceType& Type);
 
-	static FText GetReferencerAssetTypeTooltip(const ESGReferenceType& Type);
+	static FText GetReferencerAssetTypeTooltip(const ESGDTAReferenceType& Type);
 
-	static FLinearColor GetReferencerAssetTypeColor(const ESGReferenceType& Type);
+	static FLinearColor GetReferencerAssetTypeColor(const ESGDTAReferenceType& Type);
 
 private:
 

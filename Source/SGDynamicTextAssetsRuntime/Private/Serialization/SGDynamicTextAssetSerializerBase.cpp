@@ -2,24 +2,360 @@
 
 #include "Serialization/SGDynamicTextAssetSerializerBase.h"
 
+#include "Core/ISGDynamicTextAssetProvider.h"
+#include "Management/SGDynamicTextAssetRegistry.h"
+#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
+#include "Settings/SGDynamicTextAssetSettings.h"
 #include "SGDynamicTextAssetLogs.h"
+#include "Statics/SGDynamicTextAssetStatics.h"
 #include "Core/SGDynamicTextAsset.h"
 #include "Dom/JsonObject.h"
 #include "JsonObjectConverter.h"
+#include "StructUtils/InstancedStruct.h"
 #include "UObject/UnrealType.h"
 
 const FString FSGDynamicTextAssetSerializerBase::INSTANCED_OBJECT_CLASS_KEY = TEXT("SG_INST_OBJ_CLASS");
+const FString FSGDynamicTextAssetSerializerBase::STRUCT_TYPE_KEY = TEXT("SG_STRUCT_TYPE");
+const FString FSGDynamicTextAssetSerializerBase::INSTANCED_STRUCT_TYPE_KEY = TEXT("SG_INST_STRUCT_TYPE");
 
 bool FSGDynamicTextAssetSerializerBase::IsInstancedObjectProperty(const FProperty* InProperty)
 {
     return InProperty && InProperty->HasAnyPropertyFlags(CPF_InstancedReference);
 }
 
+namespace SGDTASerializerPrivate
+{
+
+// Inject SG_STRUCT_TYPE or SG_INST_STRUCT_TYPE into a JSON object based on the struct property type.
+static void InjectStructMarkerIntoObject(
+    const TSharedPtr<FJsonObject>& JsonObject,
+    const FStructProperty* StructProp,
+    const void* StructValuePtr)
+{
+    if (!JsonObject.IsValid() || !StructProp)
+    {
+        return;
+    }
+
+    if (StructProp->Struct == FInstancedStruct::StaticStruct())
+    {
+        const FInstancedStruct* instStruct = static_cast<const FInstancedStruct*>(StructValuePtr);
+        if (instStruct && instStruct->IsValid() && instStruct->GetScriptStruct())
+        {
+            JsonObject->SetStringField(
+                FSGDynamicTextAssetSerializerBase::INSTANCED_STRUCT_TYPE_KEY,
+                instStruct->GetScriptStruct()->GetFName().ToString());
+        }
+    }
+    else
+    {
+        JsonObject->SetStringField(
+            FSGDynamicTextAssetSerializerBase::STRUCT_TYPE_KEY,
+            StructProp->Struct->GetFName().ToString());
+    }
+}
+
+// Post-process a serialized JSON value to inject struct type markers based on the property descriptor.
+static void InjectStructTypeMarkers(
+    const TSharedPtr<FJsonValue>& JsonValue,
+    FProperty* Property,
+    const void* ValuePtr)
+{
+    if (!JsonValue.IsValid() || !Property || !ValuePtr)
+    {
+        return;
+    }
+
+    // Single struct property
+    if (const FStructProperty* structProp = CastField<FStructProperty>(Property))
+    {
+        const TSharedPtr<FJsonObject>* objPtr = nullptr;
+        if (JsonValue->TryGetObject(objPtr) && objPtr && objPtr->IsValid())
+        {
+            InjectStructMarkerIntoObject(*objPtr, structProp, ValuePtr);
+        }
+        return;
+    }
+
+    // TArray with struct inner type
+    if (const FArrayProperty* arrayProp = CastField<FArrayProperty>(Property))
+    {
+        const FStructProperty* innerStructProp = CastField<FStructProperty>(arrayProp->Inner);
+        if (!innerStructProp)
+        {
+            return;
+        }
+
+        const TArray<TSharedPtr<FJsonValue>>* jsonArray = nullptr;
+        if (!JsonValue->TryGetArray(jsonArray) || !jsonArray)
+        {
+            return;
+        }
+
+        FScriptArrayHelper arrayHelper(arrayProp, ValuePtr);
+        const int32 count = FMath::Min(jsonArray->Num(), arrayHelper.Num());
+        for (int32 i = 0; i < count; ++i)
+        {
+            const TSharedPtr<FJsonValue>& elementValue = (*jsonArray)[i];
+            const TSharedPtr<FJsonObject>* elemObjPtr = nullptr;
+            if (elementValue.IsValid() && elementValue->TryGetObject(elemObjPtr) && elemObjPtr && elemObjPtr->IsValid())
+            {
+                InjectStructMarkerIntoObject(*elemObjPtr, innerStructProp, arrayHelper.GetRawPtr(i));
+            }
+        }
+        return;
+    }
+
+    // TMap with struct value type
+    if (const FMapProperty* mapProp = CastField<FMapProperty>(Property))
+    {
+        const FStructProperty* valueStructProp = CastField<FStructProperty>(mapProp->ValueProp);
+        if (!valueStructProp)
+        {
+            return;
+        }
+
+        // FJsonObjectConverter serializes TMap as a JSON object with string keys.
+        // Each value may be a struct that needs a type marker.
+        const TSharedPtr<FJsonObject>* mapObjPtr = nullptr;
+        if (!JsonValue->TryGetObject(mapObjPtr) || !mapObjPtr || !mapObjPtr->IsValid())
+        {
+            return;
+        }
+
+        FScriptMapHelper mapHelper(mapProp, ValuePtr);
+        for (FScriptMapHelper::FIterator itr = mapHelper.CreateIterator(); itr; ++itr)
+        {
+            // Build the key string the same way FJsonObjectConverter does
+            FString keyString;
+            mapProp->KeyProp->ExportTextItem_Direct(keyString, mapHelper.GetKeyPtr(itr.GetInternalIndex()),
+                nullptr, nullptr, PPF_None);
+
+            TSharedPtr<FJsonValue> mapEntryValue = (*mapObjPtr)->TryGetField(keyString);
+            const TSharedPtr<FJsonObject>* entryObjPtr = nullptr;
+            if (mapEntryValue.IsValid() && mapEntryValue->TryGetObject(entryObjPtr) && entryObjPtr && entryObjPtr->IsValid())
+            {
+                InjectStructMarkerIntoObject(*entryObjPtr, valueStructProp, mapHelper.GetValuePtr(itr.GetInternalIndex()));
+            }
+        }
+        return;
+    }
+
+    // TSet with struct element type
+    if (const FSetProperty* setProp = CastField<FSetProperty>(Property))
+    {
+        const FStructProperty* elemStructProp = CastField<FStructProperty>(setProp->ElementProp);
+        if (!elemStructProp)
+        {
+            return;
+        }
+
+        const TArray<TSharedPtr<FJsonValue>>* jsonArray = nullptr;
+        if (!JsonValue->TryGetArray(jsonArray) || !jsonArray)
+        {
+            return;
+        }
+
+        FScriptSetHelper setHelper(setProp, ValuePtr);
+        int32 jsonIndex = 0;
+        for (FScriptSetHelper::FIterator itr = setHelper.CreateIterator(); itr && jsonIndex < jsonArray->Num(); ++itr, ++jsonIndex)
+        {
+            const TSharedPtr<FJsonValue>& elementValue = (*jsonArray)[jsonIndex];
+            const TSharedPtr<FJsonObject>* elemObjPtr = nullptr;
+            if (elementValue.IsValid() && elementValue->TryGetObject(elemObjPtr) && elemObjPtr && elemObjPtr->IsValid())
+            {
+                InjectStructMarkerIntoObject(*elemObjPtr, elemStructProp, setHelper.GetElementPtr(itr.GetInternalIndex()));
+            }
+        }
+    }
+}
+
+// Strip SG_STRUCT_TYPE / SG_INST_STRUCT_TYPE from a single JSON object.
+// Returns a new cleaned FJsonValueObject if stripping was needed, or the original value if not.
+static TSharedPtr<FJsonValue> StripStructMarkerFromObject(const TSharedPtr<FJsonValue>& JsonValue)
+{
+    const TSharedPtr<FJsonObject>* objPtr = nullptr;
+    if (!JsonValue.IsValid() || !JsonValue->TryGetObject(objPtr) || !objPtr || !objPtr->IsValid())
+    {
+        return JsonValue;
+    }
+
+    const TSharedPtr<FJsonObject>& obj = *objPtr;
+    if (!obj->HasField(FSGDynamicTextAssetSerializerBase::STRUCT_TYPE_KEY) &&
+        !obj->HasField(FSGDynamicTextAssetSerializerBase::INSTANCED_STRUCT_TYPE_KEY))
+    {
+        return JsonValue;
+    }
+
+    TSharedPtr<FJsonObject> cleaned = MakeShared<FJsonObject>();
+    for (const auto& pair : obj->Values)
+    {
+        if (pair.Key != FSGDynamicTextAssetSerializerBase::STRUCT_TYPE_KEY &&
+            pair.Key != FSGDynamicTextAssetSerializerBase::INSTANCED_STRUCT_TYPE_KEY)
+        {
+            cleaned->SetField(pair.Key, pair.Value);
+        }
+    }
+    return MakeShared<FJsonValueObject>(cleaned);
+}
+
+// Strip struct type markers from a JSON value before passing to FJsonObjectConverter.
+static TSharedPtr<FJsonValue> StripStructTypeMarkers(const TSharedPtr<FJsonValue>& JsonValue, FProperty* Property)
+{
+    if (!JsonValue.IsValid() || !Property)
+    {
+        return JsonValue;
+    }
+
+    // Single struct property
+    if (CastField<FStructProperty>(Property))
+    {
+        return StripStructMarkerFromObject(JsonValue);
+    }
+
+    // TArray with struct inner type
+    if (const FArrayProperty* arrayProp = CastField<FArrayProperty>(Property))
+    {
+        if (!CastField<FStructProperty>(arrayProp->Inner))
+        {
+            return JsonValue;
+        }
+
+        const TArray<TSharedPtr<FJsonValue>>* jsonArray = nullptr;
+        if (!JsonValue->TryGetArray(jsonArray) || !jsonArray)
+        {
+            return JsonValue;
+        }
+
+        // Check if any element needs stripping before allocating
+        bool bNeedsStripping = false;
+        for (const auto& elem : *jsonArray)
+        {
+            const TSharedPtr<FJsonObject>* elemObjPtr = nullptr;
+            if (elem.IsValid() && elem->TryGetObject(elemObjPtr) && elemObjPtr && elemObjPtr->IsValid())
+            {
+                if ((*elemObjPtr)->HasField(FSGDynamicTextAssetSerializerBase::STRUCT_TYPE_KEY) ||
+                    (*elemObjPtr)->HasField(FSGDynamicTextAssetSerializerBase::INSTANCED_STRUCT_TYPE_KEY))
+                {
+                    bNeedsStripping = true;
+                    break;
+                }
+            }
+        }
+
+        if (!bNeedsStripping)
+        {
+            return JsonValue;
+        }
+
+        TArray<TSharedPtr<FJsonValue>> cleanedArray;
+        cleanedArray.Reserve(jsonArray->Num());
+        for (const auto& elem : *jsonArray)
+        {
+            cleanedArray.Add(StripStructMarkerFromObject(elem));
+        }
+        return MakeShared<FJsonValueArray>(cleanedArray);
+    }
+
+    // TMap with struct value type
+    if (const FMapProperty* mapProp = CastField<FMapProperty>(Property))
+    {
+        if (!CastField<FStructProperty>(mapProp->ValueProp))
+        {
+            return JsonValue;
+        }
+
+        const TSharedPtr<FJsonObject>* mapObjPtr = nullptr;
+        if (!JsonValue->TryGetObject(mapObjPtr) || !mapObjPtr || !mapObjPtr->IsValid())
+        {
+            return JsonValue;
+        }
+
+        bool bNeedsStripping = false;
+        for (const auto& pair : (*mapObjPtr)->Values)
+        {
+            const TSharedPtr<FJsonObject>* entryObjPtr = nullptr;
+            if (pair.Value.IsValid() && pair.Value->TryGetObject(entryObjPtr) && entryObjPtr && entryObjPtr->IsValid())
+            {
+                if ((*entryObjPtr)->HasField(FSGDynamicTextAssetSerializerBase::STRUCT_TYPE_KEY) ||
+                    (*entryObjPtr)->HasField(FSGDynamicTextAssetSerializerBase::INSTANCED_STRUCT_TYPE_KEY))
+                {
+                    bNeedsStripping = true;
+                    break;
+                }
+            }
+        }
+
+        if (!bNeedsStripping)
+        {
+            return JsonValue;
+        }
+
+        TSharedPtr<FJsonObject> cleanedMap = MakeShared<FJsonObject>();
+        for (const auto& pair : (*mapObjPtr)->Values)
+        {
+            cleanedMap->SetField(pair.Key, StripStructMarkerFromObject(pair.Value));
+        }
+        return MakeShared<FJsonValueObject>(cleanedMap);
+    }
+
+    // TSet with struct element type
+    if (const FSetProperty* setProp = CastField<FSetProperty>(Property))
+    {
+        if (!CastField<FStructProperty>(setProp->ElementProp))
+        {
+            return JsonValue;
+        }
+
+        const TArray<TSharedPtr<FJsonValue>>* jsonArray = nullptr;
+        if (!JsonValue->TryGetArray(jsonArray) || !jsonArray)
+        {
+            return JsonValue;
+        }
+
+        bool bNeedsStripping = false;
+        for (const auto& elem : *jsonArray)
+        {
+            const TSharedPtr<FJsonObject>* elemObjPtr = nullptr;
+            if (elem.IsValid() && elem->TryGetObject(elemObjPtr) && elemObjPtr && elemObjPtr->IsValid())
+            {
+                if ((*elemObjPtr)->HasField(FSGDynamicTextAssetSerializerBase::STRUCT_TYPE_KEY) ||
+                    (*elemObjPtr)->HasField(FSGDynamicTextAssetSerializerBase::INSTANCED_STRUCT_TYPE_KEY))
+                {
+                    bNeedsStripping = true;
+                    break;
+                }
+            }
+        }
+
+        if (!bNeedsStripping)
+        {
+            return JsonValue;
+        }
+
+        TArray<TSharedPtr<FJsonValue>> cleanedArray;
+        cleanedArray.Reserve(jsonArray->Num());
+        for (const auto& elem : *jsonArray)
+        {
+            cleanedArray.Add(StripStructMarkerFromObject(elem));
+        }
+        return MakeShared<FJsonValueArray>(cleanedArray);
+    }
+
+    return JsonValue;
+}
+
+} // namespace SGDTASerializerPrivate
+
 TSharedPtr<FJsonValue> FSGDynamicTextAssetSerializerBase::SerializePropertyToValue(
     FProperty* Property,
     const void* ValuePtr) const
 {
-    return FJsonObjectConverter::UPropertyToJsonValue(Property, ValuePtr, 0, 0);
+    TSharedPtr<FJsonValue> result = FJsonObjectConverter::UPropertyToJsonValue(Property, ValuePtr, 0, 0);
+
+    SGDTASerializerPrivate::InjectStructTypeMarkers(result, Property, ValuePtr);
+
+    return result;
 }
 
 bool FSGDynamicTextAssetSerializerBase::DeserializeValueToProperty(
@@ -27,15 +363,16 @@ bool FSGDynamicTextAssetSerializerBase::DeserializeValueToProperty(
     FProperty* Property,
     void* ValuePtr) const
 {
-    return FJsonObjectConverter::JsonValueToUProperty(Value, Property, ValuePtr, 0, 0);
+    TSharedPtr<FJsonValue> cleanedValue = SGDTASerializerPrivate::StripStructTypeMarkers(Value, Property);
+    return FJsonObjectConverter::JsonValueToUProperty(cleanedValue, Property, ValuePtr, 0, 0);
 }
 
 bool FSGDynamicTextAssetSerializerBase::ShouldSerializeProperty(const FProperty* Property) const
 {
     // Exclude base metadata fields handled separately as wrapper level fields, not in data block.
-    // USGDynamicTextAsset::GetMetadataPropertyNames() uses GET_MEMBER_NAME_CHECKED internally so renaming
+    // USGDynamicTextAsset::GetFileInformationPropertyNames() uses GET_MEMBER_NAME_CHECKED internally so renaming
     // those properties becomes a compile error rather than a silent runtime mismatch.
-    static const TSet<FName> metadataPropertyNames = USGDynamicTextAsset::GetMetadataPropertyNames();
+    static const TSet<FName> metadataPropertyNames = USGDynamicTextAsset::GetFileInformationPropertyNames();
 
     if (metadataPropertyNames.Contains(Property->GetFName()))
     {
@@ -354,4 +691,129 @@ void FSGDynamicTextAssetSerializerBase::CollectInstancedObjectClasses(
     TSet<TObjectPtr<UClass>>& OutClasses)
 {
     SGDynamicTextAssetSerializerBasePrivate::CollectFromObject(Object, OutClasses);
+}
+
+namespace SGDTASerializerBasePrivate
+{
+
+/** Resolves the asset bundle extender for a provider. Returns nullptr if not available. */
+static USGDTAAssetBundleExtender* ResolveExtender(
+    const TScriptInterface<ISGDynamicTextAssetProvider>& Provider,
+    const FSGDTASerializerFormat& Format)
+{
+    const FSGDTAClassId extenderClassId =
+        USGDynamicTextAssetStatics::ResolveAssetBundleExtender(Provider, Format);
+    if (!extenderClassId.IsValid())
+    {
+        return nullptr;
+    }
+
+    USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get();
+    if (!registry)
+    {
+        return nullptr;
+    }
+
+    return registry->GetOrCreateAssetBundleExtender(extenderClassId);
+}
+
+/** Builds a TScriptInterface from a raw ISGDynamicTextAssetProvider pointer. */
+static TScriptInterface<ISGDynamicTextAssetProvider> MakeProviderInterface(
+    const ISGDynamicTextAssetProvider* Provider)
+{
+    const UObject* providerObject = Cast<UObject>(const_cast<ISGDynamicTextAssetProvider*>(Provider));
+    TScriptInterface<ISGDynamicTextAssetProvider> providerInterface;
+    if (providerObject)
+    {
+        providerInterface.SetObject(const_cast<UObject*>(providerObject));
+        providerInterface.SetInterface(const_cast<ISGDynamicTextAssetProvider*>(Provider));
+    }
+    return providerInterface;
+}
+
+} // namespace SGDTASerializerBasePrivate
+
+void FSGDynamicTextAssetSerializerBase::PreSerializeAssetBundles(
+    const ISGDynamicTextAssetProvider* Provider,
+    FString& InOutContent) const
+{
+    if (!Provider)
+    {
+        return;
+    }
+
+    TScriptInterface<ISGDynamicTextAssetProvider> providerInterface =
+        SGDTASerializerBasePrivate::MakeProviderInterface(Provider);
+
+    USGDTAAssetBundleExtender* extender =
+        SGDTASerializerBasePrivate::ResolveExtender(providerInterface, GetSerializerFormat());
+    if (!extender)
+    {
+        return;
+    }
+
+    extender->NotifyPreSerialize(InOutContent, GetSerializerFormat());
+}
+
+void FSGDynamicTextAssetSerializerBase::PostSerializeAssetBundles(
+    const ISGDynamicTextAssetProvider* Provider,
+    FString& InOutContent) const
+{
+    if (!Provider)
+    {
+        return;
+    }
+
+    const UObject* providerObject = Cast<UObject>(const_cast<ISGDynamicTextAssetProvider*>(Provider));
+    if (!providerObject)
+    {
+        return;
+    }
+
+    TScriptInterface<ISGDynamicTextAssetProvider> providerInterface =
+        SGDTASerializerBasePrivate::MakeProviderInterface(Provider);
+
+    USGDTAAssetBundleExtender* extender =
+        SGDTASerializerBasePrivate::ResolveExtender(providerInterface, GetSerializerFormat());
+    if (!extender)
+    {
+        return;
+    }
+
+    FSGDynamicTextAssetBundleData bundleData;
+    extender->NotifyExtractBundles(providerObject, bundleData);
+    extender->NotifyPostSerialize(bundleData, InOutContent, GetSerializerFormat());
+}
+
+bool FSGDynamicTextAssetSerializerBase::PreDeserializeAssetBundles(
+    FString& InOutContent,
+    FSGDynamicTextAssetBundleData& OutBundleData,
+    const TScriptInterface<ISGDynamicTextAssetProvider>& Provider) const
+{
+    USGDTAAssetBundleExtender* extender =
+        SGDTASerializerBasePrivate::ResolveExtender(Provider, GetSerializerFormat());
+    if (!extender)
+    {
+        // No extender resolved is not a fatal error (file may have no bundles configured)
+        return true;
+    }
+
+    extender->NotifyPreDeserialize(InOutContent, OutBundleData, GetSerializerFormat());
+    return true;
+}
+
+bool FSGDynamicTextAssetSerializerBase::PostDeserializeAssetBundles(
+    const FString& Content,
+    FSGDynamicTextAssetBundleData& InOutBundleData,
+    const TScriptInterface<ISGDynamicTextAssetProvider>& Provider) const
+{
+    USGDTAAssetBundleExtender* extender =
+        SGDTASerializerBasePrivate::ResolveExtender(Provider, GetSerializerFormat());
+    if (!extender)
+    {
+        return true;
+    }
+
+    extender->NotifyPostDeserialize(Content, InOutBundleData, GetSerializerFormat());
+    return true;
 }

@@ -12,11 +12,11 @@
 #include "Management/SGDynamicTextAssetRegistry.h"
 
 /** Tree item representing a dynamic text asset class */
-struct FSGDynamicTextAssetTypeTreeItem
+struct FSGDTATypeTreeItem
 {
-    FSGDynamicTextAssetTypeTreeItem() = default;
+    FSGDTATypeTreeItem() = default;
 
-    explicit FSGDynamicTextAssetTypeTreeItem(UClass* InClass)
+    explicit FSGDTATypeTreeItem(UClass* InClass)
         : Class(InClass)
     {
         if (InClass)
@@ -37,10 +37,10 @@ struct FSGDynamicTextAssetTypeTreeItem
     FText DisplayName;
 
     /** Child items (subclasses) */
-    TArray<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>> Children;
+    TArray<TSharedPtr<FSGDTATypeTreeItem>> Children;
 
     /** Parent item */
-    TWeakPtr<FSGDynamicTextAssetTypeTreeItem> Parent = nullptr;
+    TWeakPtr<FSGDTATypeTreeItem> Parent = nullptr;
 
     /** Whether this class can be instantiated (non-abstract) */
     uint8 bIsInstantiable : 1 = 0;
@@ -75,19 +75,19 @@ public:
 private:
 
     /** Generates a row for the tree view */
-    TSharedRef<ITableRow> GenerateRow(TSharedPtr<FSGDynamicTextAssetTypeTreeItem> Item, const TSharedRef<STableViewBase>& OwnerTable);
+    TSharedRef<ITableRow> GenerateRow(TSharedPtr<FSGDTATypeTreeItem> Item, const TSharedRef<STableViewBase>& OwnerTable);
 
     /** Gets children for a tree item */
-    void GetTreeChildren(TSharedPtr<FSGDynamicTextAssetTypeTreeItem> Item, TArray<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>& OutChildren);
+    void GetTreeChildren(TSharedPtr<FSGDTATypeTreeItem> Item, TArray<TSharedPtr<FSGDTATypeTreeItem>>& OutChildren);
 
     /** Called when selection changes */
-    void OnSelectionChanged(TSharedPtr<FSGDynamicTextAssetTypeTreeItem> Item, ESelectInfo::Type SelectInfo);
+    void OnSelectionChanged(TSharedPtr<FSGDTATypeTreeItem> Item, ESelectInfo::Type SelectInfo);
 
     /** Builds the tree hierarchy from the registry */
     void BuildTreeHierarchy();
 
     /** Recursively finds or creates a tree item for a class */
-    TSharedPtr<FSGDynamicTextAssetTypeTreeItem> FindOrCreateItem(UClass* InClass, TMap<UClass*, TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>& ItemMap);
+    TSharedPtr<FSGDTATypeTreeItem> FindOrCreateItem(UClass* InClass, TMap<UClass*, TSharedPtr<FSGDTATypeTreeItem>>& ItemMap);
 
     /** Called when the type search text changes */
     void OnTypeSearchTextChanged(const FText& NewText);
@@ -96,10 +96,10 @@ private:
     void ApplyTypeFilter();
 
     /** Returns true if the item's DisplayName contains the filter substring (case-insensitive) */
-    bool DoesItemMatchFilter(const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& Item, const FString& Filter) const;
+    bool DoesItemMatchFilter(const TSharedPtr<FSGDTATypeTreeItem>& Item, const FString& Filter) const;
 
     /** Returns true if the item or any descendant matches the filter */
-    bool DoesItemOrDescendantMatchFilter(const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& Item, const FString& Filter) const;
+    bool DoesItemOrDescendantMatchFilter(const TSharedPtr<FSGDTATypeTreeItem>& Item, const FString& Filter) const;
 
     /**
      * Creates a filtered copy of a tree item, keeping only branches that contain matches.
@@ -108,13 +108,13 @@ private:
      *
      * @return Filtered copy, or nullptr if nothing in this branch matches.
      */
-    TSharedPtr<FSGDynamicTextAssetTypeTreeItem> FilterTreeItem(const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& Source, const FString& Filter) const;
+    TSharedPtr<FSGDTATypeTreeItem> FilterTreeItem(const TSharedPtr<FSGDTATypeTreeItem>& Source, const FString& Filter) const;
 
     /** Returns the index to show in the switcher (0=empty, 1=tree) */
     int32 GetContentIndex() const;
 
     /** The tree view widget */
-    TSharedPtr<STreeView<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>> TreeView = nullptr;
+    TSharedPtr<STreeView<TSharedPtr<FSGDTATypeTreeItem>>> TreeView = nullptr;
 
     /** The type search box widget */
     TSharedPtr<SSearchBox> TypeSearchBox = nullptr;
@@ -123,13 +123,13 @@ private:
     FString TypeSearchText;
 
     /** Root items (direct children of USGDynamicTextAsset) - unfiltered source of truth */
-    TArray<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>> RootItems;
+    TArray<TSharedPtr<FSGDTATypeTreeItem>> RootItems;
 
     /** Filtered root items displayed by the tree view */
-    TArray<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>> FilteredRootItems;
+    TArray<TSharedPtr<FSGDTATypeTreeItem>> FilteredRootItems;
 
     /** All items by class */
-    TMap<UClass*, TSharedPtr<FSGDynamicTextAssetTypeTreeItem>> AllItems;
+    TMap<UClass*, TSharedPtr<FSGDTATypeTreeItem>> AllItems;
 
     /** Callback when type is selected */
     FOnDynamicTextAssetTypeSelected OnTypeSelected;

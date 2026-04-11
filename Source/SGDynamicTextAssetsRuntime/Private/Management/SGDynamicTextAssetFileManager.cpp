@@ -2,6 +2,7 @@
 
 #include "Management/SGDynamicTextAssetFileManager.h"
 
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "SGDynamicTextAssetLogs.h"
 #include "Core/SGDynamicTextAsset.h"
 #include "HAL/FileManager.h"
@@ -10,14 +11,14 @@
 #include "UObject/Package.h"
 #include "Management/SGDynamicTextAssetCookManifest.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
-#include "Management/SGDynamicTextAssetFileMetadata.h"
+#include "Management/SGDynamicTextAssetFileInfo.h"
 #include "Misc/Paths.h"
 #include "Misc/FileHelper.h"
 
-// Direct JSON includes are intentional for ExtractMetadataFromFile fallback paths only.
+// Direct JSON includes are intentional for ExtractFileInfoFromFile fallback paths only.
 // These are last-resort parsers for files whose registered serializer is no longer available.
 // All other JSON operations are routed through ISGDynamicTextAssetSerializer::UpdateFieldsInPlace
-// or ISGDynamicTextAssetSerializer::ExtractMetadata on the registered serializer instance.
+// or ISGDynamicTextAssetSerializer::ExtractFileInfo on the registered serializer instance.
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -25,14 +26,12 @@
 #include "Serialization/SGDynamicTextAssetJsonSerializer.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 
-const FString FSGDynamicTextAssetFileManager::DEFAULT_TEXT_EXTENSION = TEXT(".dta.json");
-const FString FSGDynamicTextAssetFileManager::BINARY_EXTENSION = TEXT(".dta.bin");
 const FString FSGDynamicTextAssetFileManager::DEFAULT_RELATIVE_ROOT_PATH = TEXT("SGDynamicTextAssets");
 
 FSGDataGenerateDefaultContentDelegate FSGDynamicTextAssetFileManager::ON_GENERATE_DEFAULT_CONTENT;
 
 TMap<FString, TSharedRef<ISGDynamicTextAssetSerializer>> FSGDynamicTextAssetFileManager::REGISTERED_SERIALIZERS;
-TMap<uint32, TSharedRef<ISGDynamicTextAssetSerializer>> FSGDynamicTextAssetFileManager::REGISTERED_SERIALIZERS_BY_ID;
+TMap<FSGDTASerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>> FSGDynamicTextAssetFileManager::REGISTERED_SERIALIZERS_BY_FORMAT;
 
 FString FSGDynamicTextAssetFileManager::GetDynamicTextAssetsRootPath()
 {
@@ -163,11 +162,11 @@ void FSGDynamicTextAssetFileManager::FindAllFilesForClass(const UClass* DynamicT
     TArray<FString> binaryFiles;
     if (bIncludeSubclasses)
     {
-        fileManager.FindFilesRecursive(binaryFiles, *folderPath, *(TEXT("*") + BINARY_EXTENSION), true, false);
+        fileManager.FindFilesRecursive(binaryFiles, *folderPath, *(TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
     }
     else
     {
-        fileManager.FindFiles(binaryFiles, *(folderPath / TEXT("*") + BINARY_EXTENSION), true, false);
+        fileManager.FindFiles(binaryFiles, *(folderPath / TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
         // FindFiles returns filenames only, convert to full paths
         for (FString& fileName : binaryFiles)
         {
@@ -185,7 +184,7 @@ void FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles(TArray<FString
     if (ShouldUseCookedDirectory())
     {
         const FString cookedRoot = GetCookedDynamicTextAssetsRootPath();
-        IFileManager::Get().FindFilesRecursive(OutFilePaths, *cookedRoot, *(TEXT("*") + BINARY_EXTENSION), true, false);
+        IFileManager::Get().FindFilesRecursive(OutFilePaths, *cookedRoot, *(TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
         return;
     }
 
@@ -211,7 +210,7 @@ void FSGDynamicTextAssetFileManager::FindAllDynamicTextAssetFiles(TArray<FString
     }
 
     TArray<FString> binaryFiles;
-    fileManager.FindFilesRecursive(binaryFiles, *rootPath, *(TEXT("*") + BINARY_EXTENSION), true, false);
+    fileManager.FindFilesRecursive(binaryFiles, *rootPath, *(TEXT("*") + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION), true, false);
     OutFilePaths.Append(binaryFiles);
 
     UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose, TEXT("FindAllDynamicTextAssetFiles: Found %d total file(s)"), OutFilePaths.Num());
@@ -222,9 +221,9 @@ FString FSGDynamicTextAssetFileManager::ExtractUserFacingIdFromPath(const FStrin
     FString filename = FPaths::GetCleanFilename(FilePath);
 
     // Remove .dta.bin explicitly if it's the cooked format
-    if (filename.EndsWith(BINARY_EXTENSION))
+    if (filename.EndsWith(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION))
     {
-        filename.LeftChopInline(BINARY_EXTENSION.Len());
+        filename.LeftChopInline(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION.Len());
         return filename;
     }
 
@@ -240,7 +239,7 @@ FString FSGDynamicTextAssetFileManager::ExtractUserFacingIdFromPath(const FStrin
 
 bool FSGDynamicTextAssetFileManager::IsDynamicTextAssetFile(const FString& FilePath)
 {
-    if (FilePath.EndsWith(BINARY_EXTENSION))
+    if (FilePath.EndsWith(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION))
     {
         return true;
     }
@@ -269,39 +268,39 @@ FString FSGDynamicTextAssetFileManager::SanitizeUserFacingId(const FString& User
     return result;
 }
 
-FSGDynamicTextAssetFileMetadata FSGDynamicTextAssetFileManager::ExtractMetadataFromFile(const FString& FilePath)
+FSGDynamicTextAssetFileInfo FSGDynamicTextAssetFileManager::ExtractFileInfoFromFile(const FString& FilePath)
 {
-    FSGDynamicTextAssetFileMetadata metadata;
+    FSGDynamicTextAssetFileInfo fileInfo;
 
     if (FilePath.IsEmpty() || !IsDynamicTextAssetFile(FilePath))
     {
-        return metadata;
+        return fileInfo;
     }
 
     // Binary files: extract ID from header without decompression
-    if (FilePath.EndsWith(BINARY_EXTENSION))
+    if (FilePath.EndsWith(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION))
     {
         TArray<uint8> binaryData;
         if (!FSGDynamicTextAssetBinarySerializer::ReadBinaryFile(FilePath, binaryData))
         {
             UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("Failed to read binary file at FilePath(%s)"), *FilePath);
-            return metadata;
+            return fileInfo;
         }
 
         // Read header (80 bytes, no decompression)
-        FSGBinaryDynamicTextAssetHeader header;
+        FSGDTABinaryHeader header;
         if (!FSGDynamicTextAssetBinarySerializer::ReadHeader(binaryData, header))
         {
             UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("Failed to read header from binary file at FilePath(%s)"), *FilePath);
-            return metadata;
+            return fileInfo;
         }
 
-        metadata.Id = header.Guid;
+        fileInfo.Id = header.Guid;
 
         // Extract AssetTypeId directly from header (no decompression needed)
         if (header.HasAssetTypeGuid())
         {
-            metadata.AssetTypeId = FSGDynamicTextAssetTypeId::FromGuid(header.AssetTypeGuid);
+            fileInfo.AssetTypeId = FSGDynamicTextAssetTypeId::FromGuid(header.AssetTypeGuid);
         }
 
         // In cooked builds, look up ClassName + UserFacingId from manifest (no decompression)
@@ -310,46 +309,53 @@ FSGDynamicTextAssetFileMetadata FSGDynamicTextAssetFileManager::ExtractMetadataF
             const FSGDynamicTextAssetCookManifest* manifest = GetCookManifest();
             if (manifest != nullptr)
             {
-                const FSGDynamicTextAssetCookManifestEntry* entry = manifest->FindById(metadata.Id);
+                const FSGDynamicTextAssetCookManifestEntry* entry = manifest->FindById(fileInfo.Id);
                 if (entry != nullptr)
                 {
-                    metadata.ClassName = entry->ClassName;
-                    metadata.UserFacingId = entry->UserFacingId;
+                    fileInfo.ClassName = entry->ClassName;
+                    fileInfo.UserFacingId = entry->UserFacingId;
 
                     // If AssetTypeId not available from header, derive from ClassName via registry
-                    if (!metadata.AssetTypeId.IsValid())
+                    if (!fileInfo.AssetTypeId.IsValid())
                     {
                         if (const USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
                         {
                             if (const UClass* resolvedClass = FindFirstObject<UClass>(*entry->ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous))
                             {
-                                metadata.AssetTypeId = registry->GetTypeIdForClass(resolvedClass);
+                                fileInfo.AssetTypeId = registry->GetTypeIdForClass(resolvedClass);
                             }
                         }
                     }
 
-                    metadata.bIsValid = metadata.Id.IsValid();
-                    return metadata;
+                    fileInfo.bIsValid = fileInfo.Id.IsValid();
+                    return fileInfo;
                 }
             }
         }
 
-        // Fallback: decompress payload and route to the registered serializer via type ID
+        // Fallback: decompress payload and route to the registered serializer via format
         FString payloadString;
-        uint32 payloadSerializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
-        if (FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, payloadString, payloadSerializerTypeId))
+        FSGDTASerializerFormat payloadFormat;
+        if (FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, payloadString, payloadFormat))
         {
-            // Look up the serializer by the integer type ID stored in the binary header
             TSharedPtr<ISGDynamicTextAssetSerializer> payloadSerializer;
-            if (payloadSerializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
+            if (payloadFormat.IsValid())
             {
-                payloadSerializer = FindSerializerForTypeId(payloadSerializerTypeId);
+                payloadSerializer = FindSerializerForFormat(payloadFormat);
             }
 
             if (payloadSerializer.IsValid())
             {
-                FString version;
-                payloadSerializer->ExtractMetadata(payloadString, metadata.Id, metadata.ClassName, metadata.UserFacingId, version, metadata.AssetTypeId);
+                FSGDynamicTextAssetFileInfo extractedFileInfo;
+                if (payloadSerializer->ExtractFileInfo(payloadString, extractedFileInfo))
+                {
+                    fileInfo.Id = extractedFileInfo.Id;
+                    fileInfo.ClassName = extractedFileInfo.ClassName;
+                    fileInfo.UserFacingId = extractedFileInfo.UserFacingId;
+                    fileInfo.AssetTypeId = extractedFileInfo.AssetTypeId;
+                    fileInfo.Version = extractedFileInfo.Version;
+                    fileInfo.FileFormatVersion = extractedFileInfo.FileFormatVersion;
+                }
             }
             else
             {
@@ -361,48 +367,45 @@ FSGDynamicTextAssetFileMetadata FSGDynamicTextAssetFileManager::ExtractMetadataF
                 TSharedRef<TJsonReader<>> reader = TJsonReaderFactory<>::Create(payloadString);
                 if (FJsonSerializer::Deserialize(reader, jsonObject) && jsonObject.IsValid())
                 {
-                    jsonObject->TryGetStringField(TEXT("$type"), metadata.ClassName);
-                    jsonObject->TryGetStringField(ISGDynamicTextAssetSerializer::KEY_USER_FACING_ID, metadata.UserFacingId);
+                    jsonObject->TryGetStringField(TEXT("$type"), fileInfo.ClassName);
+                    jsonObject->TryGetStringField(ISGDynamicTextAssetSerializer::KEY_USER_FACING_ID, fileInfo.UserFacingId);
                 }
             }
         }
 
-        if (metadata.UserFacingId.IsEmpty())
+        if (fileInfo.UserFacingId.IsEmpty())
         {
-            metadata.UserFacingId = ExtractUserFacingIdFromPath(FilePath);
+            fileInfo.UserFacingId = ExtractUserFacingIdFromPath(FilePath);
         }
 
-        metadata.bIsValid = metadata.Id.IsValid();
-        return metadata;
+        fileInfo.bIsValid = fileInfo.Id.IsValid();
+        return fileInfo;
     }
 
     // Non-binary files: dispatch through serializer registry
     FString fileContents;
     if (!ReadRawFileContents(FilePath, fileContents))
     {
-        return metadata;
+        return fileInfo;
     }
 
     // Try registry dispatch first
     TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FindSerializerForFile(FilePath);
     if (serializer.IsValid())
     {
-        FString className;
-        FString userFacingId;
-        FString version;
-        if (serializer->ExtractMetadata(fileContents, metadata.Id, className, userFacingId, version, metadata.AssetTypeId))
+        FSGDynamicTextAssetFileInfo extractedFileInfo;
+        if (serializer->ExtractFileInfo(fileContents, extractedFileInfo))
         {
-            metadata.ClassName = className;
-            metadata.UserFacingId = userFacingId;
+            fileInfo = extractedFileInfo;
 
-            if (metadata.UserFacingId.IsEmpty())
+            if (fileInfo.UserFacingId.IsEmpty())
             {
-                metadata.UserFacingId = ExtractUserFacingIdFromPath(FilePath);
+                fileInfo.UserFacingId = ExtractUserFacingIdFromPath(FilePath);
             }
 
-            metadata.SerializerTypeId = serializer->GetSerializerTypeId();
-            metadata.bIsValid = metadata.Id.IsValid();
-            return metadata;
+            fileInfo.SerializerFormat = serializer->GetSerializerFormat();
+            fileInfo.bIsValid = fileInfo.Id.IsValid();
+            return fileInfo;
         }
     }
 
@@ -416,31 +419,31 @@ FSGDynamicTextAssetFileMetadata FSGDynamicTextAssetFileManager::ExtractMetadataF
     if (!FJsonSerializer::Deserialize(reader, jsonObject) || !jsonObject.IsValid())
     {
         UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("Failed to parse JSON from FilePath(%s)"), *FilePath);
-        return metadata;
+        return fileInfo;
     }
 
-    metadata.SerializerTypeId = FSGDynamicTextAssetJsonSerializer::TYPE_ID;
+    fileInfo.SerializerFormat = FSGDynamicTextAssetJsonSerializer::FORMAT;
 
     // Extract ID (serializer writes "$id")
     FString idString;
     if (jsonObject->TryGetStringField(ISGDynamicTextAssetSerializer::KEY_ID, idString))
     {
-        metadata.Id.ParseString(idString);
+        fileInfo.Id.ParseString(idString);
     }
 
     // Extract UserFacingId from JSON, fall back to filename
-    jsonObject->TryGetStringField(ISGDynamicTextAssetSerializer::KEY_USER_FACING_ID, metadata.UserFacingId);
+    jsonObject->TryGetStringField(ISGDynamicTextAssetSerializer::KEY_USER_FACING_ID, fileInfo.UserFacingId);
 
-    if (metadata.UserFacingId.IsEmpty())
+    if (fileInfo.UserFacingId.IsEmpty())
     {
-        metadata.UserFacingId = ExtractUserFacingIdFromPath(FilePath);
+        fileInfo.UserFacingId = ExtractUserFacingIdFromPath(FilePath);
     }
 
     // Extract ClassName (serializer writes "$type")
-    jsonObject->TryGetStringField(TEXT("$type"), metadata.ClassName);
+    jsonObject->TryGetStringField(TEXT("$type"), fileInfo.ClassName);
 
-    metadata.bIsValid = metadata.Id.IsValid();
-    return metadata;
+    fileInfo.bIsValid = fileInfo.Id.IsValid();
+    return fileInfo;
 }
 
 bool FSGDynamicTextAssetFileManager::EnsureFolderExistsForClass(const UClass* DynamicTextAssetClass)
@@ -519,12 +522,12 @@ FString FSGDynamicTextAssetFileManager::StripClassPrefix(const FString& ClassNam
 }
 
 bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath, FString& OutContents,
-    uint32* OutSerializerTypeId /*= nullptr*/)
+    FSGDTASerializerFormat* OutSerializerFormat /*= nullptr*/)
 {
     OutContents.Empty();
-    if (OutSerializerTypeId)
+    if (OutSerializerFormat)
     {
-        *OutSerializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
+        *OutSerializerFormat = FSGDTASerializerFormat();
     }
 
     if (FilePath.IsEmpty())
@@ -534,9 +537,9 @@ bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath
     }
 
     // Binary files require decompression before returning the payload string.
-    // The SerializerTypeId stored in the binary header identifies which deserializer
-    // to use and pass it to FindSerializerForTypeId() after this call returns.
-    if (FilePath.EndsWith(BINARY_EXTENSION))
+    // The format stored in the binary header identifies which deserializer
+    // to use. Pass it to FindSerializerForFormat() after this call returns.
+    if (FilePath.EndsWith(SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION))
     {
         TArray<uint8> binaryData;
         if (!FSGDynamicTextAssetBinarySerializer::ReadBinaryFile(FilePath, binaryData))
@@ -545,23 +548,23 @@ bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath
             return false;
         }
 
-        uint32 serializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
-        if (!FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, OutContents, serializerTypeId))
+        FSGDTASerializerFormat serializerFormat;
+        if (!FSGDynamicTextAssetBinarySerializer::BinaryToString(binaryData, OutContents, serializerFormat))
         {
             UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::ReadRawFileContents: Failed to decompress binary file at FilePath(%s)"), *FilePath);
             return false;
         }
 
-        // Forward the TypeId to the caller so they can route to the correct deserializer
-        if (OutSerializerTypeId)
+        // Forward the format to the caller so they can route to the correct deserializer
+        if (OutSerializerFormat)
         {
-            *OutSerializerTypeId = serializerTypeId;
+            *OutSerializerFormat = serializerFormat;
         }
 
         return true;
     }
 
-    // JSON / text files are read directly — TypeId stays 0 (non-binary)
+    // Text files are read directly - format stays invalid (non-binary)
     if (!FFileHelper::LoadFileToString(OutContents, *FilePath))
     {
         UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::ReadRawFileContents: Failed to read file at FilePath(%s)"), *FilePath);
@@ -569,6 +572,18 @@ bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath
     }
 
     return true;
+}
+
+bool FSGDynamicTextAssetFileManager::ReadRawFileContents(const FString& FilePath, FString& OutContents,
+    uint32* OutSerializerTypeId)
+{
+    FSGDTASerializerFormat format;
+    const bool bSuccess = ReadRawFileContents(FilePath, OutContents, &format);
+    if (OutSerializerTypeId)
+    {
+        *OutSerializerTypeId = format.GetTypeId();
+    }
+    return bSuccess;
 }
 
 bool FSGDynamicTextAssetFileManager::WriteRawFileContents(const FString& FilePath, const FString& Contents)
@@ -619,7 +634,7 @@ bool FSGDynamicTextAssetFileManager::CreateDynamicTextAssetFile(const UClass* Dy
         return false;
     }
 
-    // Look up the registered serializer for this extension — fail early if none registered
+    // Look up the registered serializer for this extension  - fail early if none registered
     TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FindSerializerForExtension(Extension);
     if (!serializer.IsValid())
     {
@@ -722,26 +737,26 @@ bool FSGDynamicTextAssetFileManager::RenameDynamicTextAsset(const FString& Sourc
         return false;
     }
 
-    // Extract metadata to get class info
-    FSGDynamicTextAssetFileMetadata metadata = ExtractMetadataFromFile(SourceFilePath);
-    if (!metadata.bIsValid)
+    // Extract file information to get class info
+    FSGDynamicTextAssetFileInfo fileInfo = ExtractFileInfoFromFile(SourceFilePath);
+    if (!fileInfo.bIsValid)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::RenameDynamicTextAsset: Failed to extract metadata from source file"));
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::RenameDynamicTextAsset: Failed to extract file info from source file"));
         return false;
     }
 
-    // Find the class from metadata
-    UClass* dataObjectClass = FindFirstObject<UClass>(*metadata.ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
+    // Find the class from file info
+    UClass* dataObjectClass = FindFirstObject<UClass>(*fileInfo.ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
     if (!dataObjectClass)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::RenameDynamicTextAsset: Could not find ClassName(%s)"), *metadata.ClassName);
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::RenameDynamicTextAsset: Could not find ClassName(%s)"), *fileInfo.ClassName);
         return false;
     }
 
     // Validate resolved class is a USGDynamicTextAssetProvider subclass to prevent class confusion
     if (!dataObjectClass->ImplementsInterface(USGDynamicTextAssetProvider::StaticClass()))
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::RenameDynamicTextAsset: Resolved ClassName(%s) does not implement ISGDynamicTextAssetProvider interface"), *metadata.ClassName);
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::RenameDynamicTextAsset: Resolved ClassName(%s) does not implement ISGDynamicTextAssetProvider interface"), *fileInfo.ClassName);
         return false;
     }
 
@@ -795,7 +810,7 @@ bool FSGDynamicTextAssetFileManager::RenameDynamicTextAsset(const FString& Sourc
     }
 
     UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("FSGDynamicTextAssetFileManager::Renamed dynamic text asset: UserFacingId(%s) -> NewUserFacingId(%s)|(FilePath(%s)"),
-        *metadata.UserFacingId, *NewUserFacingId, *OutNewFilePath);
+        *fileInfo.UserFacingId, *NewUserFacingId, *OutNewFilePath);
 
     return true;
 }
@@ -825,11 +840,11 @@ bool FSGDynamicTextAssetFileManager::DuplicateDynamicTextAsset(const FString& So
         return false;
     }
 
-    // Extract metadata to get class info
-    FSGDynamicTextAssetFileMetadata metadata = ExtractMetadataFromFile(SourceFilePath);
-    if (!metadata.bIsValid)
+    // Extract file information to get class info
+    FSGDynamicTextAssetFileInfo fileInfo = ExtractFileInfoFromFile(SourceFilePath);
+    if (!fileInfo.bIsValid)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::DuplicateDynamicTextAsset: Failed to extract metadata from source file"));
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::DuplicateDynamicTextAsset: Failed to extract file info from source file"));
         return false;
     }
 
@@ -837,19 +852,19 @@ bool FSGDynamicTextAssetFileManager::DuplicateDynamicTextAsset(const FString& So
     UClass* dataObjectClass = nullptr;
     if (const USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
     {
-        if (metadata.AssetTypeId.IsValid())
+        if (fileInfo.AssetTypeId.IsValid())
         {
-            dataObjectClass = registry->ResolveClassForTypeId(metadata.AssetTypeId);
+            dataObjectClass = registry->ResolveClassForTypeId(fileInfo.AssetTypeId);
         }
 
         // Fallback: resolve by class name for legacy files without a valid Asset Type ID
-        if (!dataObjectClass && !metadata.ClassName.IsEmpty())
+        if (!dataObjectClass && !fileInfo.ClassName.IsEmpty())
         {
             TArray<UClass*> allClasses;
             registry->GetAllInstantiableClasses(allClasses);
             for (UClass* registeredClass : allClasses)
             {
-                if (registeredClass && registeredClass->GetName() == metadata.ClassName)
+                if (registeredClass && registeredClass->GetName() == fileInfo.ClassName)
                 {
                     dataObjectClass = registeredClass;
                     break;
@@ -862,7 +877,7 @@ bool FSGDynamicTextAssetFileManager::DuplicateDynamicTextAsset(const FString& So
     {
         UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
             TEXT("FSGDynamicTextAssetFileManager::DuplicateDynamicTextAsset: Failed to resolve class for AssetTypeId '%s' (ClassName '%s')"),
-            *metadata.AssetTypeId.ToString(), *metadata.ClassName);
+            *fileInfo.AssetTypeId.ToString(), *fileInfo.ClassName);
         return false;
     }
 
@@ -907,7 +922,7 @@ bool FSGDynamicTextAssetFileManager::DuplicateDynamicTextAsset(const FString& So
     }
 
     UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("FSGDynamicTextAssetFileManager::Duplicated dynamic text asset: UserFacingId(%s) -> NewUserFacingId(%s) | (NewID(%s))"),
-        *metadata.UserFacingId, *NewUserFacingId, *OutNewId.ToString());
+        *fileInfo.UserFacingId, *NewUserFacingId, *OutNewId.ToString());
 
     return true;
 }
@@ -961,11 +976,11 @@ bool FSGDynamicTextAssetFileManager::ConvertFileFormat(const FString& SourceFile
         return false;
     }
 
-    // Extract metadata to resolve the class
-    FSGDynamicTextAssetFileMetadata metadata = ExtractMetadataFromFile(SourceFilePath);
-    if (!metadata.bIsValid)
+    // Extract file information to resolve the class
+    FSGDynamicTextAssetFileInfo fileInfo = ExtractFileInfoFromFile(SourceFilePath);
+    if (!fileInfo.bIsValid)
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::ConvertFileFormat: Failed to extract metadata from SourceFilePath(%s)"), *SourceFilePath);
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error, TEXT("FSGDynamicTextAssetFileManager::ConvertFileFormat: Failed to extract file info from SourceFilePath(%s)"), *SourceFilePath);
         return false;
     }
 
@@ -973,19 +988,19 @@ bool FSGDynamicTextAssetFileManager::ConvertFileFormat(const FString& SourceFile
     UClass* dataObjectClass = nullptr;
     if (const USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
     {
-        if (metadata.AssetTypeId.IsValid())
+        if (fileInfo.AssetTypeId.IsValid())
         {
-            dataObjectClass = registry->ResolveClassForTypeId(metadata.AssetTypeId);
+            dataObjectClass = registry->ResolveClassForTypeId(fileInfo.AssetTypeId);
         }
 
         // Fallback: resolve by class name for legacy files without a valid Asset Type ID
-        if (!dataObjectClass && !metadata.ClassName.IsEmpty())
+        if (!dataObjectClass && !fileInfo.ClassName.IsEmpty())
         {
             TArray<UClass*> allClasses;
             registry->GetAllInstantiableClasses(allClasses);
             for (UClass* registeredClass : allClasses)
             {
-                if (registeredClass && registeredClass->GetName() == metadata.ClassName)
+                if (registeredClass && registeredClass->GetName() == fileInfo.ClassName)
                 {
                     dataObjectClass = registeredClass;
                     break;
@@ -998,7 +1013,7 @@ bool FSGDynamicTextAssetFileManager::ConvertFileFormat(const FString& SourceFile
     {
         UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
             TEXT("FSGDynamicTextAssetFileManager::ConvertFileFormat: Failed to resolve class for AssetTypeId '%s' (ClassName '%s')"),
-            *metadata.AssetTypeId.ToString(), *metadata.ClassName);
+            *fileInfo.AssetTypeId.ToString(), *fileInfo.ClassName);
         return false;
     }
 
@@ -1043,7 +1058,7 @@ bool FSGDynamicTextAssetFileManager::ConvertFileFormat(const FString& SourceFile
     }
 
     // 5. Build the new file path: same folder and UserFacingId, new extension
-    OutNewFilePath = BuildFilePath(dataObjectClass, metadata.UserFacingId, TargetExtension);
+    OutNewFilePath = BuildFilePath(dataObjectClass, fileInfo.UserFacingId, TargetExtension);
 
     // Check if the target file already exists
     if (FileExists(OutNewFilePath))
@@ -1071,7 +1086,7 @@ bool FSGDynamicTextAssetFileManager::ConvertFileFormat(const FString& SourceFile
 
     UE_LOG(LogSGDynamicTextAssetsRuntime, Log,
         TEXT("FSGDynamicTextAssetFileManager::ConvertFileFormat: Converted '%s' from %s to %s -> FilePath(%s)"),
-        *metadata.UserFacingId, *sourceSerializer->GetFormatName_String(), *targetSerializer->GetFormatName_String(), *OutNewFilePath);
+        *fileInfo.UserFacingId, *sourceSerializer->GetFormatName_String(), *targetSerializer->GetFormatName_String(), *OutNewFilePath);
 
     return true;
 }
@@ -1122,8 +1137,8 @@ bool FSGDynamicTextAssetFileManager::FindFileForId(const FSGDynamicTextAssetId& 
 
     for (const FString& filePath : filePaths)
     {
-        FSGDynamicTextAssetFileMetadata metadata = ExtractMetadataFromFile(filePath);
-        if (metadata.bIsValid && metadata.Id == Id)
+        FSGDynamicTextAssetFileInfo fileInfo = ExtractFileInfoFromFile(filePath);
+        if (fileInfo.bIsValid && fileInfo.Id == Id)
         {
             OutFilePath = filePath;
             return true;
@@ -1133,19 +1148,34 @@ bool FSGDynamicTextAssetFileManager::FindFileForId(const FSGDynamicTextAssetId& 
     return false;
 }
 
+FString FSGDynamicTextAssetFileManager::GetInternalFilesRootPath()
+{
+    return FPaths::Combine(FPaths::ProjectContentDir(), TEXT("_SGDynamicTextAssets"));
+}
+
 FString FSGDynamicTextAssetFileManager::GetCookedDynamicTextAssetsRootPath()
 {
-    return FPaths::Combine(FPaths::ProjectContentDir(), TEXT("SGDynamicTextAssetsCooked"));
+    return FPaths::Combine(FPaths::ProjectContentDir(), TEXT("_SGDynamicTextAssetsCooked"));
+}
+
+FString FSGDynamicTextAssetFileManager::GetCookedGeneratedPath()
+{
+    return FPaths::Combine(GetCookedDynamicTextAssetsRootPath(), TEXT("_Generated"));
 }
 
 FString FSGDynamicTextAssetFileManager::GetCookedTypeManifestsPath()
 {
-    return FPaths::Combine(GetCookedDynamicTextAssetsRootPath(), TEXT("_TypeManifests"));
+    return FPaths::Combine(GetCookedGeneratedPath(), TEXT("_TypeManifests"));
+}
+
+FString FSGDynamicTextAssetFileManager::GetSerializerExtendersPath()
+{
+    return FPaths::Combine(GetInternalFilesRootPath(), TEXT("SerializerExtenders"));
 }
 
 FString FSGDynamicTextAssetFileManager::BuildBinaryFilePath(const FSGDynamicTextAssetId& Id)
 {
-    return FPaths::Combine(GetCookedDynamicTextAssetsRootPath(), Id.ToString() + BINARY_EXTENSION);
+    return FPaths::Combine(GetCookedDynamicTextAssetsRootPath(), Id.ToString() + SGDynamicTextAssetConstants::BINARY_FILE_EXTENSION);
 }
 
 bool FSGDynamicTextAssetFileManager::ShouldUseCookedDirectory()
@@ -1168,10 +1198,10 @@ const FSGDynamicTextAssetCookManifest* FSGDynamicTextAssetFileManager::GetCookMa
     {
         cachedManifest.Emplace();
 
-        FString cookedRoot = GetCookedDynamicTextAssetsRootPath();
-        if (!cachedManifest->LoadFromFileBinary(cookedRoot))
+        FString generatedDir = GetCookedGeneratedPath();
+        if (!cachedManifest->LoadFromFileBinary(generatedDir))
         {
-            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("GetCookManifest: Failed to load cook manifest from cookedRoot(%s)"), *cookedRoot);
+            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning, TEXT("GetCookManifest: Failed to load cook manifest from '%s'"), *generatedDir);
         }
     }
 
@@ -1194,18 +1224,18 @@ void FSGDynamicTextAssetFileManager::RegisterSerializerInstance(TSharedRef<ISGDy
         return;
     }
 
-    // Validate the integer type ID, zero is reserved/invalid
-    const uint32 typeId = Serializer->GetSerializerTypeId();
-    if (typeId == ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
+    // Validate the format identifier - invalid (zero) is reserved
+    const FSGDTASerializerFormat format = Serializer->GetSerializerFormat();
+    if (!format.IsValid())
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Fatal, TEXT("RegisterSerializer: Serializer '%s' returned TypeId 0 IDs must be non-zero. Built-in range is 1-99, third-party must use >= 100."),
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Fatal, TEXT("RegisterSerializer: Serializer '%s' returned invalid format. IDs must be non-zero. Built-in range is 1-99, third-party must use >= 100."),
             *Serializer->GetFormatName_String());
         return;
     }
-    if (REGISTERED_SERIALIZERS_BY_ID.Contains(typeId))
+    if (REGISTERED_SERIALIZERS_BY_FORMAT.Contains(format))
     {
-        UE_LOG(LogSGDynamicTextAssetsRuntime, Fatal, TEXT("RegisterSerializer: TypeId(%u) is already registered by serializer(%s). Each serializer must have a unique TypeId."),
-            typeId, *REGISTERED_SERIALIZERS_BY_ID[typeId]->GetFormatName_String());
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Fatal, TEXT("RegisterSerializer: Format(%u) is already registered by serializer(%s). Each serializer must have a unique format."),
+            format.GetTypeId(), *REGISTERED_SERIALIZERS_BY_FORMAT[format]->GetFormatName_String());
         return;
     }
 
@@ -1215,9 +1245,9 @@ void FSGDynamicTextAssetFileManager::RegisterSerializerInstance(TSharedRef<ISGDy
     }
 
     REGISTERED_SERIALIZERS.Add(extension, Serializer);
-    REGISTERED_SERIALIZERS_BY_ID.Add(typeId, Serializer);
+    REGISTERED_SERIALIZERS_BY_FORMAT.Add(format, Serializer);
     UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("Registered serializer(%s) | TypeId(%u) | Extension=(%s)"),
-        *Serializer->GetFormatName_String(), typeId, *extension);
+        *Serializer->GetFormatName_String(), format.GetTypeId(), *extension);
 }
 
 void FSGDynamicTextAssetFileManager::UnregisterSerializerByExtension(const FString& Extension)
@@ -1225,8 +1255,8 @@ void FSGDynamicTextAssetFileManager::UnregisterSerializerByExtension(const FStri
     const FString lowerExtension = Extension.ToLower();
     if (TSharedRef<ISGDynamicTextAssetSerializer>* serializer = REGISTERED_SERIALIZERS.Find(lowerExtension))
     {
-        // Also remove from the type ID map before removing from the extension map
-        REGISTERED_SERIALIZERS_BY_ID.Remove((*serializer)->GetSerializerTypeId());
+        // Also remove from the format map before removing from the extension map
+        REGISTERED_SERIALIZERS_BY_FORMAT.Remove((*serializer)->GetSerializerFormat());
         REGISTERED_SERIALIZERS.Remove(lowerExtension);
         UE_LOG(LogSGDynamicTextAssetsRuntime, Log, TEXT("Unregistered serializer for extension '%s'"), *lowerExtension);
     }
@@ -1288,40 +1318,50 @@ void FSGDynamicTextAssetFileManager::GetAllRegisteredExtensions(TArray<FString>&
     REGISTERED_SERIALIZERS.GetKeys(OutExtensions);
 }
 
-TSharedPtr<ISGDynamicTextAssetSerializer> FSGDynamicTextAssetFileManager::FindSerializerForTypeId(uint32 TypeId)
+TSharedPtr<ISGDynamicTextAssetSerializer> FSGDynamicTextAssetFileManager::FindSerializerForFormat(FSGDTASerializerFormat Format)
 {
-    if (TSharedRef<ISGDynamicTextAssetSerializer>* serializer = REGISTERED_SERIALIZERS_BY_ID.Find(TypeId))
+    if (TSharedRef<ISGDynamicTextAssetSerializer>* serializer = REGISTERED_SERIALIZERS_BY_FORMAT.Find(Format))
     {
         return *serializer;
     }
     return nullptr;
 }
 
-uint32 FSGDynamicTextAssetFileManager::GetTypeIdForExtension(const FString& Extension)
+TSharedPtr<ISGDynamicTextAssetSerializer> FSGDynamicTextAssetFileManager::FindSerializerForTypeId(uint32 TypeId)
+{
+    return FindSerializerForFormat(FSGDTASerializerFormat(TypeId));
+}
+
+FSGDTASerializerFormat FSGDynamicTextAssetFileManager::GetFormatForExtension(const FString& Extension)
 {
     TSharedPtr<ISGDynamicTextAssetSerializer> serializer = FindSerializerForExtension(Extension);
     if (!serializer.IsValid())
     {
-        return ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
+        return FSGDTASerializerFormat::INVALID;
     }
-    return serializer->GetSerializerTypeId();
+    return serializer->GetSerializerFormat();
+}
+
+uint32 FSGDynamicTextAssetFileManager::GetTypeIdForExtension(const FString& Extension)
+{
+    return GetFormatForExtension(Extension).GetTypeId();
 }
 
 void FSGDynamicTextAssetFileManager::GetAllRegisteredSerializerDescriptions(TArray<FString>& OutDescriptions)
 {
     OutDescriptions.Empty();
-    OutDescriptions.Reserve(REGISTERED_SERIALIZERS_BY_ID.Num());
-    for (const TPair<uint32, TSharedRef<ISGDynamicTextAssetSerializer>>& pair : REGISTERED_SERIALIZERS_BY_ID)
+    OutDescriptions.Reserve(REGISTERED_SERIALIZERS_BY_FORMAT.Num());
+    for (const TPair<FSGDTASerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>>& pair : REGISTERED_SERIALIZERS_BY_FORMAT)
     {
         OutDescriptions.Add(FString::Printf(TEXT("TypeId(%u) | Extension(%s)| Format(%s)"),
-            pair.Key, *pair.Value->GetFileExtension(), *pair.Value->GetFormatName_String()));
+            pair.Key.GetTypeId(), *pair.Value->GetFileExtension(), *pair.Value->GetFormatName_String()));
     }
 }
 
 TArray<TSharedPtr<ISGDynamicTextAssetSerializer>> FSGDynamicTextAssetFileManager::GetAllRegisteredSerializers()
 {
     TArray<TSharedPtr<ISGDynamicTextAssetSerializer>> result;
-    for (const TPair<uint32, TSharedRef<ISGDynamicTextAssetSerializer>>& pair : REGISTERED_SERIALIZERS_BY_ID)
+    for (const TPair<FSGDTASerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>>& pair : REGISTERED_SERIALIZERS_BY_FORMAT)
     {
         result.Add(pair.Value.ToSharedPtr());
     }

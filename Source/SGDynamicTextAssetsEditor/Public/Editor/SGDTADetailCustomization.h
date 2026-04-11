@@ -14,15 +14,13 @@ class FReply;
 class SSGDynamicTextAssetIdentityBlock;
 
 /**
- * Detail customization for USGDynamicTextAsset that adds copy-to-clipboard buttons
- * next to the DynamicTextAssetId and UserFacingId identity properties.
- * 
- * Displays the following properties:
- * - DynamicTextAssetId
- * - UserFacingId
- * - Version
+ * Detail customization for USGDynamicTextAsset.
+ *
+ * Handles layout of the Identity category (custom widget with copy buttons),
+ * hides the internal "DTA" parent category, and creates the top-level
+ * "File Information" category with auto-forwarded DTA|File Information properties.
  */
-class FSGDynamicTextAssetIdentityCustomization : public IDetailCustomization
+class FSGDTADetailCustomization : public IDetailCustomization
 {
 public:
 

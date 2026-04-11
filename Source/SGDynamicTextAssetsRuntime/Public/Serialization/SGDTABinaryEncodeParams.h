@@ -7,9 +7,10 @@
 
 #include "Core/SGDynamicTextAssetId.h"
 #include "Core/SGDynamicTextAssetTypeId.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Settings/SGDynamicTextAssetSettings.h"
 
-#include "SGBinaryEncodeParams.generated.h"
+#include "SGDTABinaryEncodeParams.generated.h"
 
 
 /**
@@ -18,20 +19,20 @@
  * and easier future extension.
  */
 USTRUCT()
-struct SGDYNAMICTEXTASSETSRUNTIME_API FSGBinaryEncodeParams
+struct SGDYNAMICTEXTASSETSRUNTIME_API FSGDTABinaryEncodeParams
 {
 	GENERATED_BODY()
 public:
 
-	FSGBinaryEncodeParams() = default;
+	FSGDTABinaryEncodeParams() = default;
 
 	/** The unique asset instance identity. */
 	UPROPERTY()
 	FSGDynamicTextAssetId Id;
 
-	/** Integer ID of the serializer that produced the payload (1–99 built-in, 100+ third-party). */
+	/** Format of the serializer that produced the payload. */
 	UPROPERTY()
-	uint32 SerializerTypeId = 0;
+	FSGDTASerializerFormat SerializerFormat;
 
 	/** Asset type (class) identity GUID. */
 	UPROPERTY()

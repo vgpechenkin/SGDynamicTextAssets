@@ -51,7 +51,7 @@ void SSGDynamicTextAssetTypeTree::Construct(const FArguments& InArgs)
             // Index 1: Tree view
             + SWidgetSwitcher::Slot()
             [
-                SAssignNew(TreeView, STreeView<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>)
+                SAssignNew(TreeView, STreeView<TSharedPtr<FSGDTATypeTreeItem>>)
                 .TreeItemsSource(&FilteredRootItems)
                 .OnGenerateRow(this, &SSGDynamicTextAssetTypeTree::GenerateRow)
                 .OnGetChildren(this, &SSGDynamicTextAssetTypeTree::GetTreeChildren)
@@ -77,7 +77,7 @@ void SSGDynamicTextAssetTypeTree::RefreshTree()
         TreeView->RequestTreeRefresh();
 
         // Expand all items by default
-        for (const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& item : FilteredRootItems)
+        for (const TSharedPtr<FSGDTATypeTreeItem>& item : FilteredRootItems)
         {
             TreeView->SetItemExpansion(item, true);
         }
@@ -90,7 +90,7 @@ UClass* SSGDynamicTextAssetTypeTree::GetSelectedClass() const
 {
     if (TreeView.IsValid())
     {
-        TArray<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>> selected = TreeView->GetSelectedItems();
+        TArray<TSharedPtr<FSGDTATypeTreeItem>> selected = TreeView->GetSelectedItems();
         if (selected.Num() > 0 && selected[0].IsValid())
         {
             return selected[0]->Class.Get();
@@ -110,12 +110,12 @@ void SSGDynamicTextAssetTypeTree::SelectClass(UClass* ClassToSelect)
         return;
     }
 
-    if (TSharedPtr<FSGDynamicTextAssetTypeTreeItem>* found = AllItems.Find(ClassToSelect))
+    if (TSharedPtr<FSGDTATypeTreeItem>* found = AllItems.Find(ClassToSelect))
     {
         TreeView->SetSelection(*found);
 
         // Expand parents
-        TWeakPtr<FSGDynamicTextAssetTypeTreeItem> parent = (*found)->Parent;
+        TWeakPtr<FSGDTATypeTreeItem> parent = (*found)->Parent;
         while (parent.IsValid())
         {
             TreeView->SetItemExpansion(parent.Pin(), true);
@@ -124,7 +124,7 @@ void SSGDynamicTextAssetTypeTree::SelectClass(UClass* ClassToSelect)
     }
 }
 
-TSharedRef<ITableRow> SSGDynamicTextAssetTypeTree::GenerateRow(TSharedPtr<FSGDynamicTextAssetTypeTreeItem> Item, const TSharedRef<STableViewBase>& OwnerTable)
+TSharedRef<ITableRow> SSGDynamicTextAssetTypeTree::GenerateRow(TSharedPtr<FSGDTATypeTreeItem> Item, const TSharedRef<STableViewBase>& OwnerTable)
 {
     const bool bIsInstantiable = Item.IsValid() && Item->bIsInstantiable;
 
@@ -141,7 +141,7 @@ TSharedRef<ITableRow> SSGDynamicTextAssetTypeTree::GenerateRow(TSharedPtr<FSGDyn
         : FText::Format(INVTEXT("(This is a root dynamic text asset type that is abstract and cannot be instantiated directly)\n{0}"),
             Item->Class->GetToolTipText(false));
 
-    return SNew(STableRow<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>, OwnerTable)
+    return SNew(STableRow<TSharedPtr<FSGDTATypeTreeItem>>, OwnerTable)
         .ToolTipText(toolTipText)
     [
         SNew(SHorizontalBox)
@@ -168,7 +168,7 @@ TSharedRef<ITableRow> SSGDynamicTextAssetTypeTree::GenerateRow(TSharedPtr<FSGDyn
     ];
 }
 
-void SSGDynamicTextAssetTypeTree::GetTreeChildren(TSharedPtr<FSGDynamicTextAssetTypeTreeItem> Item, TArray<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>& OutChildren)
+void SSGDynamicTextAssetTypeTree::GetTreeChildren(TSharedPtr<FSGDTATypeTreeItem> Item, TArray<TSharedPtr<FSGDTATypeTreeItem>>& OutChildren)
 {
     if (Item.IsValid())
     {
@@ -176,7 +176,7 @@ void SSGDynamicTextAssetTypeTree::GetTreeChildren(TSharedPtr<FSGDynamicTextAsset
     }
 }
 
-void SSGDynamicTextAssetTypeTree::OnSelectionChanged(TSharedPtr<FSGDynamicTextAssetTypeTreeItem> Item, ESelectInfo::Type SelectInfo)
+void SSGDynamicTextAssetTypeTree::OnSelectionChanged(TSharedPtr<FSGDTATypeTreeItem> Item, ESelectInfo::Type SelectInfo)
 {
     if (OnTypeSelected.IsBound())
     {
@@ -205,9 +205,9 @@ void SSGDynamicTextAssetTypeTree::BuildTreeHierarchy()
     }
 
     // Find root items (direct children of USGDynamicTextAsset and other providers)
-    for (TPair<UClass*, TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>& kvp : AllItems)
+    for (TPair<UClass*, TSharedPtr<FSGDTATypeTreeItem>>& kvp : AllItems)
     {
-        TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& item = kvp.Value;
+        TSharedPtr<FSGDTATypeTreeItem>& item = kvp.Value;
         if (!item->Parent.IsValid())
         {
             // This is a root item if its parent class is USGDynamicTextAsset or not in our map
@@ -221,32 +221,32 @@ void SSGDynamicTextAssetTypeTree::BuildTreeHierarchy()
 
     // Sort root items alphabetically
     RootItems.Sort([]
-        (const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& A, const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& B)
+        (const TSharedPtr<FSGDTATypeTreeItem>& A, const TSharedPtr<FSGDTATypeTreeItem>& B)
     {
         return A->DisplayName.ToString() < B->DisplayName.ToString();
     });
 }
 
-TSharedPtr<FSGDynamicTextAssetTypeTreeItem> SSGDynamicTextAssetTypeTree::FindOrCreateItem(UClass* InClass, TMap<UClass*, TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>& ItemMap)
+TSharedPtr<FSGDTATypeTreeItem> SSGDynamicTextAssetTypeTree::FindOrCreateItem(UClass* InClass, TMap<UClass*, TSharedPtr<FSGDTATypeTreeItem>>& ItemMap)
 {
     if (!InClass)
     {
         return nullptr;
     }
     // Check if already exists
-    if (TSharedPtr<FSGDynamicTextAssetTypeTreeItem>* existing = ItemMap.Find(InClass))
+    if (TSharedPtr<FSGDTATypeTreeItem>* existing = ItemMap.Find(InClass))
     {
         return *existing;
     }
     // Create new item
-    TSharedPtr<FSGDynamicTextAssetTypeTreeItem> newItem = MakeShared<FSGDynamicTextAssetTypeTreeItem>(InClass);
+    TSharedPtr<FSGDTATypeTreeItem> newItem = MakeShared<FSGDTATypeTreeItem>(InClass);
     ItemMap.Add(InClass, newItem);
 
     // Find/create parent
     UClass* parentClass = InClass->GetSuperClass();
     if (parentClass && parentClass->ImplementsInterface(USGDynamicTextAssetProvider::StaticClass()))
     {
-        TSharedPtr<FSGDynamicTextAssetTypeTreeItem> parentItem = FindOrCreateItem(parentClass, ItemMap);
+        TSharedPtr<FSGDTATypeTreeItem> parentItem = FindOrCreateItem(parentClass, ItemMap);
         if (parentItem.IsValid())
         {
             newItem->Parent = parentItem;
@@ -254,7 +254,7 @@ TSharedPtr<FSGDynamicTextAssetTypeTreeItem> SSGDynamicTextAssetTypeTree::FindOrC
 
             // Sort children alphabetically
             parentItem->Children.Sort([]
-                (const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& A, const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& B)
+                (const TSharedPtr<FSGDTATypeTreeItem>& A, const TSharedPtr<FSGDTATypeTreeItem>& B)
             {
                 return A->DisplayName.ToString() < B->DisplayName.ToString();
             });
@@ -276,10 +276,10 @@ void SSGDynamicTextAssetTypeTree::OnTypeSearchTextChanged(const FText& NewText)
         // Auto-expand all filtered items so matches are visible
         if (!TypeSearchText.IsEmpty())
         {
-            TFunction<void(const TArray<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>&)> expandAll =
-                [this, &expandAll](const TArray<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>>& Items)
+            TFunction<void(const TArray<TSharedPtr<FSGDTATypeTreeItem>>&)> expandAll =
+                [this, &expandAll](const TArray<TSharedPtr<FSGDTATypeTreeItem>>& Items)
             {
-                for (const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& item : Items)
+                for (const TSharedPtr<FSGDTATypeTreeItem>& item : Items)
                 {
                     TreeView->SetItemExpansion(item, true);
                     expandAll(item->Children);
@@ -302,9 +302,9 @@ void SSGDynamicTextAssetTypeTree::ApplyTypeFilter()
     }
 
     // Build filtered tree by cloning only matching branches
-    for (const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& rootItem : RootItems)
+    for (const TSharedPtr<FSGDTATypeTreeItem>& rootItem : RootItems)
     {
-        TSharedPtr<FSGDynamicTextAssetTypeTreeItem> filteredItem = FilterTreeItem(rootItem, TypeSearchText);
+        TSharedPtr<FSGDTATypeTreeItem> filteredItem = FilterTreeItem(rootItem, TypeSearchText);
         if (filteredItem.IsValid())
         {
             FilteredRootItems.Add(filteredItem);
@@ -312,7 +312,7 @@ void SSGDynamicTextAssetTypeTree::ApplyTypeFilter()
     }
 }
 
-bool SSGDynamicTextAssetTypeTree::DoesItemMatchFilter(const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& Item, const FString& Filter) const
+bool SSGDynamicTextAssetTypeTree::DoesItemMatchFilter(const TSharedPtr<FSGDTATypeTreeItem>& Item, const FString& Filter) const
 {
     if (!Item.IsValid())
     {
@@ -322,7 +322,7 @@ bool SSGDynamicTextAssetTypeTree::DoesItemMatchFilter(const TSharedPtr<FSGDynami
     return Item->DisplayName.ToString().Contains(Filter, ESearchCase::IgnoreCase);
 }
 
-bool SSGDynamicTextAssetTypeTree::DoesItemOrDescendantMatchFilter(const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& Item, const FString& Filter) const
+bool SSGDynamicTextAssetTypeTree::DoesItemOrDescendantMatchFilter(const TSharedPtr<FSGDTATypeTreeItem>& Item, const FString& Filter) const
 {
     if (!Item.IsValid())
     {
@@ -334,7 +334,7 @@ bool SSGDynamicTextAssetTypeTree::DoesItemOrDescendantMatchFilter(const TSharedP
         return true;
     }
 
-    for (const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& child : Item->Children)
+    for (const TSharedPtr<FSGDTATypeTreeItem>& child : Item->Children)
     {
         if (DoesItemOrDescendantMatchFilter(child, Filter))
         {
@@ -345,7 +345,7 @@ bool SSGDynamicTextAssetTypeTree::DoesItemOrDescendantMatchFilter(const TSharedP
     return false;
 }
 
-TSharedPtr<FSGDynamicTextAssetTypeTreeItem> SSGDynamicTextAssetTypeTree::FilterTreeItem(const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& Source, const FString& Filter) const
+TSharedPtr<FSGDTATypeTreeItem> SSGDynamicTextAssetTypeTree::FilterTreeItem(const TSharedPtr<FSGDTATypeTreeItem>& Source, const FString& Filter) const
 {
     if (!Source.IsValid())
     {
@@ -355,16 +355,16 @@ TSharedPtr<FSGDynamicTextAssetTypeTreeItem> SSGDynamicTextAssetTypeTree::FilterT
     // If this item matches, include it with all its children
     if (DoesItemMatchFilter(Source, Filter))
     {
-        TSharedPtr<FSGDynamicTextAssetTypeTreeItem> copy = MakeShared<FSGDynamicTextAssetTypeTreeItem>(Source->Class.Get());
+        TSharedPtr<FSGDTATypeTreeItem> copy = MakeShared<FSGDTATypeTreeItem>(Source->Class.Get());
         copy->Children = Source->Children;
         return copy;
     }
 
     // Item doesn't match, but check if any descendant does
-    TArray<TSharedPtr<FSGDynamicTextAssetTypeTreeItem>> filteredChildren;
-    for (const TSharedPtr<FSGDynamicTextAssetTypeTreeItem>& child : Source->Children)
+    TArray<TSharedPtr<FSGDTATypeTreeItem>> filteredChildren;
+    for (const TSharedPtr<FSGDTATypeTreeItem>& child : Source->Children)
     {
-        TSharedPtr<FSGDynamicTextAssetTypeTreeItem> filteredChild = FilterTreeItem(child, Filter);
+        TSharedPtr<FSGDTATypeTreeItem> filteredChild = FilterTreeItem(child, Filter);
         if (filteredChild.IsValid())
         {
             filteredChildren.Add(filteredChild);
@@ -377,7 +377,7 @@ TSharedPtr<FSGDynamicTextAssetTypeTreeItem> SSGDynamicTextAssetTypeTree::FilterT
     }
 
     // Include this item as a parent of matching descendants
-    TSharedPtr<FSGDynamicTextAssetTypeTreeItem> copy = MakeShared<FSGDynamicTextAssetTypeTreeItem>(Source->Class.Get());
+    TSharedPtr<FSGDTATypeTreeItem> copy = MakeShared<FSGDTATypeTreeItem>(Source->Class.Get());
     copy->Children = MoveTemp(filteredChildren);
     return copy;
 }

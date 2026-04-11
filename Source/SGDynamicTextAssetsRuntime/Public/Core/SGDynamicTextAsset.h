@@ -20,7 +20,7 @@
  *
  * Key characteristics:
  * - Read-only at runtime (constant data)
- * - Soft references only (no hard references or asset bundles)
+ * - Soft references only (no hard references), with asset bundle support via meta=(AssetBundles="...")
  * - Runtime classes defined in C++ only (usable in Blueprints)
  *
  * Subclasses should:
@@ -47,7 +47,7 @@ class SGDYNAMICTEXTASSETSRUNTIME_API USGDynamicTextAsset : public UObject, publi
     friend class FSGDynamicTextAssetJsonSerializer;
 
 #if WITH_EDITOR
-    friend class FSGDynamicTextAssetIdentityCustomization;
+    friend class FSGDTADetailCustomization;
 #endif
 
 public:
@@ -76,6 +76,11 @@ public:
         const FSGDynamicTextAssetVersion& OldVersion,
         const FSGDynamicTextAssetVersion& CurrentVersion,
         const TSharedPtr<FJsonObject>& OldData) override;
+    virtual const FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData() const override;
+    virtual FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData_Mutable() override;
+    virtual bool HasSGDTAssetBundles() const override;
+    virtual FSGDTAClassId GetAssetBundleExtenderOverride() const override;
+    virtual void SetAssetBundleExtenderOverride(const FSGDTAClassId& InOverride) override;
     // ~ISGDynamicTextAssetProvider interface
 
     /** Returns the version as a formatted string */
@@ -83,27 +88,26 @@ public:
     FString GetVersionString() const;
 
     /**
-     * Returns the FNames of the base metadata UPROPERTY fields: DynamicTextAssetId, UserFacingId, Version.
-     * Used by serializers to exclude these fields from the data block during property iteration.
+     * Returns the FNames of the base metadata UPROPERTY that will have custom editor tooling.
      *
      * Implemented via GET_MEMBER_NAME_CHECKED in SGDynamicTextAsset.cpp so that renaming any
      * of these properties becomes a compile error rather than a silent runtime mismatch.
      */
+    static TSet<FName> GetFileInformationPropertyNames();
+
+    /**
+     * Returns the FNames of the base metadata UPROPERTY that will have custom editor tooling.
+     *
+     * Implemented via GET_MEMBER_NAME_CHECKED in SGDynamicTextAsset.cpp so that renaming any
+     * of these properties becomes a compile error rather than a silent runtime mismatch.
+     */
+    UE_DEPRECATED(5.6, "Use GetFileInformationPropertyNames instead. Will be removed in UE 5.7")
     static TSet<FName> GetMetadataPropertyNames();
 
 protected:
 
     /**
-     * Handles validating soft paths (soft objects and soft classes) properties on this dynamic text asset
-     * with the goal of confirming if they are pointing to a real asset and the path isn't invalid.
-     */
-    void ValidateSoftPathsInProperty(const FProperty* Property,
-        const void* ContainerPtr,
-        const FString& PropertyPath,
-        FSGDynamicTextAssetValidationResult& OutResult) const;
-
-    /**
-     * Called after this dynamic text asset's properties have been populated from JSON.
+     * Called after this dynamic text asset's properties have been populated from the serializer.
      * Override to perform custom initialization or caching.
      */
     UFUNCTION(BlueprintNativeEvent, Category = "Dynamic Text Asset", meta = (DisplayName = "Post Dynamic Text Asset Loaded"))
@@ -121,17 +125,31 @@ protected:
     bool ValidateDynamicTextAsset(FSGDynamicTextAssetValidationResult& OutResult) const;
     virtual bool ValidateDynamicTextAsset_Implementation(FSGDynamicTextAssetValidationResult& OutResult) const { return true; }
 
+    /**
+     * - Optional -
+     * Per-DTA override for the asset bundle extender.
+     *
+     * - Valid: This extender is used instead of the settings-level mapping.
+     * - Invalid: The system falls back to settings configuration.
+     */
+    UPROPERTY(EditAnywhere, Category = "SGDTA|File Information", meta = (SGDTAClassType = "SGDTAAssetBundleExtender"))
+    FSGDTAClassId AssetBundleExtenderOverride;
+
 private:
 
     /** Unique identifier that never changes after creation */
-    UPROPERTY(VisibleAnywhere, Category = "Dynamic Text Asset|Identity", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(VisibleAnywhere, Category = "SGDTA|Identity", meta = (AllowPrivateAccess = "true"))
     FSGDynamicTextAssetId DynamicTextAssetId;
 
     /** Human-readable identifier, can be renamed */
-    UPROPERTY(VisibleAnywhere, Category = "Dynamic Text Asset|Identity", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(VisibleAnywhere, Category = "SGDTA|Identity", meta = (AllowPrivateAccess = "true"))
     FString UserFacingId;
 
     /** Semantic version of this dynamic text asset instance */
-    UPROPERTY(VisibleAnywhere, Category = "Dynamic Text Asset|Identity", meta = (AllowPrivateAccess = "true"))
+    UPROPERTY(VisibleAnywhere, Category = "SGDTA|Identity", meta = (AllowPrivateAccess = "true"))
     FSGDynamicTextAssetVersion Version;
+
+    /** Asset bundle data extracted from soft reference properties with AssetBundles metadata. */
+    UPROPERTY(Transient)
+    FSGDynamicTextAssetBundleData SGDTAssetBundleData;
 };

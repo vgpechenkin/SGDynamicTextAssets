@@ -1,6 +1,6 @@
 // Copyright Start Games, Inc. All Rights Reserved.
 
-#include "Editor/FSGDynamicTextAssetIdCustomization.h"
+#include "Customization/SGDynamicTextAssetIdCustomization.h"
 
 #include "Core/SGDynamicTextAssetId.h"
 #include "DetailWidgetRow.h"
@@ -76,7 +76,7 @@ void FSGDynamicTextAssetIdCustomization::CustomizeChildren(TSharedRef<IPropertyH
 	IDetailChildrenBuilder& ChildBuilder,
 	IPropertyTypeCustomizationUtils& CustomizationUtils)
 {
-	// No children exposed — the ID is displayed inline in the header row
+	// No children exposed  - the ID is displayed inline in the header row
 }
 
 FText FSGDynamicTextAssetIdCustomization::GetIdDisplayText() const

@@ -20,10 +20,12 @@ class FSGDynamicTextAssetCookManifest;
  *   ├── {Id1}.dta.bin
  *   ├── {Id2}.dta.bin
  *   ├── ...
- *   ├── dta_manifest.bin
- *   └── _TypeManifests/
- *       ├── {RootTypeId1}.json
- *       └── {RootTypeId2}.json
+ *   └── _Generated/
+ *       ├── dta_manifest.bin
+ *       ├── DTA_{FrameworkKey}_extenders.dta.bin
+ *       └── _TypeManifests/
+ *           ├── {RootTypeId1}.json
+ *           └── {RootTypeId2}.json
  *
  * @see USGDynamicTextAssetCookCommandlet
  * @see FSGDynamicTextAssetCookManifest
@@ -52,7 +54,7 @@ public:
 
 	/**
 	 * Cooks a single .dta.json file to flat ID-named binary format.
-	 * Extracts metadata (ID, ClassName, UserFacingId) from the JSON,
+	 * Extracts file information (ID, ClassName, UserFacingId) from the JSON,
 	 * converts to compressed binary, writes {Id}.dta.bin to OutputDirectory,
 	 * and adds an entry to the manifest.
 	 *
@@ -93,9 +95,20 @@ public:
 	 * Returns the root directory for cooked dynamic text assets.
 	 * Delegates to FSGDynamicTextAssetFileManager::GetCookedDynamicTextAssetsRootPath().
 	 *
-	 * @return Absolute path to Content/SGDynamicTextAssetsCooked/
+	 * @return Absolute path to Content/_SGDynamicTextAssetsCooked/
 	 */
 	static FString GetCookedOutputRootPath();
+
+	/**
+	 * Scans all DTA files and groups soft reference package names by their AssetBundles
+	 * metadata tag value. Deserializes each DTA into a transient UObject and uses
+	 * FSGDynamicTextAssetBundleData::ExtractFromObject() to collect bundle entries.
+	 * Soft references without AssetBundles metadata are grouped under NAME_None.
+	 *
+	 * @param OutBundlePackages Map of bundle name to array of package names
+	 * @return Total number of unique packages found across all bundles
+	 */
+	static int32 GatherSoftReferencesBySGDTBundle(TMap<FName, TArray<FName>>& OutBundlePackages);
 
 	/**
 	 * Scans all DTA files and gathers soft object/class references from their properties.
@@ -114,7 +127,7 @@ private:
 
 	/**
 	 * Recursively walks a property and collects soft object/class reference package names.
-	 * Handles FSoftObjectProperty, FSoftClassProperty, FStructProperty, FArrayProperty, FMapProperty.
+	 * Handles FSoftObjectProperty, FSoftClassProperty, FStructProperty, FArrayProperty, FMapProperty, FSetProperty.
 	 *
 	 * @param Property The property to inspect
 	 * @param ContainerPtr Pointer to the struct/object containing this property

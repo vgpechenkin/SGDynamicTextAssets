@@ -6,6 +6,7 @@
 #include "Core/ISGDynamicTextAssetProvider.h"
 #include "Core/SGDynamicTextAsset.h"
 #include "Dom/JsonObject.h"
+#include "Engine/AssetManager.h"
 #include "Engine/Engine.h"
 #include "GameFramework/Actor.h"
 #include "GenericPlatform/GenericPlatformFile.h"
@@ -15,6 +16,12 @@
 #include "Management/SGDynamicTextAssetTypeManifest.h"
 #include "Misc/Paths.h"
 #include "SGDynamicTextAssetLogs.h"
+#include "Core/SGDTAClassId.h"
+#include "Management/SGDTAExtenderManifest.h"
+#include "Serialization/AssetBundleExtenders/SGDTAAssetBundleExtender.h"
+#include "Serialization/AssetBundleExtenders/SGDTADefaultAssetBundleExtender.h"
+#include "Serialization/AssetBundleExtenders/SGDTAPerPropertyAssetBundleExtender.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "UObject/UObjectIterator.h"
 
 USGDynamicTextAssetRegistry* USGDynamicTextAssetRegistry::Get()
@@ -42,13 +49,22 @@ void USGDynamicTextAssetRegistry::Initialize(FSubsystemCollectionBase& Collectio
     // Register the base USGDynamicTextAsset class with the registry
     RegisterDynamicTextAssetClass(USGDynamicTextAsset::StaticClass());
 
+    // Create the asset bundle extender framework manifest
+    ExtenderRegistry.GetOrCreateManifest(SGDynamicTextAssetConstants::ASSET_BUNDLE_EXTENDER_FRAMEWORK_KEY);
+
     if (FSGDynamicTextAssetFileManager::ShouldUseCookedDirectory())
     {
-        // Packaged builds: load pre-cooked type manifests from _TypeManifests/
-        LoadCookedManifests();
+        // Packaged builds: defer loading cooked manifests until UAssetManager is ready.
+        // The subsystem initializes before the AssetManager during engine startup,
+        // so we register a callback to load once it becomes available.
+        UAssetManager::CallOrRegister_OnAssetManagerCreated(
+            FSimpleMulticastDelegate::FDelegate::CreateUObject(this, &USGDynamicTextAssetRegistry::LoadCookedManifests));
     }
     else
     {
+        // Load extender manifests from disk and register built-in extenders
+        LoadAndPersistExtenderManifests();
+
         // Editor: discover classes via reflection and sync manifests
         SyncManifests();
     }
@@ -56,11 +72,81 @@ void USGDynamicTextAssetRegistry::Initialize(FSubsystemCollectionBase& Collectio
 
 void USGDynamicTextAssetRegistry::Deinitialize()
 {
+    ExtenderRegistry.ClearAllManifests();
     RootClassManifests.Empty();
     TypeIdToSoftClassMap.Empty();
     ClassToTypeIdMap.Empty();
 
     Super::Deinitialize();
+}
+
+FSGDTASerializerExtenderRegistry& USGDynamicTextAssetRegistry::GetExtenderRegistry()
+{
+    return ExtenderRegistry;
+}
+
+const FSGDTASerializerExtenderRegistry& USGDynamicTextAssetRegistry::GetExtenderRegistry() const
+{
+    return ExtenderRegistry;
+}
+
+void USGDynamicTextAssetRegistry::LoadAndPersistExtenderManifests()
+{
+    const FString directory = FSGDynamicTextAssetFileManager::GetSerializerExtendersPath();
+
+    // Ensure the directory exists
+    IFileManager::Get().MakeDirectory(*directory, true);
+
+    // Load existing manifests from disk
+    ExtenderRegistry.LoadAllManifests(directory);
+
+    // Discover extender classes via reflection and register any that are new
+    TSharedPtr<FSGDTAExtenderManifest> manifest = ExtenderRegistry.GetOrCreateManifest(
+        SGDynamicTextAssetConstants::ASSET_BUNDLE_EXTENDER_FRAMEWORK_KEY);
+    if (manifest.IsValid())
+    {
+        TArray<UClass*> derivedClasses;
+        GetDerivedClasses(USGDTAAssetBundleExtender::StaticClass(), derivedClasses);
+
+        for (UClass* derivedClass : derivedClasses)
+        {
+            if (!derivedClass || derivedClass->HasAnyClassFlags(CLASS_Abstract))
+            {
+                continue;
+            }
+
+            const FString className = derivedClass->GetName();
+            const FSoftObjectPath classPath(derivedClass);
+            const FString classPathStr = classPath.ToString();
+
+            if (const FSGDTASerializerExtenderRegistryEntry* existing = manifest->FindByClassName(className))
+            {
+                // Verify class path is current, update if stale
+                if (existing->Class.ToString() != classPathStr)
+                {
+                    manifest->AddExtender(existing->ExtenderId, TSoftClassPtr<UObject>(classPath));
+                    UE_LOG(LogSGDynamicTextAssetsRuntime, Log,
+                        TEXT("LoadAndPersistExtenderManifests: Updated classPath for '%s': '%s' -> '%s'"),
+                        *className, *existing->Class.ToString(), *classPathStr);
+                }
+            }
+            else
+            {
+                // New extender class discovered, assign a stable ID
+                FSGDTAClassId newId = FSGDTAClassId::NewGeneratedId();
+                manifest->AddExtender(newId, TSoftClassPtr<UObject>(classPath));
+                UE_LOG(LogSGDynamicTextAssetsRuntime, Log,
+                    TEXT("LoadAndPersistExtenderManifests: Discovered new extender '%s', assigned ClassId(%s)"),
+                    *className, *newId.ToString());
+            }
+        }
+    }
+
+    // Save if any manifests were dirtied (first run or new extenders added)
+    if (ExtenderRegistry.HasAnyDirty())
+    {
+        ExtenderRegistry.SaveAllManifests(directory);
+    }
 }
 
 bool USGDynamicTextAssetRegistry::RegisterDynamicTextAssetClass(UClass* DynamicTextAssetClass)
@@ -353,7 +439,13 @@ const FSGDynamicTextAssetTypeManifest* USGDynamicTextAssetRegistry::GetManifestF
 
 void USGDynamicTextAssetRegistry::LoadCookedManifests()
 {
+    // Load binary extender manifests from cooked _Generated/ directory
+    FString generatedDir = FSGDynamicTextAssetFileManager::GetCookedGeneratedPath();
+    ExtenderRegistry.LoadAllManifestsBinary(generatedDir);
+
     FString typeManifestsDir = FSGDynamicTextAssetFileManager::GetCookedTypeManifestsPath();
+
+    FStreamableManager& manager = UAssetManager::Get().GetStreamableManager();
 
     // Find all .json files in _TypeManifests/
     TArray<FString> manifestFilenames;
@@ -373,10 +465,9 @@ void USGDynamicTextAssetRegistry::LoadCookedManifests()
 
         // Identify root class from the manifest's root type ID
         UClass* rootClass = nullptr;
-        const FSGDynamicTextAssetTypeManifestEntry* rootEntry = manifest->FindByTypeId(manifest->GetRootTypeId());
-        if (rootEntry)
+        if (const FSGDynamicTextAssetTypeManifestEntry* rootEntry = manifest->FindByTypeId(manifest->GetRootTypeId()))
         {
-            rootClass = rootEntry->Class.LoadSynchronous();
+            rootClass = manager.LoadSynchronous(rootEntry->Class);
         }
 
         // Store manifest keyed by root class for GetManifestForRootClass()
@@ -634,9 +725,9 @@ void USGDynamicTextAssetRegistry::SyncManifests()
 
 FString USGDynamicTextAssetRegistry::GetRootClassManifestFilePath(const UClass* RootClass)
 {
-    const FString rootFolder = FSGDynamicTextAssetFileManager::GetFolderPathForClass(RootClass);
+    const FString typeManifestsDir = FPaths::Combine(FSGDynamicTextAssetFileManager::GetInternalFilesRootPath(), TEXT("TypeManifests"));
     const FString manifestFileName = RootClass->GetName() + TEXT("_TypeManifest.json");
-    return FPaths::Combine(rootFolder, manifestFileName);
+    return FPaths::Combine(typeManifestsDir, manifestFileName);
 }
 
 void USGDynamicTextAssetRegistry::ApplyServerTypeOverrides(const TSharedPtr<FJsonObject>& ServerData)
@@ -670,27 +761,23 @@ void USGDynamicTextAssetRegistry::ApplyServerTypeOverrides(const TSharedPtr<FJso
     }
 
     int32 appliedCount = 0;
-    for (const auto& [rootTypeIdString, value] : (*manifestsObject)->Values)
+    for (const TPair<FString, TSharedPtr<FJsonValue>>& serverEntry : (*manifestsObject)->Values)
     {
-        FSGDynamicTextAssetTypeId rootTypeId = FSGDynamicTextAssetTypeId::FromString(rootTypeIdString);
-        if (!rootTypeId.IsValid())
+        const FString& rootTypeId = serverEntry.Key;
+        const TSharedPtr<FJsonObject> rootData = serverEntry.Value.IsValid() ? serverEntry.Value->AsObject() : nullptr;
+        if (!rootData.IsValid())
         {
-            UE_LOG(LogSGDynamicTextAssetsRuntime, Warning,
-                TEXT("ApplyServerTypeOverrides: Invalid root type ID '%s'"), *rootTypeIdString);
             continue;
         }
 
-        // Find the manifest matching this root type ID
-        for (auto& [classWeak, manifest] : RootClassManifests)
+        // Find the matching manifest by root type ID
+        for (TPair<TWeakObjectPtr<UClass>, TSharedPtr<FSGDynamicTextAssetTypeManifest>>& manifestEntry : RootClassManifests)
         {
-            if (manifest.IsValid() && manifest->GetRootTypeId() == rootTypeId)
+            if (manifestEntry.Value.IsValid()
+                && manifestEntry.Value->GetRootTypeId() == FSGDynamicTextAssetTypeId::FromString(rootTypeId))
             {
-                TSharedPtr<FJsonObject> rootData = value->AsObject();
-                if (rootData.IsValid())
-                {
-                    manifest->ApplyServerOverrides(rootData);
-                    appliedCount++;
-                }
+                manifestEntry.Value->ApplyServerOverrides(rootData);
+                appliedCount++;
                 break;
             }
         }
@@ -709,11 +796,11 @@ void USGDynamicTextAssetRegistry::ApplyServerTypeOverrides(const TSharedPtr<FJso
 void USGDynamicTextAssetRegistry::ClearServerTypeOverrides()
 {
     bool bHadOverrides = false;
-    for (auto& [classWeak, manifest] : RootClassManifests)
+    for (TPair<TWeakObjectPtr<UClass>, TSharedPtr<FSGDynamicTextAssetTypeManifest>>& pair : RootClassManifests)
     {
-        if (manifest.IsValid() && manifest->HasServerOverrides())
+        if (pair.Value.IsValid() && pair.Value->HasServerOverrides())
         {
-            manifest->ClearServerOverrides();
+            pair.Value->ClearServerOverrides();
             bHadOverrides = true;
         }
     }
@@ -731,9 +818,9 @@ void USGDynamicTextAssetRegistry::ClearServerTypeOverrides()
 
 bool USGDynamicTextAssetRegistry::HasServerTypeOverrides() const
 {
-    for (const auto& [classWeak, manifest] : RootClassManifests)
+    for (const TPair<TWeakObjectPtr<UClass>, TSharedPtr<FSGDynamicTextAssetTypeManifest>>& pair : RootClassManifests)
     {
-        if (manifest.IsValid() && manifest->HasServerOverrides())
+        if (pair.Value.IsValid() && pair.Value->HasServerOverrides())
         {
             return true;
         }
@@ -746,25 +833,83 @@ void USGDynamicTextAssetRegistry::RebuildTypeIdMaps()
     TypeIdToSoftClassMap.Empty();
     ClassToTypeIdMap.Empty();
 
-    for (const auto& [classWeak, manifest] : RootClassManifests)
+    FStreamableManager& manager = UAssetManager::Get().GetStreamableManager();
+
+    for (const TPair<TWeakObjectPtr<UClass>, TSharedPtr<FSGDynamicTextAssetTypeManifest>>& pair : RootClassManifests)
     {
-        if (!manifest.IsValid())
+        if (!pair.Value.IsValid())
         {
             continue;
         }
 
         TArray<FSGDynamicTextAssetTypeManifestEntry> effectiveEntries;
-        manifest->GetAllEffectiveTypes(effectiveEntries);
+        pair.Value->GetAllEffectiveTypes(effectiveEntries);
 
         for (const FSGDynamicTextAssetTypeManifestEntry& entry : effectiveEntries)
         {
             TypeIdToSoftClassMap.Add(entry.TypeId, entry.Class);
 
-            UClass* resolvedClass = entry.Class.LoadSynchronous();
-            if (resolvedClass)
+            if (UClass* resolvedClass = manager.LoadSynchronous(entry.Class))
             {
                 ClassToTypeIdMap.Add(resolvedClass, entry.TypeId);
             }
         }
     }
+}
+
+USGDTAAssetBundleExtender* USGDynamicTextAssetRegistry::GetOrCreateAssetBundleExtender(
+    const FSGDTAClassId& ExtenderClassId)
+{
+    if (!ExtenderClassId.IsValid())
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
+            TEXT("USGDynamicTextAssetRegistry::GetOrCreateAssetBundleExtender: Inputted invalid ExtenderClassId"));
+        return nullptr;
+    }
+
+    // Check cache before resolving via manifest
+    if (TObjectPtr<USGDTAAssetBundleExtender>* existing = CachedAssetBundleExtenders.Find(ExtenderClassId))
+    {
+        if (existing->Get())
+        {
+            return existing->Get();
+        }
+    }
+
+    // Resolve ClassId to soft class pointer via the asset bundle extender manifest
+    TSharedPtr<FSGDTAExtenderManifest> manifest =
+        ExtenderRegistry.GetManifest(SGDynamicTextAssetConstants::ASSET_BUNDLE_EXTENDER_FRAMEWORK_KEY);
+    if (!manifest.IsValid())
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
+            TEXT("USGDynamicTextAssetRegistry::GetOrCreateAssetBundleExtender: Asset bundle extender manifest is not available"));
+        return nullptr;
+    }
+
+    const TSoftClassPtr<UObject> softClass = manifest->GetSoftClassPtr(ExtenderClassId);
+    if (softClass.IsNull())
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
+            TEXT("USGDynamicTextAssetRegistry::GetOrCreateAssetBundleExtender: No manifest entry found for ClassId '%s'"),
+            *ExtenderClassId.ToString());
+        return nullptr;
+    }
+
+    UClass* loadedClass = UAssetManager::Get().GetStreamableManager().LoadSynchronous(softClass);
+    if (!loadedClass)
+    {
+        UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
+            TEXT("USGDynamicTextAssetRegistry::GetOrCreateAssetBundleExtender: Failed to load extender class '%s'"),
+            *softClass.ToString());
+        return nullptr;
+    }
+
+    USGDTAAssetBundleExtender* newInstance = NewObject<USGDTAAssetBundleExtender>(this, loadedClass);
+    CachedAssetBundleExtenders.Add(ExtenderClassId, newInstance);
+
+    UE_LOG(LogSGDynamicTextAssetsRuntime, Verbose,
+        TEXT("USGDynamicTextAssetRegistry: Created asset bundle extender instance for class '%s'"),
+        *loadedClass->GetName());
+
+    return newInstance;
 }

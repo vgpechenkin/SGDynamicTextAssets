@@ -3,13 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
+
 #include "Core/SGDynamicTextAssetId.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
+
+#include "Core/SGDTASerializerFormat.h"
 
 class USGDynamicTextAsset;
 class FSGDynamicTextAssetCookManifest;
 class ISGDynamicTextAssetSerializer;
 
-struct FSGDynamicTextAssetFileMetadata;
+struct FSGDynamicTextAssetFileInfo;
 
 DECLARE_DELEGATE_RetVal_FourParams(FString, FSGDataGenerateDefaultContentDelegate, const UClass*,
     const FSGDynamicTextAssetId&, const FString&, TSharedRef<ISGDynamicTextAssetSerializer>);
@@ -66,7 +70,7 @@ public:
      * @param Extension File extension to use (defaults to JSON)
      * @return Full absolute path with extension
      */
-    static FString BuildFilePath(const UClass* DynamicTextAssetClass, const FString& UserFacingId, const FString& Extension = DEFAULT_TEXT_EXTENSION);
+    static FString BuildFilePath(const UClass* DynamicTextAssetClass, const FString& UserFacingId, const FString& Extension = SGDynamicTextAssetConstants::JSON_FILE_EXTENSION);
 
     /**
      * Builds the relative file path (from Content directory) for a dynamic text asset.
@@ -76,7 +80,7 @@ public:
      * @param Extension File extension to use (defaults to JSON)
      * @return Relative path with extension
      */
-    static FString BuildRelativeFilePath(const UClass* DynamicTextAssetClass, const FString& UserFacingId, const FString& Extension = DEFAULT_TEXT_EXTENSION);
+    static FString BuildRelativeFilePath(const UClass* DynamicTextAssetClass, const FString& UserFacingId, const FString& Extension = SGDynamicTextAssetConstants::JSON_FILE_EXTENSION);
 
     /**
      * Finds all dynamic text asset files of a given class.
@@ -120,13 +124,13 @@ public:
     static FString SanitizeUserFacingId(const FString& UserFacingId);
 
     /**
-     * Extracts metadata from a dynamic text asset file without fully loading it.
-     * Reads only the header/metadata section of the JSON.
-     * 
+     * Extracts file information from a dynamic text asset file without fully loading it.
+     * Reads only the header/file information section of the file.
+     *
      * @param FilePath Absolute path to the file
-     * @return Metadata struct (check bIsValid)
+     * @return File info struct (check bIsValid)
      */
-    static FSGDynamicTextAssetFileMetadata ExtractMetadataFromFile(const FString& FilePath);
+    static FSGDynamicTextAssetFileInfo ExtractFileInfoFromFile(const FString& FilePath);
 
     /**
      * Ensures the folder structure exists for a given class.
@@ -140,18 +144,22 @@ public:
     /**
      * Reads raw file contents from a dynamic text asset file.
      * For binary (.dta.bin) files the payload is decompressed before returning, and
-     * the serializer TypeId embedded in the binary header is written to OutSerializerTypeId.
-     * For plain text files (e.g. .dta.json) OutSerializerTypeId is set to 0.
-     * Pass the TypeId to FindSerializerForTypeId() to obtain the correct deserializer.
+     * the serializer format embedded in the binary header is written to OutSerializerFormat.
+     * For plain text files (e.g. .dta.json) OutSerializerFormat is set to invalid.
+     * Pass the format to FindSerializerForFormat() to obtain the correct deserializer.
      *
      * @param FilePath             Absolute path to the file
-     * @param OutContents          Output string — always a text payload after return
-     * @param OutSerializerTypeId  For binary files: TypeId from the binary header.
-     *                             For text files: 0. Pass nullptr to ignore.
+     * @param OutContents          Output string - always a text payload after return
+     * @param OutSerializerFormat  For binary files: format from the binary header.
+     *                             For text files: invalid. Pass nullptr to ignore.
      * @return True if file was read successfully
      */
     static bool ReadRawFileContents(const FString& FilePath, FString& OutContents,
-        uint32* OutSerializerTypeId = nullptr);
+        FSGDTASerializerFormat* OutSerializerFormat = nullptr);
+
+    UE_DEPRECATED(5.6, "Use ReadRawFileContents with FSGDTASerializerFormat* instead. Will be removed in UE 5.7")
+    static bool ReadRawFileContents(const FString& FilePath, FString& OutContents,
+        uint32* OutSerializerTypeId);
 
     /**
      * Writes raw file contents to a dynamic text asset file.
@@ -213,11 +221,11 @@ public:
      * Converts a dynamic text asset file from one format to another.
      * Reads the source file, deserializes into an in-memory provider instance,
      * re-serializes using the target format's serializer, writes the new file,
-     * and deletes the old file. All metadata (GUID, UserFacingId, Version,
+     * and deletes the old file. All file information (GUID, UserFacingId, Version,
      * AssetTypeId) is preserved through the round-trip.
      *
      * Source control operations (mark-for-add, mark-for-delete) are NOT handled
-     * by this method — the caller is responsible for managing source control state.
+     * by this method  - the caller is responsible for managing source control state.
      *
      * @param SourceFilePath   Absolute path to the source file
      * @param TargetExtension  Target format extension (e.g., ".dta.xml", ".dta.yaml")
@@ -246,16 +254,36 @@ public:
     static bool FindFileForId(const FSGDynamicTextAssetId& Id, FString& OutFilePath, const UClass* SearchClass = nullptr);
 
     /**
+     * Returns the root directory for internal plugin files (manifests, extender configs, etc.).
+     * Separate from the asset data directory to avoid scanner interference.
+     * @return Absolute path to Content/_SGDynamicTextAssets/
+     */
+    static FString GetInternalFilesRootPath();
+
+    /**
      * Returns the root directory for cooked dynamic text assets.
-     * @return Absolute path to Content/SGDynamicTextAssetsCooked/
+     * @return Absolute path to Content/_SGDynamicTextAssetsCooked/
      */
     static FString GetCookedDynamicTextAssetsRootPath();
 
     /**
+     * Returns the path to the generated metadata subdirectory within the cooked output.
+     * Contains the cook manifest, extender manifests, and type manifests.
+     * @return Absolute path to Content/_SGDynamicTextAssetsCooked/_Generated/
+     */
+    static FString GetCookedGeneratedPath();
+
+    /**
      * Returns the path to the cooked type manifests subdirectory.
-     * @return Absolute path to Content/SGDynamicTextAssetsCooked/_TypeManifests/
+     * @return Absolute path to Content/_SGDynamicTextAssetsCooked/_Generated/_TypeManifests/
      */
     static FString GetCookedTypeManifestsPath();
+
+    /**
+     * Returns the absolute path to the serializer extender manifests directory.
+     * @return Absolute path to Content/_SGDynamicTextAssets/SerializerExtenders/
+     */
+    static FString GetSerializerExtendersPath();
 
     /**
      * Builds the full file path for a cooked binary file using its Id.
@@ -315,21 +343,27 @@ public:
     static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForExtension(FStringView Extension);
 
     /**
-     * Finds a registered serializer by its integer type ID.
+     * Finds a registered serializer by its format identifier.
      * Used when loading binary (.dta.bin) files to route the payload to the correct deserializer.
      *
-     * @param TypeId The serializer type ID stored in the binary file header
+     * @param Format The serializer format to look up
      * @return The serializer, or nullptr if not found
      */
+    static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForFormat(FSGDTASerializerFormat Format);
+
+    UE_DEPRECATED(5.6, "Use FindSerializerForFormat instead. Will be removed in UE 5.7")
     static TSharedPtr<ISGDynamicTextAssetSerializer> FindSerializerForTypeId(uint32 TypeId);
 
     /**
-     * Returns the integer TypeId for the serializer registered under the given file extension.
-     * Returns 0 if no serializer is registered for that extension.
-     * Use this to convert a known extension string to a binary-format TypeId.
+     * Returns the serializer format for the serializer registered under the given file extension.
+     * Returns an invalid format if no serializer is registered for that extension.
      *
-     * @param Extension File extension without leading dot (e.g., "dta.json")
+     * @param Extension File extension (e.g., ".dta.json")
+     * @return The serializer format, or invalid if not found
      */
+    static FSGDTASerializerFormat GetFormatForExtension(const FString& Extension);
+
+    UE_DEPRECATED(5.6, "Use GetFormatForExtension instead. Will be removed in UE 5.7")
     static uint32 GetTypeIdForExtension(const FString& Extension);
 
     /**
@@ -387,12 +421,6 @@ public:
      */
     static FSGDataGenerateDefaultContentDelegate ON_GENERATE_DEFAULT_CONTENT;
 
-    /** File extension for dynamic text assets (includes dot) as the text file. Currently using JSON. */
-    static const FString DEFAULT_TEXT_EXTENSION;
-
-    /** File extension for binary dynamic text assets (includes dot) */
-    static const FString BINARY_EXTENSION;
-
     /** Relative root directory (from Content). */
     static const FString DEFAULT_RELATIVE_ROOT_PATH;
 
@@ -415,7 +443,7 @@ private:
     /** Registered serializers keyed by file extension (case-insensitive) */
     static TMap<FString, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS;
 
-    /** Registered serializers keyed by integer type ID — used for binary file routing */
-    static TMap<uint32, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS_BY_ID;
+    /** Registered serializers keyed by format identifier - used for binary file routing */
+    static TMap<FSGDTASerializerFormat, TSharedRef<ISGDynamicTextAssetSerializer>> REGISTERED_SERIALIZERS_BY_FORMAT;
 };
 

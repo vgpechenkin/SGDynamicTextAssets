@@ -6,6 +6,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Widgets/SWidget.h"
 #include "Management/SGDynamicTextAssetFileManager.h"
+#include "Statics/SGDynamicTextAssetConstants.h"
 #include "SGDynamicTextAssetEditorLogs.h"
 #include "WorkspaceMenuStructure.h"
 #include "WorkspaceMenuStructureModule.h"
@@ -19,7 +20,7 @@ bool USGDynamicTextAssetEditorStatics::CreateDynamicTextAsset(TSubclassOf<USGDyn
 		return false;
 	}
 
-	return FSGDynamicTextAssetFileManager::CreateDynamicTextAssetFile(DynamicTextAssetClass, UserFacingId, FSGDynamicTextAssetFileManager::DEFAULT_TEXT_EXTENSION, OutId, OutFilePath);
+	return FSGDynamicTextAssetFileManager::CreateDynamicTextAssetFile(DynamicTextAssetClass, UserFacingId, SGDynamicTextAssetConstants::JSON_FILE_EXTENSION, OutId, OutFilePath);
 }
 
 bool USGDynamicTextAssetEditorStatics::RenameDynamicTextAsset(const FString& SourceFilePath, const FString& NewUserFacingId, FString& OutNewFilePath)

@@ -6,6 +6,8 @@
 
 #include "Core/ISGDynamicTextAssetProvider.h"
 #include "Core/SGDynamicTextAssetId.h"
+#include "Core/SGDTASerializerFormat.h"
+#include "Engine/StreamableManager.h"
 #include "Server/ISGDynamicTextAssetServerInterface.h"
 #include "UObject/ScriptInterface.h"
 #include "Subsystems/GameInstanceSubsystem.h"
@@ -14,7 +16,10 @@
 #include "SGDynamicTextAssetSubsystem.generated.h"
 
 class FJsonObject;
+
 class USGDynamicTextAsset;
+
+struct FSGDynamicTextAssetBundleData;
 
 /**
  * Wrapper for a set of tracked UClass references used by instanced sub-objects.
@@ -22,7 +27,7 @@ class USGDynamicTextAsset;
  * (e.g., TMap<Id, TSet<UClass*>>).
  */
 USTRUCT()
-struct FSGTrackedInstancedClasses
+struct FSGDTATrackedInstancedClasses
 {
     GENERATED_BODY()
 public:
@@ -38,7 +43,7 @@ public:
  * trigger GC, log diagnostics, or pre-load replacements.
  */
 USTRUCT(BlueprintType)
-struct FSGInstancedClassReleaseContext
+struct FSGDTAInstancedClassReleaseContext
 {
     GENERATED_BODY()
 public:
@@ -63,7 +68,7 @@ public:
  */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
     FOnInstancedClassesReleased,
-    const FSGInstancedClassReleaseContext&, Context);
+    const FSGDTAInstancedClassReleaseContext&, Context);
 
 /**
  * Game Instance Subsystem for loading and caching dynamic text assets at runtime.
@@ -240,6 +245,64 @@ public:
     int32 GetPendingAsyncLoadCount() const { return PendingAsyncLoads.GetValue(); }
 
     /**
+     * Async-loads all referenced assets for a specific bundle on a single DTA.
+     * Retrieves the cached provider via GetDynamicTextAsset(Id), extracts paths
+     * from GetSGDTAssetBundleData().GetPathsForBundle(), and uses
+     * FStreamableManager to async-load them.
+     *
+     * @param Id The unique identifier of the DTA to load bundles for
+     * @param BundleName The bundle name to load (e.g., "Visual", "Audio")
+     * @param OnComplete Callback invoked when all assets in the bundle are loaded
+     * @return True if an async load was initiated
+     */
+    bool LoadSGDTAssetBundle(const FSGDynamicTextAssetId& Id,
+        FName BundleName,
+        FStreamableDelegate OnComplete = FStreamableDelegate());
+
+    /**
+     * Async-loads all referenced assets for a named bundle across every cached DTA.
+     * Iterates all cached providers in LoadedObjects, collects paths for the
+     * named bundle, and batch-loads them via FStreamableManager.
+     *
+     * @param BundleName The bundle name to load across all cached DTAs
+     * @param OnComplete Callback invoked when all assets are loaded
+     * @return Number of DTAs that had matching bundles
+     */
+    int32 LoadSGDTAssetBundleForAll(FName BundleName,
+        FStreamableDelegate OnComplete = FStreamableDelegate());
+
+    /**
+     * Returns a pointer to the cached provider's bundle data for a given DTA Id.
+     * Returns nullptr if the DTA is not cached.
+     *
+     * @param Id The unique identifier of the DTA
+     * @return Pointer to the bundle data, or nullptr if not cached
+     */
+    const FSGDynamicTextAssetBundleData* GetSGDTAssetBundleData(const FSGDynamicTextAssetId& Id) const;
+
+    /**
+     * Blueprint-accessible version that copies the bundle data into an out parameter.
+     *
+     * @param Id The unique identifier of the DTA
+     * @param OutBundleData The bundle data for this DTA (only valid if return is true)
+     * @return True if the DTA was cached and bundle data was retrieved
+     */
+    UFUNCTION(BlueprintPure, Category = "Dynamic Text Asset|Bundles")
+    bool GetSGDTAssetBundleDataCopy(const FSGDynamicTextAssetId& Id,
+        FSGDynamicTextAssetBundleData& OutBundleData) const;
+
+    /**
+     * Gathers all soft object paths for a named bundle across all cached providers.
+     * Appends to OutPaths without clearing it first.
+     *
+     * @param BundleName The bundle name to collect paths for
+     * @param OutPaths Array to append soft object paths to
+     */
+    UFUNCTION(BlueprintPure, Category = "Dynamic Text Asset|Bundles")
+    void GetAllPathsForSGDTBundle(FName BundleName,
+        TArray<FSoftObjectPath>& OutPaths) const;
+
+    /**
      * Applies server-provided type overrides to the type registry.
      * Routes the JSON data to the appropriate manifests and rebuilds type lookup maps.
      * No-op in editor builds (server overlay is runtime-only).
@@ -333,7 +396,7 @@ protected:
 
     /**
      * Server interface for remote dynamic text asset operations.
-     * Always valid — either a real implementation or USGDynamicTextAssetServerNullInterface.
+     * Always valid  - either a real implementation or USGDynamicTextAssetServerNullInterface.
      */
     UPROPERTY(Transient)
     TObjectPtr<USGDynamicTextAssetServerInterface> ServerInterface = nullptr;
@@ -356,7 +419,7 @@ private:
      * Populated after deserialization, cleaned up on cache removal.
      */
     UPROPERTY(Transient)
-    TMap<FSGDynamicTextAssetId, FSGTrackedInstancedClasses> TrackedInstancedClasses;
+    TMap<FSGDynamicTextAssetId, FSGDTATrackedInstancedClasses> TrackedInstancedClasses;
 
     /**
      * Reference count per instanced object UClass across all cached DTAs.
@@ -382,14 +445,14 @@ private:
      * @param FilePath          Absolute path to the source file
      * @param ClassPtr          Class to instantiate for the dynamic text asset
      * @param TextPayload      Text payload read on the background thread (decompressed if binary)
-     * @param SerializerTypeId  TypeId from binary header (non-zero) or 0 for plain text files
+     * @param SerializerFormat  Format from binary header (valid) or default-constructed for plain text files
      * @param bReadSuccess      True if the file read succeeded
      * @param OnComplete        Delegate invoked with the loaded provider (or empty on failure)
      */
     void Internal_LoadDynamicTextAssetFromFileAsync_GameThread(const FString& FilePath,
         const UClass* ClassPtr,
         const FString& TextPayload,
-        uint32 SerializerTypeId,
+        FSGDTASerializerFormat SerializerFormat,
         const bool& bReadSuccess,
         const FOnDynamicTextAssetLoaded& OnComplete);
 };

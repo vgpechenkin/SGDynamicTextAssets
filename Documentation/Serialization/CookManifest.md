@@ -9,7 +9,7 @@ The cook manifest (`dta_manifest.bin`) maps IDs to class names, asset type IDs, 
 ## File Location
 
 ```
-Content/SGDynamicTextAssetsCooked/dta_manifest.bin
+Content/SGDynamicTextAssetsCooked/_Generated/dta_manifest.bin
 ```
 
 ## Binary Format
@@ -147,7 +147,7 @@ The manifest is lazy-loaded at runtime via `FSGDynamicTextAssetFileManager::GetC
 
 - `FindFileForId()`: O(1) lookup to build the binary file path from an ID.
 - `FindAllFilesForClass()`: Class-based filtering without scanning the file system.
-- `ExtractMetadataFromFile()`: Quick metadata access without decompressing binaries.
+- `ExtractFileInfoFromFile()`: Quick file info access without decompressing binaries.
 
 In editor builds, `GetCookManifest()` returns `nullptr`: the editor uses direct file system scanning instead.
 

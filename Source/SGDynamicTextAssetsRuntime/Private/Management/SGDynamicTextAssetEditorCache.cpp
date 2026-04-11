@@ -8,6 +8,7 @@
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Management/SGDynamicTextAssetRegistry.h"
 #include "SGDynamicTextAssetLogs.h"
+#include "Core/SGDTASerializerFormat.h"
 #include "Serialization/SGDynamicTextAssetSerializer.h"
 #include "Editor.h"
 
@@ -154,8 +155,8 @@ TScriptInterface<ISGDynamicTextAssetProvider> FSGDynamicTextAssetEditorCache::In
 
 	// Step 2: Read raw file contents
 	FString textPayload;
-	uint32 serializerTypeId = ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID;
-	if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, textPayload, &serializerTypeId))
+	FSGDTASerializerFormat serializerFormat;
+	if (!FSGDynamicTextAssetFileManager::ReadRawFileContents(filePath, textPayload, &serializerFormat))
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
 			TEXT("FSGDynamicTextAssetEditorCache: Failed to read file FilePath(%s)"), *filePath);
@@ -164,8 +165,8 @@ TScriptInterface<ISGDynamicTextAssetProvider> FSGDynamicTextAssetEditorCache::In
 
 	// Step 3: Find the appropriate serializer
 	TSharedPtr<ISGDynamicTextAssetSerializer> serializer =
-		(serializerTypeId != ISGDynamicTextAssetSerializer::INVALID_SERIALIZER_TYPE_ID)
-		? FSGDynamicTextAssetFileManager::FindSerializerForTypeId(serializerTypeId)
+		serializerFormat.IsValid()
+		? FSGDynamicTextAssetFileManager::FindSerializerForFormat(serializerFormat)
 		: FSGDynamicTextAssetFileManager::FindSerializerForFile(filePath);
 	if (!serializer.IsValid())
 	{
@@ -174,35 +175,33 @@ TScriptInterface<ISGDynamicTextAssetProvider> FSGDynamicTextAssetEditorCache::In
 		return emptyProvider;
 	}
 
-	// Step 4: Extract metadata to resolve the class
-	FSGDynamicTextAssetId metadataId;
-	FString metadataClassName, metadataUserId, metadataVersion;
-	FSGDynamicTextAssetTypeId metadataAssetTypeId;
-	if (!serializer->ExtractMetadata(textPayload, metadataId, metadataClassName, metadataUserId, metadataVersion, metadataAssetTypeId))
+	// Step 4: Extract file information to resolve the class
+	FSGDynamicTextAssetFileInfo cacheMeta;
+	if (!serializer->ExtractFileInfo(textPayload, cacheMeta))
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
-			TEXT("FSGDynamicTextAssetEditorCache: Failed to extract metadata from FilePath(%s)"), *filePath);
+			TEXT("FSGDynamicTextAssetEditorCache: Failed to extract file info from FilePath(%s)"), *filePath);
 		return emptyProvider;
 	}
 
 	// Step 5: Resolve the class (TypeId first, fallback to className)
 	UClass* dynamicTextAssetClass = nullptr;
-	if (metadataAssetTypeId.IsValid())
+	if (cacheMeta.AssetTypeId.IsValid())
 	{
 		if (USGDynamicTextAssetRegistry* registry = USGDynamicTextAssetRegistry::Get())
 		{
-			dynamicTextAssetClass = registry->ResolveClassForTypeId(metadataAssetTypeId);
+			dynamicTextAssetClass = registry->ResolveClassForTypeId(cacheMeta.AssetTypeId);
 		}
 	}
-	if (!dynamicTextAssetClass && !metadataClassName.IsEmpty())
+	if (!dynamicTextAssetClass && !cacheMeta.ClassName.IsEmpty())
 	{
-		dynamicTextAssetClass = FindFirstObject<UClass>(*metadataClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
+		dynamicTextAssetClass = FindFirstObject<UClass>(*cacheMeta.ClassName, EFindFirstObjectOptions::EnsureIfAmbiguous);
 	}
 	if (!dynamicTextAssetClass)
 	{
 		UE_LOG(LogSGDynamicTextAssetsRuntime, Error,
 			TEXT("FSGDynamicTextAssetEditorCache: Could not resolve class for Id(%s) ClassName(%s) TypeId(%s)"),
-			*Id.ToString(), *metadataClassName, *metadataAssetTypeId.ToString());
+			*Id.ToString(), *cacheMeta.ClassName, *cacheMeta.AssetTypeId.ToString());
 		return emptyProvider;
 	}
 

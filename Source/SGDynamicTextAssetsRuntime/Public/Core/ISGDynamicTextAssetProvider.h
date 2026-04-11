@@ -4,9 +4,11 @@
 
 #include "CoreMinimal.h"
 
+#include "Core/SGDTAClassId.h"
 #include "Core/SGDynamicTextAssetId.h"
 #include "Core/SGDynamicTextAssetVersion.h"
 #include "Core/SGDynamicTextAssetValidationResult.h"
+#include "Core/SGDynamicTextAssetBundleData.h"
 #include "Dom/JsonObject.h"
 #include "SGDynamicTextAssetDelegates.h"
 #include "UObject/Interface.h"
@@ -118,7 +120,7 @@ public:
 	 * @param OutResult Container to populate with validation entries
 	 * @return True if no error-severity entries were produced
 	 */
-	virtual bool Native_ValidateDynamicTextAsset(FSGDynamicTextAssetValidationResult& OutResult) const = 0;
+	virtual bool Native_ValidateDynamicTextAsset(FSGDynamicTextAssetValidationResult& OutResult) const;
 
 	/**
 	 * Called when loading data from an older version.
@@ -137,6 +139,31 @@ public:
 		const FSGDynamicTextAssetVersion& OldVersion,
 		const FSGDynamicTextAssetVersion& CurrentVersion,
 		const TSharedPtr<FJsonObject>& OldData) = 0;
+
+	/** Returns the asset bundle data extracted from this provider's soft reference properties. */
+	virtual const FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData() const = 0;
+
+	/** Returns a mutable reference to the asset bundle data. */
+	virtual FSGDynamicTextAssetBundleData& GetSGDTAssetBundleData_Mutable() = 0;
+
+	/** Returns true if this provider has any asset bundles. */
+	virtual bool HasSGDTAssetBundles() const;
+
+	/**
+	 * Returns the per-DTA asset bundle extender override class ID.
+	 * When valid, this extender takes priority over the settings mapping.
+	 * Default: returns FSGDTAClassId::INVALID_CLASS_ID (no override).
+	 */
+	virtual FSGDTAClassId GetAssetBundleExtenderOverride() const;
+
+	/**
+	 * Sets the per-DTA asset bundle extender override class ID.
+	 * Called during deserialization when the file information block contains
+	 * an "assetBundleExtender" field. Default implementation is a no-op.
+	 *
+	 * @param InOverride The ClassId identifying the extender to use for this asset
+	 */
+	virtual void SetAssetBundleExtenderOverride(const FSGDTAClassId& InOverride);
 
 #if WITH_EDITOR
 	/** Notifies listeners that this dynamic text asset has changed */
