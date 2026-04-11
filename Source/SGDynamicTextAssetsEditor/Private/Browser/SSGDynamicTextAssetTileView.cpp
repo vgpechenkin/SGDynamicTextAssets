@@ -16,11 +16,13 @@
 #include "HAL/PlatformApplicationMisc.h"
 #include "Misc/MessageDialog.h"
 #include "ReferenceViewer/SGDynamicTextAssetReferenceSubsystem.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Views/STableRow.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SSpacer.h"
+#include "Styling/AppStyle.h"
 
 FText FSGDTAAssetListItem::GetDisplayName() const
 {
@@ -254,8 +256,27 @@ TSharedRef<ITableRow> SSGDynamicTextAssetTileView::GenerateRow(TSharedPtr<FSGDTA
             .VAlign(VAlign_Center)
             .Padding(2.0f, 0.0f)
             [
-                SNew(SSGDynamicTextAssetIcon)
-                .Serializer(weakSerializer)
+                SNew(SOverlay)
+
+                + SOverlay::Slot()
+                [
+                    SNew(SSGDynamicTextAssetIcon)
+                    .Serializer(weakSerializer)
+                ]
+
+                + SOverlay::Slot()
+                .HAlign(HAlign_Left)
+                .VAlign(VAlign_Top)
+                [
+                    SNew(SImage)
+                    .Image(FAppStyle::GetBrush("ContentBrowser.ContentDirty"))
+                    .Visibility_Lambda([Item]()
+                    {
+                        return FSGDynamicTextAssetEditorToolkit::HasOpenEditorWithUnsavedChanges(Item->FilePath)
+                            ? EVisibility::HitTestInvisible
+                            : EVisibility::Collapsed;
+                    })
+                ]
             ]
 
             // Name and class

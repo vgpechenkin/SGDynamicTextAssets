@@ -35,6 +35,7 @@
 #include "Management/SGDynamicTextAssetFileManager.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Widgets/Notifications/SNotificationList.h"
+#include "Interfaces/IMainFrameModule.h"
 
 #define LOCTEXT_NAMESPACE "FSGDynamicTextAssetsEditorModule"
 
@@ -127,12 +128,28 @@ public:
                 });
             }
         });
+
+        // Register shutdown hook so unsaved DTA changes prompt a save dialog before the editor closes
+        if (FModuleManager::Get().IsModuleLoaded("MainFrame"))
+        {
+            IMainFrameModule& mainFrameModule = FModuleManager::LoadModuleChecked<IMainFrameModule>("MainFrame");
+            CanCloseEditorDelegateHandle = mainFrameModule.RegisterCanCloseEditor(
+                IMainFrameModule::FMainFrameCanCloseEditor::CreateStatic(&FSGDynamicTextAssetEditorToolkit::HandleCanCloseEditor));
+        }
     }
 
     /** Called when the module is unloaded from memory. */
     virtual void ShutdownModule() override
     {
         UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("SGDynamicTextAssetsEditor module shutdown"));
+
+        // Unregister shutdown save dialog hook
+        if (CanCloseEditorDelegateHandle.IsValid() && FModuleManager::Get().IsModuleLoaded("MainFrame"))
+        {
+            IMainFrameModule& mainFrameModule = FModuleManager::LoadModuleChecked<IMainFrameModule>("MainFrame");
+            mainFrameModule.UnregisterCanCloseEditor(CanCloseEditorDelegateHandle);
+            CanCloseEditorDelegateHandle.Reset();
+        }
 
         // Unsubscribe from cook delegates
         UE::Cook::FDelegates::CookStarted.Remove(CookStartedHandle);
@@ -648,6 +665,9 @@ private:
 
     /** Handle for the ModifyCook delegate subscription (soft reference cook inclusion) */
     FDelegateHandle ModifyCookHandle;
+
+    /** Handle for the CanCloseEditor delegate (DTA shutdown save dialog) */
+    FDelegateHandle CanCloseEditorDelegateHandle;
 };
 
 #undef LOCTEXT_NAMESPACE

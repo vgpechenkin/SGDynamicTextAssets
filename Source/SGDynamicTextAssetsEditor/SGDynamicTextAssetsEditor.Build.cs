@@ -36,7 +36,8 @@ public class SGDynamicTextAssetsEditor : ModuleRules
             "LevelEditor",
             "WorkspaceMenuStructure",
             "ToolWidgets",
-            "ClassViewer"
+            "ClassViewer",
+            "MainFrame"
         });
     }
 }

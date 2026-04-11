@@ -10,6 +10,8 @@
 #include "Editor.h"
 #include "Editor/SGDynamicTextAssetBundleRowExtension.h"
 #include "Editor/SGDynamicTextAssetEditorCommands.h"
+#include "Editor/SSGDynamicTextAssetSaveDialog.h"
+#include "Interfaces/IMainFrameModule.h"
 #include "Editor/SSGDynamicTextAssetRawView.h"
 #include "Framework/Docking/TabManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
@@ -30,6 +32,7 @@
 #include "Utilities/SGDynamicTextAssetSourceControl.h"
 #include "Utilities/SGDynamicTextAssetEditorStatics.h"
 #include "Widgets/Docking/SDockTab.h"
+#include "Widgets/SWindow.h"
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SHyperlink.h"
@@ -41,6 +44,7 @@
 
 // Static deduplication map definition
 TMap<FString, TWeakPtr<FSGDynamicTextAssetEditorToolkit>> FSGDynamicTextAssetEditorToolkit::OPEN_EDITORS;
+TMap<FString, FSGDynamicTextAssetEditorToolkit::FDirtyObjectCacheEntry> FSGDynamicTextAssetEditorToolkit::DIRTY_OBJECT_CACHE;
 
 FSGDynamicTextAssetEditorToolkit::FSGDynamicTextAssetEditorToolkit()
 {
@@ -51,6 +55,15 @@ FSGDynamicTextAssetEditorToolkit::~FSGDynamicTextAssetEditorToolkit()
     if (GEditor)
     {
         GEditor->UnregisterForUndo(this);
+    }
+
+    // Cache the dirty object so it survives GC until the editor is reopened or changes are discarded
+    if (!FilePath.IsEmpty() && bHasUnsavedChanges && EditedDynamicTextAssetStrong.IsValid())
+    {
+        DIRTY_OBJECT_CACHE.Add(FilePath, FDirtyObjectCacheEntry{
+            MoveTemp(EditedDynamicTextAssetStrong),
+            LoadedFileFormatVersion
+        });
     }
 
     if (!FilePath.IsEmpty())
@@ -243,8 +256,26 @@ void FSGDynamicTextAssetEditorToolkit::InitEditor(EToolkitMode::Type Mode,
     DetailsView->OnFinishedChangingProperties().AddSP(
         this, &FSGDynamicTextAssetEditorToolkit::OnPropertyChanged);
 
-    // Load data from disk, need to do this first to avoid dependent UI not having any data loaded
-    LoadFromFile();
+    // Check for a cached dirty object from a previously closed editor
+    if (FDirtyObjectCacheEntry* cachedEntry = DIRTY_OBJECT_CACHE.Find(FilePath))
+    {
+        EditedDynamicTextAssetStrong = MoveTemp(cachedEntry->Object);
+        EditedDynamicTextAsset = EditedDynamicTextAssetStrong.Get();
+        LoadedFileFormatVersion = cachedEntry->LoadedFileFormatVersion;
+        DIRTY_OBJECT_CACHE.Remove(FilePath);
+
+        if (DetailsView.IsValid())
+        {
+            DetailsView->SetObject(EditedDynamicTextAsset);
+        }
+
+        bHasUnsavedChanges = true;
+    }
+    else
+    {
+        // Load data from disk, need to do this first to avoid dependent UI not having any data loaded
+        LoadFromFile();
+    }
 
     // Build the default layout: Details area and RawView Stacked
     // Don't forget to increment the version number if its layout is changed due to editor caching!
@@ -395,6 +426,9 @@ void FSGDynamicTextAssetEditorToolkit::ConstructParentClassHyperlink()
 
 bool FSGDynamicTextAssetEditorToolkit::LoadFromFile()
 {
+    // Clear any cached dirty object for this file (Revert should always read from disk)
+    DIRTY_OBJECT_CACHE.Remove(FilePath);
+
     if (FilePath.IsEmpty())
     {
         UE_LOG(LogSGDynamicTextAssetsEditor, Error, TEXT("Cannot load: empty file path"));
@@ -494,7 +528,7 @@ bool FSGDynamicTextAssetEditorToolkit::LoadFromFile()
     return true;
 }
 
-bool FSGDynamicTextAssetEditorToolkit::SaveToFile()
+bool FSGDynamicTextAssetEditorToolkit::SaveToFile(bool bSkipValidation)
 {
     if (!EditedDynamicTextAsset)
     {
@@ -516,58 +550,61 @@ bool FSGDynamicTextAssetEditorToolkit::SaveToFile()
         return false;
     }
 
-    FSGDynamicTextAssetValidationResult validationResult;
-    if (!provider->Native_ValidateDynamicTextAsset(validationResult))
+    if (!bSkipValidation)
     {
-        FString errorMessage = TEXT("Validation failed with the following issues:\n\n");
-        errorMessage += validationResult.ToFormattedString();
-        errorMessage += TEXT("\nPlease fix the error(s) before saving.");
-
-        for (const FSGDynamicTextAssetValidationEntry& error : validationResult.Errors)
+        FSGDynamicTextAssetValidationResult validationResult;
+        if (!provider->Native_ValidateDynamicTextAsset(validationResult))
         {
+            FString errorMessage = TEXT("Validation failed with the following issues:\n\n");
+            errorMessage += validationResult.ToFormattedString();
+            errorMessage += TEXT("\nPlease fix the error(s) before saving.");
+
+            for (const FSGDynamicTextAssetValidationEntry& error : validationResult.Errors)
+            {
+                UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+                    TEXT("Validation error for '%s' [%s]: %s"),
+                    *provider->GetUserFacingId(),
+                    *error.PropertyPath,
+                    *error.Message.ToString());
+            }
+
             UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
-                TEXT("Validation error for '%s' [%s]: %s"),
+                TEXT("Cannot save '%s' (%s): validation failed with %d issue(s)"),
                 *provider->GetUserFacingId(),
-                *error.PropertyPath,
-                *error.Message.ToString());
-        }
+                *provider->GetDynamicTextAssetId().ToString(),
+                validationResult.GetTotalCount());
 
-        UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
-            TEXT("Cannot save '%s' (%s): validation failed with %d issue(s)"),
-            *provider->GetUserFacingId(),
-            *provider->GetDynamicTextAssetId().ToString(),
-            validationResult.GetTotalCount());
+            FMessageDialog::Open(EAppMsgType::Ok,
+                FText::FromString(errorMessage),
+                INVTEXT("Validation Failed"));
 
-        FMessageDialog::Open(EAppMsgType::Ok,
-            FText::FromString(errorMessage),
-            INVTEXT("Validation Failed"));
-
-        return false;
-    }
-
-    // Show warnings to the user and let them decide whether to proceed
-    if (validationResult.HasWarnings())
-    {
-        for (const FSGDynamicTextAssetValidationEntry& warning : validationResult.Warnings)
-        {
-            UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
-                TEXT("Validation warning for '%s' [%s]: %s"),
-                *provider->GetUserFacingId(),
-                *warning.PropertyPath,
-                *warning.Message.ToString());
-        }
-
-        FString warningMessage = TEXT("Validation produced the following warnings:\n\n");
-        warningMessage += validationResult.ToFormattedString();
-        warningMessage += TEXT("\nDo you want to save anyway?");
-
-        EAppReturnType::Type userChoice = FMessageDialog::Open(EAppMsgType::YesNo,
-            FText::FromString(warningMessage),
-            INVTEXT("Validation Warnings"));
-
-        if (userChoice != EAppReturnType::Yes)
-        {
             return false;
+        }
+
+        // Show warnings to the user and let them decide whether to proceed
+        if (validationResult.HasWarnings())
+        {
+            for (const FSGDynamicTextAssetValidationEntry& warning : validationResult.Warnings)
+            {
+                UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+                    TEXT("Validation warning for '%s' [%s]: %s"),
+                    *provider->GetUserFacingId(),
+                    *warning.PropertyPath,
+                    *warning.Message.ToString());
+            }
+
+            FString warningMessage = TEXT("Validation produced the following warnings:\n\n");
+            warningMessage += validationResult.ToFormattedString();
+            warningMessage += TEXT("\nDo you want to save anyway?");
+
+            EAppReturnType::Type userChoice = FMessageDialog::Open(EAppMsgType::YesNo,
+                FText::FromString(warningMessage),
+                INVTEXT("Validation Warnings"));
+
+            if (userChoice != EAppReturnType::Yes)
+            {
+                return false;
+            }
         }
     }
 
@@ -633,6 +670,7 @@ bool FSGDynamicTextAssetEditorToolkit::SaveToFile()
     }
 
     MarkClean();
+    DIRTY_OBJECT_CACHE.Remove(FilePath);
     RefreshRawView();
 
     // Incrementally update the project info cache with this file's format version
@@ -650,6 +688,297 @@ bool FSGDynamicTextAssetEditorToolkit::SaveToFile()
 
     UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("Saved dynamic text asset to: %s"), *FilePath);
     return true;
+}
+
+bool FSGDynamicTextAssetEditorToolkit::HandleCanCloseEditor()
+{
+    // Collect all dirty DTAs from open editors and the dirty object cache
+    TSharedRef<SSGDynamicTextAssetSaveDialog> dialog = SNew(SSGDynamicTextAssetSaveDialog);
+    bool bHasAnyDirty = false;
+
+    // From open editors
+    for (const TPair<FString, TWeakPtr<FSGDynamicTextAssetEditorToolkit>>& pair : OPEN_EDITORS)
+    {
+        TSharedPtr<FSGDynamicTextAssetEditorToolkit> toolkit = pair.Value.Pin();
+        if (toolkit.IsValid() && toolkit->HasUnsavedChanges())
+        {
+            FString assetName = TEXT("Unknown");
+            FString typeName = TEXT("Unknown");
+            if (ISGDynamicTextAssetProvider* provider = Cast<ISGDynamicTextAssetProvider>(toolkit->EditedDynamicTextAsset))
+            {
+                assetName = provider->GetUserFacingId();
+            }
+            if (toolkit->EditedDynamicTextAsset)
+            {
+                typeName = toolkit->EditedDynamicTextAsset->GetClass()->GetName();
+            }
+
+            FString relativePath;
+            FString contentDir = FPaths::ProjectContentDir();
+            if (pair.Key.StartsWith(contentDir))
+            {
+                relativePath = pair.Key.RightChop(contentDir.Len());
+            }
+            else
+            {
+                relativePath = FPaths::GetCleanFilename(pair.Key);
+            }
+
+            dialog->AddItem(assetName, relativePath, typeName, pair.Key);
+            bHasAnyDirty = true;
+        }
+    }
+
+    // From dirty object cache (closed editors with unsaved changes)
+    for (const TPair<FString, FDirtyObjectCacheEntry>& pair : DIRTY_OBJECT_CACHE)
+    {
+        FString assetName = TEXT("Unknown");
+        FString typeName = TEXT("Unknown");
+        if (pair.Value.Object.IsValid())
+        {
+            if (ISGDynamicTextAssetProvider* provider = Cast<ISGDynamicTextAssetProvider>(pair.Value.Object.Get()))
+            {
+                assetName = provider->GetUserFacingId();
+            }
+            typeName = pair.Value.Object->GetClass()->GetName();
+        }
+
+        FString relativePath;
+        FString contentDir = FPaths::ProjectContentDir();
+        if (pair.Key.StartsWith(contentDir))
+        {
+            relativePath = pair.Key.RightChop(contentDir.Len());
+        }
+        else
+        {
+            relativePath = FPaths::GetCleanFilename(pair.Key);
+        }
+
+        dialog->AddItem(assetName, relativePath, typeName, pair.Key);
+        bHasAnyDirty = true;
+    }
+
+    // No dirty DTAs, allow close
+    if (!bHasAnyDirty)
+    {
+        return true;
+    }
+
+    // Show modal dialog
+    TSharedRef<SWindow> modalWindow = SNew(SWindow)
+        .Title(INVTEXT("Save Content"))
+        .ClientSize(FVector2D(640, 492))
+        .SupportsMinimize(false)
+        .SupportsMaximize(false);
+
+    modalWindow->SetContent(dialog);
+    dialog->SetParentWindow(modalWindow);
+
+    GEditor->EditorAddModalWindow(modalWindow);
+
+    switch (dialog->GetResult())
+    {
+        case ESGDTASaveDialogResult::SaveSelected:
+        {
+            TArray<TSharedPtr<FSGDTASaveDialogItem>> checkedItems = dialog->GetCheckedItems();
+
+            // Phase 1: Pre-validate all checked items and separate into passed/failed
+            TArray<TSharedPtr<FSGDTASaveDialogItem>> validItems;
+            int32 validationFailCount = 0;
+
+            for (const TSharedPtr<FSGDTASaveDialogItem>& item : checkedItems)
+            {
+                if (!item.IsValid())
+                {
+                    continue;
+                }
+
+                // Find the provider for this item (from open editor or dirty cache)
+                ISGDynamicTextAssetProvider* provider = nullptr;
+
+                TWeakPtr<FSGDynamicTextAssetEditorToolkit>* editorEntry = OPEN_EDITORS.Find(item->AbsoluteFilePath);
+                if (editorEntry)
+                {
+                    TSharedPtr<FSGDynamicTextAssetEditorToolkit> toolkit = editorEntry->Pin();
+                    if (toolkit.IsValid() && toolkit->EditedDynamicTextAsset)
+                    {
+                        provider = Cast<ISGDynamicTextAssetProvider>(toolkit->EditedDynamicTextAsset);
+                    }
+                }
+
+                if (!provider)
+                {
+                    if (FDirtyObjectCacheEntry* cachedEntry = DIRTY_OBJECT_CACHE.Find(item->AbsoluteFilePath))
+                    {
+                        if (cachedEntry->Object.IsValid())
+                        {
+                            provider = Cast<ISGDynamicTextAssetProvider>(cachedEntry->Object.Get());
+                        }
+                    }
+                }
+
+                if (!provider)
+                {
+                    UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+                        TEXT("Shutdown save: no provider found for %s, skipping"), *item->AbsoluteFilePath);
+                    continue;
+                }
+
+                FSGDynamicTextAssetValidationResult validationResult;
+                if (provider->Native_ValidateDynamicTextAsset(validationResult))
+                {
+                    validItems.Add(item);
+                }
+                else
+                {
+                    validationFailCount++;
+                    UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+                        TEXT("Shutdown save: validation failed for '%s' (%s) with %d issue(s)"),
+                        *provider->GetUserFacingId(),
+                        *item->AbsoluteFilePath,
+                        validationResult.GetTotalCount());
+
+                    for (const FSGDynamicTextAssetValidationEntry& error : validationResult.Errors)
+                    {
+                        UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+                            TEXT("  Validation error [%s]: %s"),
+                            *error.PropertyPath,
+                            *error.Message.ToString());
+                    }
+                }
+            }
+
+            // Phase 2: Save all items that passed validation (skip re-validation)
+            int32 writeFailCount = 0;
+
+            for (const TSharedPtr<FSGDTASaveDialogItem>& item : validItems)
+            {
+                bool bSaved = false;
+
+                // Try saving via open editor first
+                if (TWeakPtr<FSGDynamicTextAssetEditorToolkit>* editorEntry = OPEN_EDITORS.Find(item->AbsoluteFilePath))
+                {
+                    TSharedPtr<FSGDynamicTextAssetEditorToolkit> toolkit = editorEntry->Pin();
+                    if (toolkit.IsValid() && toolkit->HasUnsavedChanges())
+                    {
+                        bSaved = toolkit->SaveToFile(true);
+                        if (!bSaved)
+                        {
+                            writeFailCount++;
+                            UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+                                TEXT("Shutdown save: failed to save open editor for %s"), *item->AbsoluteFilePath);
+                        }
+                        continue;
+                    }
+                }
+
+                // Save cached dirty objects that have no open editor
+                if (FDirtyObjectCacheEntry* cachedEntry = DIRTY_OBJECT_CACHE.Find(item->AbsoluteFilePath))
+                {
+                    if (cachedEntry->Object.IsValid())
+                    {
+                        if (ISGDynamicTextAssetProvider* provider = Cast<ISGDynamicTextAssetProvider>(cachedEntry->Object.Get()))
+                        {
+                            TSharedPtr<ISGDynamicTextAssetSerializer> serializer =
+                                FSGDynamicTextAssetFileManager::FindSerializerForFile(item->AbsoluteFilePath);
+                            if (serializer.IsValid())
+                            {
+                                FString serializedContents;
+                                if (serializer->SerializeProvider(provider, serializedContents)
+                                    && FSGDynamicTextAssetFileManager::WriteRawFileContents(item->AbsoluteFilePath, serializedContents))
+                                {
+                                    bSaved = true;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!bSaved)
+                    {
+                        writeFailCount++;
+                        UE_LOG(LogSGDynamicTextAssetsEditor, Warning,
+                            TEXT("Shutdown save: failed to write cached DTA %s"), *item->AbsoluteFilePath);
+                    }
+                }
+            }
+
+            // Phase 3: Handle validation failures
+            if (validationFailCount > 0)
+            {
+                FString message = FString::Printf(
+                    TEXT("%d asset(s) failed validation and could not be saved.\n"
+                         "Refer to the log or re-run validation for details.\n\n"
+                         "Assets that passed validation have been saved.\n\n"
+                         "Discard changes to the failed asset(s) and close the editor?"),
+                    validationFailCount);
+
+                EAppReturnType::Type choice = FMessageDialog::Open(EAppMsgType::YesNo,
+                    FText::FromString(message),
+                    INVTEXT("Validation Failed"));
+
+                if (choice != EAppReturnType::Yes)
+                {
+                    // User chose Don't Discard - cancel shutdown so they can fix validation
+                    return false;
+                }
+            }
+
+            // Phase 4: Handle write failures
+            if (writeFailCount > 0)
+            {
+                FString message = FString::Printf(
+                    TEXT("%d file(s) failed to save properly.\n"
+                         "Please refer to logs for information on the failure reason.\n\n"
+                         "Continue closing editor?"),
+                    writeFailCount);
+
+                EAppReturnType::Type choice = FMessageDialog::Open(EAppMsgType::YesNo,
+                    FText::FromString(message),
+                    INVTEXT("Save Failed"));
+
+                if (choice != EAppReturnType::Yes)
+                {
+                    return false;
+                }
+            }
+
+            // Clear all cached dirty objects (saved or intentionally discarded)
+            DIRTY_OBJECT_CACHE.Empty();
+
+            // Mark all open dirty editors clean so they close without re-caching in the destructor
+            for (const TPair<FString, TWeakPtr<FSGDynamicTextAssetEditorToolkit>>& pair : OPEN_EDITORS)
+            {
+                TSharedPtr<FSGDynamicTextAssetEditorToolkit> toolkit = pair.Value.Pin();
+                if (toolkit.IsValid() && toolkit->HasUnsavedChanges())
+                {
+                    toolkit->MarkClean();
+                }
+            }
+
+            return true;
+        }
+        case ESGDTASaveDialogResult::DontSave:
+        {
+            // Discard all unsaved changes
+            DIRTY_OBJECT_CACHE.Empty();
+
+            for (const TPair<FString, TWeakPtr<FSGDynamicTextAssetEditorToolkit>>& pair : OPEN_EDITORS)
+            {
+                TSharedPtr<FSGDynamicTextAssetEditorToolkit> toolkit = pair.Value.Pin();
+                if (toolkit.IsValid() && toolkit->HasUnsavedChanges())
+                {
+                    toolkit->MarkClean();
+                }
+            }
+
+            return true;
+        }
+        // ESGDTASaveDialogResult::Cancelled
+        default:
+        {
+            return false;
+        }
+    }
 }
 
 bool FSGDynamicTextAssetEditorToolkit::CanSaveAsset() const
@@ -835,6 +1164,12 @@ void FSGDynamicTextAssetEditorToolkit::NotifyFileRenamed(const FString& OldFileP
     toolkit->FilePath = NewFilePath;
     OPEN_EDITORS.Add(NewFilePath, toolkit);
 
+    // Update dirty object cache key if it exists
+    if (FDirtyObjectCacheEntry cachedEntry; DIRTY_OBJECT_CACHE.RemoveAndCopyValue(OldFilePath, cachedEntry))
+    {
+        DIRTY_OBJECT_CACHE.Add(NewFilePath, MoveTemp(cachedEntry));
+    }
+
     // Reload UserFacingId from the renamed file's file info
     if (ISGDynamicTextAssetProvider* provider = Cast<ISGDynamicTextAssetProvider>(toolkit->EditedDynamicTextAsset))
     {
@@ -867,6 +1202,7 @@ void FSGDynamicTextAssetEditorToolkit::NotifyFileDeleted(const FString& InFilePa
 
     // Remove before CloseWindow so the destructor's OPEN_EDITORS.Remove is a harmless no-op
     OPEN_EDITORS.Remove(InFilePath);
+    DIRTY_OBJECT_CACHE.Remove(InFilePath);
     toolkit->CloseWindow(EAssetEditorCloseReason::AssetUnloadingOrInvalid);
 
     UE_LOG(LogSGDynamicTextAssetsEditor, Log, TEXT("NotifyFileDeleted: closed editor for %s"), *InFilePath);
@@ -875,18 +1211,17 @@ void FSGDynamicTextAssetEditorToolkit::NotifyFileDeleted(const FString& InFilePa
 bool FSGDynamicTextAssetEditorToolkit::HasOpenEditorWithUnsavedChanges(const FString& InFilePath)
 {
     TWeakPtr<FSGDynamicTextAssetEditorToolkit>* existing = OPEN_EDITORS.Find(InFilePath);
-    if (!existing || !existing->IsValid())
+    if (existing && existing->IsValid())
     {
-        return false;
+        TSharedPtr<FSGDynamicTextAssetEditorToolkit> toolkit = existing->Pin();
+        if (toolkit.IsValid())
+        {
+            return toolkit->HasUnsavedChanges();
+        }
     }
 
-    TSharedPtr<FSGDynamicTextAssetEditorToolkit> toolkit = existing->Pin();
-    if (!toolkit.IsValid())
-    {
-        return false;
-    }
-
-    return toolkit->HasUnsavedChanges();
+    // Also check the dirty object cache for closed-but-dirty editors
+    return DIRTY_OBJECT_CACHE.Contains(InFilePath);
 }
 
 bool FSGDynamicTextAssetEditorToolkit::SaveOpenEditor(const FString& InFilePath)
