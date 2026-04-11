@@ -135,6 +135,13 @@ public:
      */
     static bool SaveOpenEditor(const FString& FilePath);
 
+    /**
+     * Registered with IMainFrameModule::RegisterCanCloseEditor to intercept editor shutdown.
+     * Collects all dirty DTAs (open editors + cached dirty objects), shows a modal save dialog,
+     * and returns false to block shutdown if the user cancels.
+     */
+    static bool HandleCanCloseEditor();
+
     /** Returns the absolute path of the file being edited. */
     const FString& GetFilePath() const { return FilePath; }
 
@@ -163,7 +170,13 @@ private:
     /** Loads the dynamic text asset from FilePath into EditedDynamicTextAsset. */
     bool LoadFromFile();
 
-    bool SaveToFile();
+    /**
+     * Saves the in-memory dynamic text asset to its JSON file on disk.
+     *
+     * @param bSkipValidation  If true, bypasses validation and warning dialogs.
+     *                         Used during shutdown saves where validation is handled externally.
+     */
+    bool SaveToFile(bool bSkipValidation = false);
 
     void MarkDirty();
     void MarkClean();
@@ -211,4 +224,14 @@ private:
 
     /** Weak references to all currently open toolkits, keyed by file path. */
     static TMap<FString, TWeakPtr<FSGDynamicTextAssetEditorToolkit>> OPEN_EDITORS;
+
+    /** Entry for caching a dirty UObject when an editor tab is closed with unsaved changes. */
+    struct FDirtyObjectCacheEntry
+    {
+        TStrongObjectPtr<UObject> Object;
+        FSGDynamicTextAssetVersion LoadedFileFormatVersion;
+    };
+
+    /** Cached dirty objects for editors that were closed with unsaved changes. Keyed by file path. */
+    static TMap<FString, FDirtyObjectCacheEntry> DIRTY_OBJECT_CACHE;
 };
